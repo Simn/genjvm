@@ -189,18 +189,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		match self#get_exception_kind t with
 		| ExcAll ->
 			code#get_stack#push (self#vtype t);
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			TObject((["java";"lang"],"Throwable"),[])
 		| ExcString ->
 			code#get_stack#push exception_sig;
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			let offset = pool#add_field throwable_path "getMessage" "()Ljava/lang/String;" false in
 			code#invokevirtual offset throwable_sig [] [string_sig];
 			exception_sig
 		| ExcOther ->
 			let t = self#vtype t in
 			code#get_stack#push t;
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			t
 
 	method wrap_exception t f =
@@ -403,7 +403,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			term && term'
 		) true rl in
 		jm#set_terminated term;
-		if not term then ignore(jm#add_stack_frame);
+		if not term then jm#add_stack_frame;
 
 	method int_switch ret e1 cases def =
 		self#texpr RValue e1;
@@ -446,13 +446,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				offset_def
 			| Some e ->
 				offset_def := code#get_fp - !offset_def;
-				ignore(jm#add_stack_frame);
+				jm#add_stack_frame;
 				self#texpr ret e;
 				self#maybe_make_jump
 		in
 		let rl = List.map (fun (rl,e) ->
 			let was_terminated = restore() in
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			List.iter (fun r -> r := code#get_fp - !r) rl;
 			self#texpr ret e;
 			was_terminated,self#maybe_make_jump
@@ -918,7 +918,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#switch ret e1 cases def
 		| TWhile(e1,e2,flag) -> (* TODO: do-while *)
 			(* TODO: could optimize a bit *)
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			let fp = code#get_fp in
 			let old_continue = continue in
 			continue <- fp;
@@ -932,7 +932,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			pop_scope();
 			ignore(restore());
 			jump_then := code#get_fp - !jump_then;
-			ignore(jm#add_stack_frame);
+			jm#add_stack_frame;
 			let fp' = code#get_fp in
 			List.iter (fun r -> r := fp' - !r) breaks;
 			continue <- old_continue;

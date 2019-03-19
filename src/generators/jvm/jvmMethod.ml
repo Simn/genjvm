@@ -62,16 +62,18 @@ class builder jc api name jsig = object(self)
 		)
 
 	method add_stack_frame =
-		let locals = Array.of_list (List.map (fun (init,_,t) ->
+		let locals = List.map (fun (init,_,t) ->
 			match !init with
 			| None -> JvmVerificationTypeInfo.VTop
 			| _ -> JvmVerificationTypeInfo.of_signature jc#get_pool t
-		) (List.rev locals)) in
-		let astack = Array.of_list (List.map (JvmVerificationTypeInfo.of_signature jc#get_pool) (List.rev code#get_stack#get_stack)) in
-		let r = ref code#get_fp in
+		) locals in
+		let astack = List.map (JvmVerificationTypeInfo.of_signature jc#get_pool) (code#get_stack#get_stack) in
+		let r = code#get_fp in
 		let ff = (r,locals,astack) in
-		stack_frames <- ff :: stack_frames;
-		r
+		(* If we already have a frame at the same position, overwrite it. This can happen in the case of nested branches. *)
+		stack_frames <- (match stack_frames with
+			| (r',_,_) :: stack_frames when r' = r -> ff :: stack_frames
+			| _ -> ff :: stack_frames)
 
 	method add_exception (exc : jvm_exception) =
 		exceptions <- exc :: exceptions
@@ -172,13 +174,13 @@ class builder jc api name jsig = object(self)
 		if not self#is_terminated then code#goto r_then;
 		jump_then := code#get_fp - !jump_then;
 		let term1 = restore() in
-		ignore(self#add_stack_frame);
+		self#add_stack_frame;
 		let pop = self#push_scope in
 		f_else();
 		pop();
 		self#set_terminated (term1 && self#is_terminated);
 		r_then := code#get_fp - !r_then;
-		if not self#is_terminated then ignore(self#add_stack_frame)
+		if not self#is_terminated then self#add_stack_frame
 
 	method if_then f_if (f_then : unit -> unit) =
 		let jump_then = f_if () in
@@ -188,7 +190,7 @@ class builder jc api name jsig = object(self)
 		pop();
 		ignore(restore());
 		jump_then := code#get_fp - !jump_then;
-		ignore(self#add_stack_frame)
+		self#add_stack_frame
 
 	method add_local (name : string) t (init_state : var_init_state) =
 		let slot = local_offset in
@@ -250,14 +252,9 @@ class builder jc api name jsig = object(self)
 
 	method get_stack_map_table =
 		let stack_map = List.fold_left (fun (last,acc) (offset,locals,stack) ->
-			let cur = !offset - last - 1 in
-			let entry = StackFull(cur,locals,stack) in
-			(* TODO: this is super dodgy. If we have nested branches, we want to use the outermost stack frame
-			   in the end. This should be handled earlier so we don't have to do this weird "merge" here. *)
-			if cur < 0 then begin match acc with
-				| StackFull (cur,_,_) :: tl -> (!offset,(StackFull(cur,locals,stack) :: tl))
-				| _ -> assert false
-			end else (!offset,entry :: acc)
+			let cur = offset - last - 1 in
+			let entry = StackFull(cur,Array.of_list (List.rev locals),Array.of_list (List.rev stack)) in
+			(offset,entry :: acc)
 		) (-1,[]) (List.rev stack_frames) in
 		Array.of_list (List.rev (snd stack_map))
 
