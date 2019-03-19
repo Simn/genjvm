@@ -1,3 +1,4 @@
+import haxe.ds.StringMap;
 import haxe.PosInfos;
 import java.lang.System;
 
@@ -19,6 +20,7 @@ class Main {
 		testAssignment();
 		testOps();
 		testIntArray();
+		testStringMap();
 		System.out.print("Done! ");
 		System.out.print(numTests);
 		System.out.print(" tests with ");
@@ -82,13 +84,17 @@ class Main {
 		eq(-11, ~a);
 
 		// boolean
-		// TODO: these are a bit awkward
-		// var b = true;
-		// eq(false, !b);
-		// eq(false, b && false);
-		// eq(true, b || false);
+		var b = true;
+		eq(false, !b);
+		eq(false, b && false);
+		eq(true, b || false);
 
-		// TODO: comparison, same problem
+		eq(true, a > 5);
+		eq(true, a >= 5);
+		eq(false, a < 5);
+		eq(false, a <= 5);
+		eq(true, a != 5);
+		eq(false, a != 10);
 	}
 
 	function testIntArray() {
@@ -150,7 +156,8 @@ class Main {
 		eq(2, f[3]);
 		eq(3, f[4]);
 
-		f.remove(5);
+		eq(false, f.remove(99));
+		eq(true, f.remove(5));
 		eq(4, f.length);
 		eq(4, f[0]);
 		eq(1, f[1]);
@@ -199,6 +206,17 @@ class Main {
 		eq(9, j[5]);
 
 		// TODO: toString and join
+	}
+
+	function testStringMap() {
+		var sm = new StringMap();
+		eq(null, sm.get("foo")); // TODO This fails with a null pointer unless -D no_map_cache
+		eq(false, sm.exists("foo"));
+		sm.set("foo", 12);
+		eq(true, sm.exists("foo"));
+		eq(12, sm.get("foo"));
+		sm.remove("foo");
+		eq(null, sm.get("foo"));
 	}
 
 	// has to be inline at the moment because TObjectDecl for PosInfos doesn't work yet

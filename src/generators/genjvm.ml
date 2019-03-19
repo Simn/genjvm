@@ -501,7 +501,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method do_compare op =
 		match code#get_stack#get_stack_items 2 with
-		| [TInt;TInt] ->
+		| [TInt | TByte | TChar | TBool;TInt | TByte | TChar | TBool] ->
 			(fun () -> code#if_icmp_ref op)
 		| [t2;TObject((["java";"lang"],"String"),[]) as t1] ->
 			(* TODO: We need a slow compare if java.lang.Object is involved because it could refer to String *)
