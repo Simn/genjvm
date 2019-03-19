@@ -1,0 +1,4 @@
+-cp src
+-main Main
+-D jvm
+-java export
