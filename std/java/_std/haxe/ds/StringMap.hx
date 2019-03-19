@@ -279,7 +279,7 @@ import java.NativeArray;
 			this.hashes = newHash;
 			this.nBuckets = newNBuckets;
 			this.nOccupied = size;
-			this.upperBound = Std.int(newNBuckets * HASH_UPPER + .5);
+			this.upperBound = cast (newNBuckets * HASH_UPPER + .5);
 		}
 	}
 
@@ -420,7 +420,7 @@ import java.NativeArray;
 		for( i in it ) {
 			s.add(i);
 			s.add(" => ");
-			s.add(Std.string(get(i)));
+			s.add((get(i)));
 			if( it.hasNext() )
 				s.add(", ");
 		}
