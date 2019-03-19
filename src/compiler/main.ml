@@ -316,7 +316,10 @@ let generate tctx ext xml_out interp swf_header =
 		| Cs ->
 			Gencs.generate,"cs"
 		| Java ->
-			Genjava.generate,"java"
+			if Common.defined com Jvm then
+				Genjvm.generate,"java"
+			else
+				Genjava.generate,"java"
 		| Python ->
 			Genpy.generate,"python"
 		| Hl ->
