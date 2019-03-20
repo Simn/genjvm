@@ -625,7 +625,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			(fun () -> code#iconst Int32.one)
 			(fun () -> code#iconst Int32.zero)
 
-	method binop ret op e1 e2 = match op with
+	method binop ret op e1 e2 t = match op with
 		| OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte ->
 			let op = convert_cmp_op op in
 			let op = flip_cmp_op op in
@@ -635,7 +635,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr RValue e2;
 				self#cast e1.etype;
 			in
-			self#read_write ret AKNone e1 f e2.etype
+			self#read_write ret AKNone e1 f t
 		| OpAssignOp op ->
 			begin match op,(Texpr.skip e1).eexpr,(Texpr.skip e2).eexpr with
 			| OpAdd,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range Int16Range (Int32.to_int i32) ->
@@ -653,7 +653,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (fun () -> ()) (fun () -> self#texpr RValue e2);
 					if is_null e1.etype then self#expect_reference_type;
 				in
-				self#read_write ret AKPre e1 f e2.etype
+				self#read_write ret AKPre e1 f t
 			end
 		| _ ->
 			let f e () = self#texpr RValue e in
@@ -890,12 +890,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| TBinop(op,e1,e2) ->
 			begin match op with
-			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2
+			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2 e.etype
 			| _ when ret = RVoid ->
 				self#texpr ret e1;
 				self#texpr ret e2;
 			| _ ->
-				self#binop ret op e1 e2
+				self#binop ret op e1 e2 e.etype
 			end
 		| TConst ct ->
 			self#const e.etype ct
@@ -1193,7 +1193,7 @@ let generate_field gctx jc c mtype cf =
 			let default () =
 				let p = null_pos in
 				let efield = Texpr.Builder.make_static_field c cf p in
-				let eop = mk (TBinop(OpAssign,efield,e)) e.etype p in
+				let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type p in
 				begin match c.cl_init with
 				| None -> c.cl_init <- Some eop
 				| Some e -> c.cl_init <- Some (concat e eop)
@@ -1202,7 +1202,7 @@ let generate_field gctx jc c mtype cf =
 			match e.eexpr with
 			| TConst ct ->
 				begin match ct with
-				| TInt i32 ->
+				| TInt i32 when not (is_nullable cf.cf_type) ->
 					let offset = jc#get_pool#add (ConstInt i32) in
 					jm#add_attribute (AttributeConstantValue offset);
 				| TString s ->
