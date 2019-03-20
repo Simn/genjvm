@@ -1012,6 +1012,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			List.iter (fun (v,_) ->
 				ignore(handler#add_local v VarArgument);
 			) tf.tf_args;
+			jm#finalize_arguments;
 			handler#texpr RReturn tf.tf_expr;
 			jc#add_method jm#export_method;
 			self#type_expr jc#get_this_path;
@@ -1134,6 +1135,7 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 	List.iter (fun (v,_) ->
 		ignore(handler#add_local v VarArgument);
 	) args;
+	jm#finalize_arguments;
 	begin match mtype with
 	| MConstructorTop ->
 		handler#object_constructor

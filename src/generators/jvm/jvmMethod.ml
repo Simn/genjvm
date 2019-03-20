@@ -22,6 +22,7 @@ class builder jc api name jsig = object(self)
 	val mutable debug_locals = []
 	val mutable stack_frames = []
 	val mutable exceptions = []
+	val mutable argument_locals = []
 
 	(* per-frame *)
 	val mutable locals = []
@@ -61,12 +62,15 @@ class builder jc api name jsig = object(self)
 			local_offset <- old_offset;
 		)
 
-	method add_stack_frame =
-		let locals = List.map (fun (init,_,t) ->
+	method get_locals_for_stack_frame locals =
+		List.map (fun (init,_,t) ->
 			match !init with
 			| None -> JvmVerificationTypeInfo.VTop
 			| _ -> JvmVerificationTypeInfo.of_signature jc#get_pool t
-		) locals in
+		) locals
+
+	method add_stack_frame =
+		let locals = self#get_locals_for_stack_frame locals in
 		let astack = List.map (JvmVerificationTypeInfo.of_signature jc#get_pool) (code#get_stack#get_stack) in
 		let r = code#get_fp in
 		let ff = (r,locals,astack) in
@@ -250,12 +254,66 @@ class builder jc api name jsig = object(self)
 			store()
 		)
 
+	method finalize_arguments =
+		argument_locals <- locals
+
 	method get_stack_map_table =
-		let stack_map = List.fold_left (fun (last,acc) (offset,locals,stack) ->
-			let cur = offset - last - 1 in
-			let entry = StackFull(cur,Array.of_list (List.rev locals),Array.of_list (List.rev stack)) in
-			(offset,entry :: acc)
-		) (-1,[]) (List.rev stack_frames) in
+		let argument_locals = self#get_locals_for_stack_frame argument_locals in
+		let stack_map = List.fold_left (fun ((last_offset,last_locals,last_locals_length),acc) (offset,locals,stack) ->
+			let cur = offset - last_offset - 1 in
+			let a_locals = Array.of_list (List.rev locals) in
+			let locals_length = Array.length a_locals in
+			let default () =
+				StackFull(cur,a_locals,Array.of_list (List.rev stack))
+			in
+			let entry = match stack,locals_length - last_locals_length with
+			| [],0 ->
+				if last_locals = locals then begin
+					if cur <= 64 then StackSame cur
+					else StackSameExtended cur
+				end else
+					default()
+			| [vt],0 ->
+				if last_locals = locals then begin
+					if cur <= 64 then Stack1StackItem(cur,vt)
+					else Stack1StackItemExtended(cur,vt)
+				end else
+					default()
+			| [],1 ->
+				begin match locals with
+				| vt1 :: locals when locals = last_locals -> StackAppend1(cur,vt1)
+				| _ -> default()
+				end
+			| [],2 ->
+				begin match locals with
+				| vt1 :: vt2 :: locals when locals = last_locals -> StackAppend2(cur,vt2,vt1)
+				| _ -> default()
+				end
+			| [],3 ->
+				begin match locals with
+				| vt1 :: vt2 :: vt3 :: locals when locals = last_locals -> StackAppend3(cur,vt3,vt2,vt1)
+				| _ -> default()
+				end
+			| [],-1 ->
+				begin match last_locals with
+				| _ :: last_locals when locals = last_locals -> StackChop1 cur
+				| _ -> default()
+				end
+			| [],-2 ->
+				begin match last_locals with
+				| _ :: _ :: last_locals when locals = last_locals -> StackChop2 cur
+				| _ -> default()
+				end
+			| [],-3 ->
+				begin match last_locals with
+				| _ :: _ :: _ :: last_locals when locals = last_locals -> StackChop3 cur
+				| _ -> default()
+				end
+			| _ ->
+				default()
+			in
+			((offset,locals,locals_length),entry :: acc)
+		) ((-1,argument_locals,List.length argument_locals),[]) (List.rev stack_frames) in
 		Array.of_list (List.rev (snd stack_map))
 
 	method get_code = code

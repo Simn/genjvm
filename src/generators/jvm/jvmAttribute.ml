@@ -8,9 +8,13 @@ type j_stack_map_frame =
 	| StackSame of int
 	| Stack1StackItem of int * JvmVerificationTypeInfo.t
 	| Stack1StackItemExtended of int * JvmVerificationTypeInfo.t
-	| StackChop of int * int
+	| StackChop1 of int
+	| StackChop2 of int
+	| StackChop3 of int
 	| StackSameExtended of int
-	| StackAppend of int * int * JvmVerificationTypeInfo.t array
+	| StackAppend1 of int * JvmVerificationTypeInfo.t
+	| StackAppend2 of int * JvmVerificationTypeInfo.t * JvmVerificationTypeInfo.t
+	| StackAppend3 of int * JvmVerificationTypeInfo.t * JvmVerificationTypeInfo.t * JvmVerificationTypeInfo.t
 	| StackFull of int * JvmVerificationTypeInfo.t array * JvmVerificationTypeInfo.t array
 
 (* https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.13 *)
@@ -49,24 +53,43 @@ let write_verification_type ch = function
 
 let write_stack_map_frame ch = function
 	| StackSame i ->
+		assert (i <= 64);
 		write_byte ch i
 	| Stack1StackItem(i,t) ->
-		write_byte ch i;
+		assert (i <= 64);
+		write_byte ch (i + 64);
 		write_verification_type ch t;
 	| Stack1StackItemExtended(i,t) ->
 		write_byte ch 247;
 		write_ui16 ch i;
 		write_verification_type ch t;
-	| StackChop(i1,i2) ->
-		write_byte ch i1;
-		write_ui16 ch i2;
+	| StackChop1 i1 ->
+		write_byte ch 250;
+		write_ui16 ch i1;
+	| StackChop2 i1 ->
+		write_byte ch 249;
+		write_ui16 ch i1;
+	| StackChop3 i1 ->
+		write_byte ch 248;
+		write_ui16 ch i1;
 	| StackSameExtended i ->
 		write_byte ch 251;
 		write_ui16 ch i
-	| StackAppend(i1,i2,tl) ->
-		write_byte ch i1;
-		write_ui16 ch i2;
-		Array.iter (write_verification_type ch) tl
+	| StackAppend1(i1,t1) ->
+		write_byte ch 252;
+		write_ui16 ch i1;
+		write_verification_type ch t1;
+	| StackAppend2(i1,t1,t2) ->
+		write_byte ch 253;
+		write_ui16 ch i1;
+		write_verification_type ch t1;
+		write_verification_type ch t2;
+	| StackAppend3(i1,t1,t2,t3) ->
+		write_byte ch 254;
+		write_ui16 ch i1;
+		write_verification_type ch t1;
+		write_verification_type ch t2;
+		write_verification_type ch t3;
 	| StackFull(i1,tl1,tl2) ->
 		write_byte ch 255;
 		write_ui16 ch i1;
