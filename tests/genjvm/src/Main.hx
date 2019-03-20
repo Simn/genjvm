@@ -21,6 +21,7 @@ class Main {
 		testOps();
 		testIntArray();
 		testStringMap();
+		testObjectDecl();
 		System.out.print("Done! ");
 		System.out.print(numTests);
 		System.out.print(" tests with ");
@@ -217,6 +218,34 @@ class Main {
 		eq(12, sm.get("foo"));
 		sm.remove("foo");
 		eq(null, sm.get("foo"));
+	}
+
+	function testObjectDecl() {
+		var obj = {
+			a: null,
+			b: 1,
+			c: "foo"
+		}
+		eq(obj, obj); // to avoid inline constructor
+		eq(null, obj.a);
+		eq(1, obj.b);
+		eq("foo", obj.c);
+		eq("bar", obj.a = "bar");
+		eq(2, obj.b = 2);
+		eq("fooo", obj.c = "fooo");
+
+		var objDynamic:Dynamic = obj;
+		eq("bar", objDynamic.a);
+		eq(2, objDynamic.b);
+		eq("fooo", objDynamic.c);
+
+		eq(null, objDynamic.a = null);
+		eq(1, objDynamic.b = 1);
+		eq("foo", objDynamic.c = "foo");
+
+		eq(null, objDynamic.d);
+		eq("wow", objDynamic.d = "wow");
+		eq("wow", objDynamic.d);
 	}
 
 	// has to be inline at the moment because TObjectDecl for PosInfos doesn't work yet

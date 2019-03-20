@@ -315,7 +315,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end;
 			apply (fun () -> code#dup_x1);
 			code#putfield offset vtobj vt
-		| TField(e1,FDynamic s) ->
+		| TField(e1,(FDynamic s | FAnon {cf_name = s})) ->
 			let c,cf_write = resolve_method com true haxe_jvm_path "writeField" in
 			let offset_write = add_field pool c cf_write in
 			let c,cf_read = resolve_method com true haxe_jvm_path "readField" in
@@ -1106,10 +1106,20 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#set_terminated true
 		| TObjectDecl fl ->
 			let f () =
-				let offset = pool#add_field object_path "<init>" "()V" false in
+				let offset = pool#add_field haxe_dynamic_object_path "<init>" "()V" false in
 				[],offset
 			in
-			self#construct ret object_path object_sig f;
+			self#construct ret haxe_dynamic_object_path object_sig f;
+			let c,cf = resolve_method com false (["haxe";"jvm"],"DynamicObject") "_hx_setField" in
+			let offset = add_field pool c cf in
+			List.iter (fun ((name,_,_),e) ->
+				code#dup;
+				code#dup;
+				self#string name;
+				self#texpr RValue e;
+				self#expect_reference_type;
+				code#invokevirtual offset haxe_dynamic_object_sig [string_sig;self#vtype (self#mknull e.etype)] [];
+			) fl;
 		| TIdent _ ->
 			Error.error (s_expr_ast false "" (s_type (print_context())) e) e.epos;
 

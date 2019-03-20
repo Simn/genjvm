@@ -1,6 +1,7 @@
 package java.jvm;
 
 import java.jvm.Enum;
+import java.jvm.DynamicObject;
 
 @:keep
 @:native('haxe.jvm.Jvm')
@@ -71,6 +72,9 @@ class Jvm {
 					return java.lang.invoke.MethodHandles.lookup().unreflect(m);
 				}
 			}
+			if (instanceof(obj, java.jvm.DynamicObject)) {
+				return (obj : java.jvm.DynamicObject)._hx_getField(name);
+			}
 			return null;
 		}
 	}
@@ -85,6 +89,9 @@ class Jvm {
 			field.setAccessible(true);
 			field.set(obj, value);
 		} catch (_:java.lang.NoSuchFieldException) {
+			if (instanceof(obj, java.jvm.DynamicObject)) {
+				return (obj : java.jvm.DynamicObject)._hx_setField(name, value);
+			}
 			return;
 		}
 	}

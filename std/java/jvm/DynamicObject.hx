@@ -1,30 +1,45 @@
 package java.jvm;
+import haxe.ds.StringMap;
 
-import java.NativeArray;
-
-@:native("haxe.jvm.DynamicObject")
+@:keep
+@:native('haxe.jvm.DynamicObject')
 class DynamicObject {
-	var values:NativeArray<Dynamic>;
-	var lookup:Map<String, Int>;
+	public var _hx_fields:Null<StringMap<Dynamic>>;
+	public var _hx_deletedAField:Null<Int>;
 
-	public function new(values:NativeArray<Dynamic>, lookup:Map<String, Int>) {
-		this.values = values;
-		this.lookup = lookup;
+	public function new() {	}
+
+	final public function _hx_deleteField(name:String) {
+		_hx_initReflection();
+		_hx_deletedAField = 1;
+		try {
+			Reflect.setField(this, name, null);
+		} catch(_:Dynamic) { }
+		return _hx_fields.remove(name);
 	}
 
-	@:overload public function readField(index:Int) {
-		return values[index];
+	final public function _hx_getField<T>(name:String) {
+		_hx_initReflection();
+		return _hx_fields.get(name);
 	}
 
-	@:overload public function readField(name:String) {
-		return values[lookup[name]];
+	final public function _hx_hasField(name:String) {
+		_hx_initReflection();
+		return _hx_fields.exists(name);
 	}
 
-	@:overload public function writeField(index:Int, value:Dynamic) {
-		values[index] = value;
+	final public function _hx_setField<T>(name:String, value:T) {
+		_hx_initReflection();
+		_hx_fields.set(name, value);
 	}
 
-	@:overload public function writeField(name:String, value:Dynamic) {
-		values[lookup[name]] = value;
+	final function _hx_initReflection() {
+		if (_hx_fields == null) {
+			_hx_fields = _hx_getKnownFields();
+		}
+	}
+
+	function _hx_getKnownFields():StringMap<Dynamic> {
+		return new StringMap();
 	}
 }
