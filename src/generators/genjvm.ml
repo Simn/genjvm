@@ -1114,7 +1114,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let offset = add_field pool c cf in
 			List.iter (fun ((name,_,_),e) ->
 				code#dup;
-				code#dup;
 				self#string name;
 				self#texpr RValue e;
 				self#expect_reference_type;
