@@ -95,7 +95,17 @@ let var_to_json name value vio env =
 		| VArray va -> jv "Array" (array_elems (EvalArray.to_list va)) va.alength
 		| VVector vv -> jv "Vector" (array_elems (Array.to_list vv)) (Array.length vv)
 		| VInstance vi ->
-			let class_name = EvalDebugMisc.safe_call env.env_eval EvalPrinting.value_string v in
+			let class_name () = EvalDebugMisc.safe_call env.env_eval EvalPrinting.value_string v in
+			let num_children,class_name = match vi.ikind with
+			| IMutex _ -> 1,class_name()
+			| IThread _ -> 1,class_name()
+			| IBytes bytes ->
+				let max = 40 in
+				let s = Bytes.to_string bytes in
+				let s = (try String.sub s 0 max ^ "..." with Invalid_argument _ -> s) in
+				List.length (instance_fields vi),s
+			| _ -> List.length (instance_fields vi),class_name()
+			in
 			let num_children = match vi.ikind with
 			| IMutex _ -> 1
 			| IThread _ -> 1
@@ -291,6 +301,25 @@ let output_inner_vars v env =
 	let vars = List.map (fun (n,v) -> var_to_json n v None env) children in
 	JArray vars
 
+let handle_in_temp_thread ctx env f =
+	let channel = Event.new_channel () in
+	let _ = EvalThread.spawn ctx (fun () ->
+		let eval = get_eval ctx in
+		eval.env <- Some env;
+		let v = try
+			f()
+		with
+		| RunTimeException(v,stack,p) ->
+			prerr_endline (EvalExceptions.get_exc_error_message ctx v stack p);
+			vnull
+		| exc ->
+			prerr_endline (Printexc.to_string exc);
+			vnull
+		in
+		Event.poll (Event.send channel v)
+	) in
+	Event.sync (Event.receive channel)
+
 module ValueCompletion = struct
 	let prototype_instance_fields proto =
 		let rec loop acc proto =
@@ -426,11 +455,11 @@ module ValueCompletion = struct
 			save();
 			let rec loop e = match fst e with
 			| EDisplay(e1,DKDot) ->
-				let v = expr_to_value ctx env e1 in
+				let v = handle_in_temp_thread ctx env (fun () -> expr_to_value ctx env e1) in
 				let json = output_completion ctx column v in
 				raise (JsonException json)
 			| EArray(e1,(EDisplay((EConst (Ident "null"),_),DKMarked),_)) ->
-				let v = expr_to_value ctx env e1 in
+				let v = handle_in_temp_thread ctx env (fun () -> expr_to_value ctx env e1) in
 				begin match v with
 				| VArray va ->
 					let l = EvalArray.to_list va in
@@ -468,6 +497,10 @@ type handler_context = {
 	send_error : 'a . string -> 'a;
 }
 
+let expect_env hctx env = match env with
+	| Some env -> env
+	| None -> hctx.send_error "No frame found"
+
 let handler =
 	let parse_breakpoint hctx jo =
 		let j = hctx.jsonrpc in
@@ -476,7 +509,7 @@ let handler =
 		let column = j#get_opt_param (fun () -> BPColumn (j#get_int_field "column" "column" obj)) BPAny in
 		let condition = j#get_opt_param (fun () ->
 			let s = j#get_string_field "condition" "condition" obj in
-			let env = Option.get hctx.ctx.eval.env in (* Use the main env, we only care about the position anyway *)
+			let env = expect_env hctx hctx.ctx.eval.env in (* Use the main env, we only care about the position anyway *)
 			Some (parse_expr hctx.ctx s env.env_debug.expr.epos)
 		) None in
 		(line,column,condition)
@@ -515,15 +548,15 @@ let handler =
 		);
 		"next",(fun hctx ->
 			let eval = select_thread hctx in
-			let env = Option.get eval.env in
+			let env = expect_env hctx eval.env in
 			eval.debug_state <- DbgNext(env,env.env_debug.expr.epos);
 			ignore(Event.poll (Event.send eval.debug_channel ()));
 			JNull
 		);
 		"stepOut",(fun hctx ->
 			let eval = select_thread hctx in
-			let env = Option.get eval.env in
-			let penv = Option.get env.env_parent in
+			let env = expect_env hctx eval.env in
+			let penv = expect_env hctx env.env_parent in
 			eval.debug_state <- DbgFinish penv;
 			ignore(Event.poll (Event.send eval.debug_channel ()));
 			JNull
@@ -533,7 +566,7 @@ let handler =
 		);
 		"stackTrace",(fun hctx ->
 			let eval = select_thread hctx in
-			let env = Option.get eval.env in
+			let env = expect_env hctx eval.env in
 			output_call_stack hctx.ctx eval env.env_debug.expr.epos
 		);
 		"getScopes",(fun hctx ->
@@ -675,11 +708,12 @@ let handler =
 			JNull
 		);
 		"evaluate",(fun hctx ->
-			let env = try select_frame hctx with _ -> Option.get hctx.ctx.eval.env in
+			let ctx = hctx.ctx in
+			let env = try select_frame hctx with _ -> expect_env hctx ctx.eval.env in
 			let s = hctx.jsonrpc#get_string_param "expr" in
 			begin try
-				let e = parse_expr hctx.ctx s env.env_debug.expr.epos in
-				let v = expr_to_value hctx.ctx env e in
+				let e = parse_expr ctx s env.env_debug.expr.epos in
+				let v = handle_in_temp_thread ctx env (fun () -> expr_to_value ctx env e) in
 				var_to_json "" v None env
 			with
 			| Parse_expr_error e ->
@@ -689,7 +723,7 @@ let handler =
 			end
 		);
 		"getCompletion",(fun hctx ->
-			let env = Option.get hctx.ctx.eval.env in
+			let env = expect_env hctx hctx.ctx.eval.env in
 			let text = hctx.jsonrpc#get_string_param "text" in
 			let column = hctx.jsonrpc#get_int_param "column" in
 			try
