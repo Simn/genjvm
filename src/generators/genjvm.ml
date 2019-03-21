@@ -1194,14 +1194,14 @@ let generate_method gctx jc c mtype cf =
 			generate_expr gctx jc jm e (cf.cf_name = "main") true mtype;
 		end;
 		begin match cf.cf_params with
-			| [] ->
+			| [] when c.cl_params = [] ->
 				()
 			| _ ->
 				let stl = String.concat "" (List.map (fun (n,_) ->
 					Printf.sprintf "%s:Ljava/lang/Object;" n
 				) cf.cf_params) in
 				let ssig = generate_method_signature true (jsignature_of_type cf.cf_type) in
-				let s = Printf.sprintf "<%s>%s" stl ssig in
+				let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
 				let offset = jc#get_pool#add_string s in
 				jm#add_attribute (AttributeSignature offset);
 		end;
