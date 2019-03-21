@@ -2,8 +2,15 @@ import haxe.ds.StringMap;
 import haxe.PosInfos;
 import java.lang.System;
 
+class Base {
+	function new() { }
+	function test(value:String) {
+		return "Base.test(" + value + ")";
+	}
+}
+
 @:analyzer(ignore)
-class Main {
+class Main extends Base {
 	static public function main() {
 		new Main();
 	}
@@ -18,6 +25,7 @@ class Main {
 	static var falseValue = false;
 
 	function new() {
+		super();
 		numTests = 0;
 		numFailures = 0;
 		testAssignment();
@@ -26,7 +34,12 @@ class Main {
 		testStringMap();
 		testObjectDecl();
 		testStringConcat();
+		testOop();
 		trace('Done! $numTests tests with $numFailures failures');
+	}
+
+	override function test(value:String) {
+		return super.test(value) + "Main.test(" + value + ")";
 	}
 
 	function testAssignment() {
@@ -270,7 +283,10 @@ class Main {
 		eq("1.0a", 1.0 + "a");
 	}
 
-	// has to be inline at the moment because TObjectDecl for PosInfos doesn't work yet
+	function testOop() {
+		eq("Base.test(MainValue)Main.test(MainValue)", test("MainValue"));
+	}
+
 	function eq<T>(expected:T, actual:T, ?p:PosInfos) {
 		++numTests;
 		if (expected != actual) {

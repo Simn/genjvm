@@ -276,7 +276,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#iconst Int32.zero;
 			let jasig,jsig = self#new_native_array object_sig [] in
 			let offset_field = pool#add_field path "<init>" (generate_method_signature false enum_ctor_sig) false in
-			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig]
+			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] []
 		| FDynamic s | FAnon {cf_name = s} ->
 			let c,cf = resolve_method com true haxe_jvm_path "readField" in
 			let offset = add_field pool c cf in
@@ -767,10 +767,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			tr
 		| TField(e1,FInstance(c,tl,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let offset = add_field pool c cf in
-			self#texpr RValue e1;
+			let is_super = match e1.eexpr with
+			| TConst TSuper ->
+				code#aload jc#get_jsig 0;
+				true
+			| _ ->
+				self#texpr RValue e1;
+				false
+			in
 			let tl,tr = self#call_arguments cf.cf_type el in
 			let t1 = self#vtype e1.etype in
-			code#invokevirtual offset t1 tl (retype tr);
+			(if is_super then code#invokespecial else code#invokevirtual) offset t1 tl (retype tr);
 			tr
 		| TField(_,FEnum(en,ef)) ->
 			let path = en.e_path in
@@ -781,12 +788,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#iconst (Int32.of_int (List.length el));
 			let jasig,jsig = self#new_native_array object_sig el in
 			let offset_field = pool#add_field path "<init>" (generate_method_signature false enum_ctor_sig) false in
-			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig];
+			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] [];
 			Some (TObject(path,[]))
 		| TConst TSuper ->
 			code#aload jc#get_jsig 0;
 			let tl,_ = self#call_arguments t_dynamic el in (* TODO *)
-			code#invokespecial jc#get_offset_super_ctor jc#get_jsig tl;
+			code#invokespecial jc#get_offset_super_ctor jc#get_jsig tl [];
 			None
 		| TIdent "__array__" ->
 			begin match follow tr with
@@ -856,7 +863,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		code#new_ t offset_class;
 		if ret <> RVoid then code#dup;
 		let tl,offset = f() in
-		code#invokespecial offset t tl
+		code#invokespecial offset t tl []
 
 	method type_expr path =
 		let path = path_map path in
@@ -1132,7 +1139,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let path = object_path in
 		let offset = pool#add_field path "<init>" "()V" false in
 		code#aload jc#get_jsig 0;
-		code#invokespecial offset jc#get_jsig []
+		code#invokespecial offset jc#get_jsig [] []
 end
 
 let generate_expr gctx jc jm e is_main is_method mtype =
@@ -1239,7 +1246,7 @@ let generate_class gctx c =
 			| Some cf ->
 				generate_method_signature true (jsignature_of_type cf.cf_type)
 			| None ->
-				""
+				"()V"
 	in
 	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
 	let pool = jc#get_pool in
@@ -1308,7 +1315,7 @@ let generate_enum gctx en =
 	load0();
 	load1();
 	load2();
-	jm#get_code#invokespecial offset_field jc#get_jsig [TInt;enum_ctor_sig];
+	jm#get_code#invokespecial offset_field jc#get_jsig [TInt;enum_ctor_sig] [];
 	jm#get_code#return_void;
 	jc#add_method jm#export_method;
 	let jc = jc#export_class in
