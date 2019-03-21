@@ -95,4 +95,16 @@ class Jvm {
 			return;
 		}
 	}
+
+	static public function toString<T:java.lang.Object>(obj:T) {
+		if (obj == null) {
+			return "null";
+		} else {
+			return obj.toString();
+		}
+	}
+
+	static public function stringConcat<A:java.lang.Object, B:java.lang.Object>(a:A, b:B):String {
+		return (cast toString(a) : java.lang.JavaString.String).concat(toString(b));
+	}
 }

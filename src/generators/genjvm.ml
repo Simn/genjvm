@@ -485,11 +485,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method binop_exprs cast_type f1 f2 =
 		f1();
-		Option.may jm#cast cast_type;
+		Option.may (jm#cast ~allow_to_string:true) cast_type;
 		f2();
-		Option.may jm#cast cast_type;
+		Option.may (jm#cast ~allow_to_string:true) cast_type;
 
 	method get_binop_type t1 t2 = match jsignature_of_type (follow t1),jsignature_of_type (follow t2) with
+		| TObject((["java";"lang"],"String"),_),_
+		| _,TObject((["java";"lang"],"String"),_) ->
+			Some string_sig
 		| TLong,_ | _,TLong ->
 			Some TLong
 		| TDouble,_ | _,TDouble ->
@@ -564,8 +567,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TDouble;TDouble] -> opd ()
 		| [TLong;TLong] -> opl ()
 		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[]);] ->
-			let offset = pool#add_field string_path "concat" "(Ljava/lang/String;)Ljava/lang/String;" false in
-			code#invokevirtual offset string_sig [string_sig] [string_sig]
+			let c,cf = resolve_method com true (["haxe";"jvm"],"Jvm") "stringConcat" in
+			let offset = add_field jc#get_pool c cf in
+			code#invokestatic offset [string_sig;string_sig] [string_sig]
 		| [t1;t2] -> jerror (Printf.sprintf "Can't numop %s and %s" (generate_signature false t1) (generate_signature false t2))
 		| tl -> jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
 		end
@@ -1313,6 +1317,7 @@ let generate_enum gctx en =
 let debug_path path = match path with
 	| ([],"Main") | (["haxe";"jvm"],_) -> true
 	| ([],"MyClass") | ([],"Base") | ([],"Array") -> true
+	| (["haxe"],"Log") | ([],"Std") -> true
 	| (["haxe";"ds"],_) -> true
 	| _ -> false
 

@@ -3,3 +3,4 @@
 -D jvm
 -D no_map_cache
 -java export
+-D dump=pretty

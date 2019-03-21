@@ -117,7 +117,7 @@ class builder jc api name jsig = object(self)
 		| TDouble -> unwrap_null "Double" "toDouble"
 		| _ -> ()
 
-	method cast vt =
+	method cast ?(allow_to_string=false) vt =
 		let vt' = code#get_stack#top in
 		begin match vt,vt' with
 		| TObject((["java";"lang"],"Double"),_),TInt ->
@@ -137,11 +137,13 @@ class builder jc api name jsig = object(self)
 			code#i2l;
 		| TInt,TLong ->
 			code#l2i;
-		(* | TObject((["java";"lang"],"String"),_),_ ->
+		| TObject(path1,_),TObject(path2,_) when path1 = path2 ->
+			()
+		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
 			self#expect_reference_type;
-			let offset = jc#get_pool#add_field (["java";"lang"],"Object") "toString" "()Ljava/lang/String;" false in
-			code#invokevirtual offset code#get_stack#top [] [vt] *)
-		| TObject(path1,_),TObject(path2,_) when path1 <> path2 ->
+			let offset = api.resolve_method true (["haxe";"jvm"],"Jvm") "toString" in
+			code#invokestatic offset [code#get_stack#top] [vt]
+		| TObject(path1,_),TObject(path2,_) ->
 			code#checkcast path1;
 		| TObject(path,_),TTypeParameter _ ->
 			code#checkcast path

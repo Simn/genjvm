@@ -22,11 +22,8 @@ class Main {
 		testIntArray();
 		testStringMap();
 		testObjectDecl();
-		System.out.print("Done! ");
-		System.out.print(numTests);
-		System.out.print(" tests with ");
-		System.out.print(numFailures);
-		System.out.println(" failures");
+		testStringConcat();
+		trace('Done! $numTests tests with $numFailures failures');
 	}
 
 	function testAssignment() {
@@ -248,18 +245,25 @@ class Main {
 		eq("wow", objDynamic.d);
 	}
 
+	function testStringConcat() {
+		eq("abc", "ab" + "c");
+		eq("abc", "a" + "b" + "c");
+		eq("anull", "a" + null);
+		eq("nulla", null + "a");
+		eq("a1", "a" + 1);
+		eq("1a", 1 + "a");
+		eq("atrue", "a" + true);
+		eq("truea", true + "a");
+		eq("a1.0", "a" + 1.0);
+		eq("1.0a", 1.0 + "a");
+	}
+
 	// has to be inline at the moment because TObjectDecl for PosInfos doesn't work yet
 	inline function eq<T>(expected:T, actual:T, ?p:PosInfos) {
 		++numTests;
 		if (expected != actual) {
 			++numFailures;
-			System.out.print(p.fileName);
-			System.out.print(":");
-			System.out.print(p.lineNumber);
-			System.out.print(": ");
-			System.out.print(actual);
-			System.out.print(" should be ");
-			System.out.println(expected);
+			haxe.Log.trace('$actual should be $expected', p);
 		}
 	}
 }
