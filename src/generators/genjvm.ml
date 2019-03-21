@@ -242,7 +242,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		self#string name;
 		code#invokestatic offset [t;self#vtype com.basic.tstring] [self#vtype t_dynamic];
 
-	method read e1 fa =
+	method read t e1 fa =
 		match fa with
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			self#texpr RValue e1;
@@ -282,7 +282,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let offset = add_field pool c cf in
 			self#texpr RValue e1;
 			self#string s;
-			code#invokestatic offset [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic]
+			code#invokestatic offset [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic];
+			self#cast t;
 		| _ ->
 			assert false
 
@@ -478,7 +479,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				in
 				(e_cond,e)
 			) cases in
-			let e = List.fold_left (fun e_else (e_cond,e_then) -> Some (mk (TIf(e_cond,e_then,e_else)) e_then.etype e_then.epos)) None el in
+			let e = List.fold_left (fun e_else (e_cond,e_then) -> Some (mk (TIf(e_cond,e_then,e_else)) e_then.etype e_then.epos)) def el in
 			self#texpr ret (Option.get e)
 
 	(* binops *)
@@ -994,7 +995,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#close_jumps ((restore(),r_try) :: rl)
 		| TField(e1,fa) ->
 			if ret = RVoid then self#texpr ret e1
-			else self#read e1 fa;
+			else self#read e.etype e1 fa;
 		| TCall(e1,el) ->
 			self#call ret e.etype e1 el
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
