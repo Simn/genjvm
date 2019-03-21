@@ -792,9 +792,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			Some (TObject(path,[]))
 		| TConst TSuper ->
 			code#aload jc#get_jsig 0;
-			let tl,_ = self#call_arguments t_dynamic el in (* TODO *)
-			code#invokespecial jc#get_offset_super_ctor jc#get_jsig tl [];
-			None
+			begin match follow e1.etype with
+			| TInst(c,_) ->
+				begin match c.cl_constructor with
+				| None ->
+					jerror (Printf.sprintf "%s does not have a constructor" (s_type_path c.cl_path));
+				| Some cf ->
+					let tl,_ = self#call_arguments cf.cf_type el in
+					code#invokespecial jc#get_offset_super_ctor jc#get_jsig tl [];
+					None
+				end;
+			| _ ->
+				assert false
+			end
 		| TIdent "__array__" ->
 			begin match follow tr with
 			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
