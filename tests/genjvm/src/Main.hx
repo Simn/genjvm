@@ -14,6 +14,9 @@ class Main {
 
 	static var staticIntField:Int;
 
+	static var trueValue = true;
+	static var falseValue = false;
+
 	function new() {
 		numTests = 0;
 		numFailures = 0;
@@ -84,8 +87,17 @@ class Main {
 		// boolean
 		var b = true;
 		eq(false, !b);
-		eq(false, b && false);
-		eq(true, b || false);
+		eq(false, b && falseValue);
+		eq(true, b && trueValue);
+		eq(true, b || falseValue);
+		eq(true, b || trueValue);
+
+		b = false;
+		eq(true, !b);
+		eq(false, b && falseValue);
+		eq(false, b && trueValue);
+		eq(false, b || falseValue);
+		eq(true, b || trueValue);
 
 		eq(true, a > 5);
 		eq(true, a >= 5);
@@ -259,7 +271,7 @@ class Main {
 	}
 
 	// has to be inline at the moment because TObjectDecl for PosInfos doesn't work yet
-	inline function eq<T>(expected:T, actual:T, ?p:PosInfos) {
+	function eq<T>(expected:T, actual:T, ?p:PosInfos) {
 		++numTests;
 		if (expected != actual) {
 			++numFailures;

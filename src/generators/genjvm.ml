@@ -609,7 +609,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#if_then_else
 				(fun () -> code#if_ref CmpEq)
 				(fun () -> operand f2)
-				(fun () -> code#iconst Int32.zero)
+				(fun () -> code#bconst false)
 		| OpBoolOr ->
 			let operand f =
 				f();
@@ -618,7 +618,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			operand f1;
 			jm#if_then_else
 				(fun () -> code#if_ref CmpEq)
-				(fun () -> code#iconst Int32.one)
+				(fun () -> code#bconst true)
 				(fun () -> operand f2)
 		| _ ->
 			assert false
@@ -626,8 +626,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method boolop f =
 		jm#if_then_else
 			f
-			(fun () -> code#iconst Int32.one)
-			(fun () -> code#iconst Int32.zero)
+			(fun () -> code#bconst true)
+			(fun () -> code#bconst false)
 
 	method binop ret op e1 e2 t = match op with
 		| OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte ->
@@ -704,8 +704,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| Not,_ ->
 			jm#if_then_else
 				(self#condition e)
-				(fun () -> code#iconst Int32.zero)
-				(fun () -> code#iconst Int32.one)
+				(fun () -> code#bconst false)
+				(fun () -> code#bconst true)
 		| NegBits,_ ->
 			self#texpr RValue e;
 			begin match jsignature_of_type (follow e.etype) with

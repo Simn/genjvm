@@ -206,7 +206,7 @@ class builder jc api name jsig = object(self)
 					code#iconst Int32.zero;
 					code#istore slot
 				end;
-				(fun () -> code#iload slot),(fun () -> code#istore slot),1
+				(fun () -> code#iload ~vt:t slot),(fun () -> code#istore slot),1
 			| TLong ->
 				if init_state = VarNeedDefault then begin
 					code#lconst Int64.zero;
