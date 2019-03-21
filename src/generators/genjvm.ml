@@ -1332,11 +1332,9 @@ let generate_enum gctx en =
 	write_class gctx.jar en.e_path jc
 
 let debug_path path = match path with
-	| ([],"Main") | (["haxe";"jvm"],_) -> true
-	| ([],"MyClass") | ([],"Base") | ([],"Array") -> true
-	| (["haxe"],"Log") | ([],"Std") -> true
-	| (["haxe";"ds"],_) -> true
-	| _ -> false
+	(* | ([],"Main") | (["haxe";"jvm"],_) -> true *)
+	| (["haxe";"lang"],_) -> false (* Old Haxe/Java stuff that's weird *)
+	| _ -> true
 
 let generate_module_type ctx mt = match mt with
 	| TClassDecl c when not c.cl_extern && debug_path c.cl_path -> generate_class ctx c
