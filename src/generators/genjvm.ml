@@ -176,7 +176,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	val mutable breaks = []
 	val mutable continue = 0
-	val mutable closure_count = 0
+
 
 	method vtype t =
 		jsignature_of_type t
@@ -1044,8 +1044,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#set_terminated true;
 		| TFunction tf ->
 			let t = tfun (List.map (fun (v,_) -> v.v_type) tf.tf_args) tf.tf_type in
-			let name = Printf.sprintf "hx_closure$%i" closure_count in
-			closure_count <- closure_count + 1;
+			let name = jc#get_next_closure_name in
 			let jm = new JvmMethod.builder jc (make_resolve_api com jc) name (self#vtype t) in
 			jm#add_access_flag 0x1;
 			jm#add_access_flag 0x8;

@@ -26,6 +26,7 @@ class builder path_this path_super = object(self)
 	val mutable interface_offsets = []
 	val fields = DynArray.create ()
 	val methods = DynArray.create ()
+	val mutable closure_count = 0
 
 	method add_interface path =
 		interface_offsets <- (pool#add_path path) :: interface_offsets
@@ -45,6 +46,11 @@ class builder path_this path_super = object(self)
 
 	method get_offset_super_ctor = offset_super_ctor
 	method set_offset_super_ctor offset = offset_super_ctor <- offset
+
+	method get_next_closure_name =
+		let name = Printf.sprintf "hx_closure$%i" closure_count in
+		closure_count <- closure_count + 1;
+		name
 
 	method export_class =
 		let attributes = self#export_attributes pool in
