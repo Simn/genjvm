@@ -1,10 +1,20 @@
 package test;
 import haxe.macro.Expr;
 
+enum Tree<T> {
+	Leaf(t:T);
+	Node(l:Tree<T>, r:Tree<T>);
+}
+
 enum A<T> {
 	TA<Q>(q : Q) : A<Q>;
 	TB(v : Bool) : A<Bool>;
 	TC(v : Bool) : A<String>;
+}
+
+enum X<A> {
+	U1(x:Int):X<Int>;
+	U2:X<String>;
 }
 
 class TestMatch extends BaseTest {
@@ -13,6 +23,8 @@ class TestMatch extends BaseTest {
 		testBasic();
 		testTuple();
 		testGrouping();
+		testGadt();
+		testNullPattern();
 	}
 
 	static function switchNormal(e:Expr):String {
@@ -97,6 +109,15 @@ class TestMatch extends BaseTest {
 				"4";
 			case _:
 				"5";
+		}
+	}
+
+	static function toStringX<Z>(x1:X<Z>) {
+		return switch (x1) {
+			case U1(x) if (x > 1): ">1";
+			case U1(x) if (x <= 1): "<=1";
+			case U1(_): throw "this is impossible to reach actually";
+			case U2: "U2";
 		}
 	}
 
@@ -208,5 +229,69 @@ class TestMatch extends BaseTest {
 		for (i in 0...results.length) {
 			eq(results[i], test(i));
 		}
+	}
+
+	function testGadt() {
+		eq("<=1", toStringX(U1(1)));
+		eq(">1", toStringX(U1(2)));
+		eq("U2", toStringX(U2));
+	}
+
+	function testNullPattern() {
+		var i:Null<Int> = null;
+		var r = switch(i) {
+			case 1: 1;
+			case null: 2;
+			case _: 3;
+		}
+		eq(2, r);
+
+		// this should not compile because the argument is not explicitly Null
+		//var e = EConst(null);
+		//var r = switch(e) {
+			//case EConst(null): 1;
+			//case _: 2;
+		//}
+
+		var t:Null<Tree<String>> = null;
+		var r = switch(t) {
+			case Leaf(_): 1;
+			case null if (i != null): 2;
+			case null: 3;
+			case Node(_): 4;
+		}
+		eq(r, 3);
+
+		var e1 = macro if (1) 2;
+		var e2 = macro if (1) 2 else 3;
+		function matchIf(e) {
+			return switch(e.expr) {
+				case EIf(_, _, null): 1;
+				case EIf(_, _, _): 2;
+				case _: 3;
+			}
+		}
+		eq(1, matchIf(e1));
+		eq(2, matchIf(e2));
+
+		var t = Leaf("foo");
+		function f(t) return switch(t) {
+			case Leaf(null): "null";
+			case Leaf(e): e;
+			case Node(_): "default";
+		}
+		eq(f(t), "foo");
+
+		function f(a) {
+			return switch(a:{a: Int}) {
+				case {a: 1}: 1;
+				case null: 2;
+				default: 3;
+			}
+		}
+
+		eq(f(null), 2);
+		eq(f({a: 1}), 1);
+		eq(f({a: 2}), 3);
 	}
 }
