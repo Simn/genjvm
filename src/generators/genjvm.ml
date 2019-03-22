@@ -741,11 +741,41 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* calls *)
 
-	method call_arguments t el =
+	(* TODO: this bloody mess tries to find the right overload because TNew loses it... *)
+	method check_hack hack tl el = match hack with
+		| None ->
+			tl
+		| Some rcf ->
+			let tl' = List.map (fun e -> e.etype) el in
+			let rec loop cfl = match cfl with
+				| cf :: cfl ->
+					begin match follow cf.cf_type with
+						| TFun(tl,_) ->
+							let rec loop2 tl' tl = match tl',tl with
+								| t' :: tl',(_,_,t) :: tl ->
+									(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
+								| [],[] ->
+									rcf := cf;
+									tl
+								| _ ->
+									loop cfl
+							in
+							loop2 tl' tl
+						| _ ->
+							assert false
+					end;
+
+				| [] ->
+					tl
+			in
+			loop (!rcf :: !rcf.cf_overloads)
+
+	method call_arguments ?(hack=None) t el =
 		let tl,tr = match follow t with
 			| TFun(tl,tr) -> tl,tr
 			| _ -> (List.map (fun _ -> "",false,t_dynamic) el),t_dynamic
 		in
+		let tl = self#check_hack hack tl el in
 		let rec loop acc tl el = match tl,el with
 			| (_,_,t) :: tl,e :: el ->
 				self#texpr RValue e;
@@ -1027,8 +1057,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jerror (Printf.sprintf "%s does not have a constructor" (s_type_path c.cl_path));
 			| Some cf ->
 				let f () =
-					let tl,_ = self#call_arguments cf.cf_type el in
-					let offset = add_field pool c cf in
+					let hack_cf = ref cf in
+					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
+					let offset = add_field pool c !hack_cf in
 					tl,offset
 				in
 				self#construct ret c.cl_path (self#vtype (TInst(c,tl))) f;
