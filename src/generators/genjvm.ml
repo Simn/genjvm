@@ -160,6 +160,12 @@ let write_class jar path jc =
 	Zip.add_entry (Bytes.unsafe_to_string (IO.close_out ch)) jar path;
 	t()
 
+let is_const_int_pattern (el,_) =
+	List.for_all (fun e -> match e.eexpr with
+		| TConst (TInt _) -> true
+		| _ -> false
+	) el
+
 class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return_type : Type.t) = object(self)
 	val com = gctx.com
 	val code = jm#get_code
@@ -426,7 +432,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					case_lut := IntMap.add i r !case_lut;
 					r
 				| _ ->
-					raise Exit
+					assert false
 			) el in
 			(rl,e)
 		) cases in
@@ -442,30 +448,35 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		end else
 			code#lookupswitch offset_def (DynArray.to_array flat_cases);
 		let restore = jm#start_branch in
+		offset_def := code#get_fp - !offset_def;
 		let r_def = match def with
 			| None ->
-				offset_def
+				if ret = RVoid then offset_def else (ref 0)
 			| Some e ->
-				offset_def := code#get_fp - !offset_def;
 				jm#add_stack_frame;
 				self#texpr ret e;
 				self#maybe_make_jump
 		in
-		let rl = List.map (fun (rl,e) ->
-			let was_terminated = restore() in
+
+		let rec loop acc cases = match cases with
+		| (rl,e) :: cases ->
+			ignore(restore());
 			jm#add_stack_frame;
 			List.iter (fun r -> r := code#get_fp - !r) rl;
 			self#texpr ret e;
-			was_terminated,self#maybe_make_jump
-		) cases in
-		self#close_jumps ((restore(),r_def) :: rl)
+			loop ((jm#is_terminated,self#maybe_make_jump) :: acc) cases
+		| [] ->
+			List.rev acc
+		in
+		let rl = loop [] cases in
+		self#close_jumps ((jm#is_terminated,r_def) :: rl)
 
 	method switch ret e1 cases def =
 		if cases = [] then
 			self#texpr ret e1
-		else try
+		else if List.for_all is_const_int_pattern cases then
 			self#int_switch ret e1 cases def
-		with Exit ->
+		else begin
 			(* TODO: rewriting this is stupid *)
 			let el = List.rev_map (fun (el,e) ->
 				let f e' = mk (TBinop(OpEq,e1,e')) com.basic.tbool e'.epos in
@@ -481,6 +492,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			) cases in
 			let e = List.fold_left (fun e_else (e_cond,e_then) -> Some (mk (TIf(e_cond,e_then,e_else)) e_then.etype e_then.epos)) def el in
 			self#texpr ret (Option.get e)
+		end
 
 	(* binops *)
 

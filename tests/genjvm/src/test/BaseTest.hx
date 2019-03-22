@@ -15,4 +15,8 @@ class BaseTest {
 			haxe.Log.trace('$actual should be $expected', p);
 		}
 	}
+
+	function t(v:Bool, ?p:PosInfos) {
+		eq(true, v, p);
+	}
 }
