@@ -413,6 +413,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		if not term then jm#add_stack_frame;
 
 	method int_switch ret e1 cases def =
+		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 in
+		let def,cases = match def,cases with
+			| None,(_,ec) :: cases when is_exhaustive ->
+				Some ec,cases
+			| _ ->
+				def,cases
+		in
 		self#texpr RValue e1;
 		jm#cast TInt;
 		let flat_cases = DynArray.create () in
