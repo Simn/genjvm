@@ -144,6 +144,9 @@ module NativeSignatures = struct
 	let haxe_dynamic_object_path = ["haxe";"jvm"],"DynamicObject"
 	let haxe_dynamic_object_sig = TObject(haxe_dynamic_object_path,[])
 
+	let haxe_exception_path = ["haxe";"jvm"],"Exception"
+	let haxe_exception_sig = TObject(haxe_exception_path,[])
+
 	let throwable_path = (["java";"lang"],"Throwable")
 	let throwable_sig = TObject(throwable_path,[])
 

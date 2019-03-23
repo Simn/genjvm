@@ -3,6 +3,7 @@ class Main {
 		new test.TestChaos();
 		new test.TestOop();
 		new test.TestMatch();
+		new test.TestExceptions();
 		trace('Done! ${test.BaseTest.numTests} tests with ${test.BaseTest.numFailures} failures');
 	}
 }

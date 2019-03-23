@@ -2,6 +2,7 @@ package java.jvm;
 
 import java.jvm.Enum;
 import java.jvm.DynamicObject;
+import java.jvm.Exception;
 
 @:keep
 @:native('haxe.jvm.Jvm')
