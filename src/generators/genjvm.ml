@@ -655,6 +655,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			(fun () -> code#bconst true)
 			(fun () -> code#bconst false)
 
+	method var_slot_is_in_int8_range v =
+		let slot,_,_ = self#get_local v in
+		in_range true Int8Range slot
+
 	method binop ret op e1 e2 t = match op with
 		| OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte ->
 			let op = convert_cmp_op op in
@@ -668,12 +672,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#read_write ret AKNone e1 f t
 		| OpAssignOp op ->
 			begin match op,(Texpr.skip e1).eexpr,(Texpr.skip e2).eexpr with
-			| OpAdd,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range Int16Range (Int32.to_int i32) ->
+			| OpAdd,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range false Int8Range (Int32.to_int i32) && self#var_slot_is_in_int8_range v->
 				let slot,load,_ = self#get_local v in
 				let i = Int32.to_int i32 in
 				code#iinc slot i;
 				if ret <> RVoid then load();
-			| OpSub,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range Int16Range (-Int32.to_int i32) ->
+			| OpSub,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range false Int8Range (-Int32.to_int i32) && self#var_slot_is_in_int8_range v ->
 				let slot,load,_ = self#get_local v in
 				let i = -Int32.to_int i32 in
 				code#iinc slot i;
@@ -691,11 +695,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method unop ret op flag e =
 		match op,(Texpr.skip e).eexpr with
-		(* | (Increment | Decrement),TLocal v when ExtType.is_int v.v_type ->
+		| (Increment | Decrement),TLocal v when ExtType.is_int v.v_type && self#var_slot_is_in_int8_range v ->
 			let slot,load,_ = self#get_local v in
 			if flag = Postfix && ret <> RVoid then load();
 			code#iinc slot (if op = Increment then 1 else -1);
-			if flag = Prefix && ret <> RVoid then load(); *)
+			if flag = Prefix && ret <> RVoid then load();
 		| (Increment | Decrement),_ ->
 			let is_null = is_null e.etype in
 			let f () =

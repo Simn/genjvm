@@ -35,7 +35,7 @@ let get_numeric_range_unsigned i =
 	else if i <= 0xFFFF then Int16Range
 	else Int32Range
 
-let in_range range i = match get_numeric_range i,range with
+let in_range unsigned range i = match (if unsigned then get_numeric_range_unsigned else get_numeric_range) i,range with
 	| Int8Range,(Int8Range | Int16Range | Int32Range) -> true
 	| Int16Range,(Int16Range | Int32Range) -> true
 	| Int32Range,Int32Range -> true
