@@ -23,6 +23,7 @@ class TestExceptions extends BaseTest {
 	public function new() {
 		super();
 		test();
+		testNested();
 	}
 
 	function test() {
@@ -34,6 +35,19 @@ class TestExceptions extends BaseTest {
 		eq("caught Dynamic: 12.0", raise(() -> throw 12.));
 		eq("caught Dynamic: false", raise(() -> throw false));
 		eq("caught Throwable: msg", raise(() -> throw new java.lang.Exception("msg")));
+	}
+
+	function testNested() {
+		var s = try {
+			try {
+				throw "foo";
+			} catch(e:Int) {
+				"something went wrong";
+			}
+		} catch(e:String) {
+			e;
+		}
+		eq("foo", s);
 	}
 
 	static function raise<T>(f:Void -> String) {

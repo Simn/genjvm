@@ -977,7 +977,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let excl = List.map (fun (v,e) -> new haxe_exception gctx v.v_type,v,e) catches in
 		let rec loop acc excl = match excl with
 			| (exc,v,e) :: excl ->
-				if List.exists (fun (exc',_,_) -> exc'#is_assignable_to exc) excl then begin
+				if List.exists (fun (exc',_,_) -> exc'#is_assignable_to exc) excl || excl = [] && not exc#is_native_exception then begin
 					let res = commit_instanceof_checks ((exc,v,e) :: excl) in
 					acc @ res
 				end else begin
