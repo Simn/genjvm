@@ -848,8 +848,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| None ->
 					jerror (Printf.sprintf "%s does not have a constructor" (s_type_path c.cl_path));
 				| Some cf ->
-					let tl,_ = self#call_arguments cf.cf_type el in
-					code#invokespecial jc#get_offset_super_ctor jc#get_jsig tl [];
+					let hack_cf = ref cf in
+					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
+					let offset = add_field pool c !hack_cf in
+					code#invokespecial offset jc#get_jsig tl [];
 					None
 				end;
 			| _ ->
