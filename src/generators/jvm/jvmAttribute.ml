@@ -26,6 +26,13 @@ type jvm_local_debug = {
 	ld_index : int;
 }
 
+type jvm_inner_class = {
+	ic_inner_class_info_index : int;
+	ic_outer_class_info_index : int;
+	ic_inner_name_index : int;
+	ic_inner_class_access_flags : int;
+}
+
 (* https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7 *)
 type j_attribute =
 	| AttributeConstantValue of jvm_constant_pool_index
@@ -35,6 +42,7 @@ type j_attribute =
 	| AttributeLineNumberTable of (int * int) array
 	| AttributeSignature of jvm_constant_pool_index
 	| AttributeLocalVariableTable of jvm_local_debug array
+	| AttributeInnerClasses of jvm_inner_class array
 
 let write_verification_type ch = function
 	| VTop -> write_byte ch 0
@@ -117,6 +125,14 @@ let write_attribute pool jvma =
 	| AttributeStackMapTable stack_map ->
 		write_array16 ch write_stack_map_frame stack_map;
 		"StackMapTable"
+	| AttributeInnerClasses icl ->
+		write_array16 ch (fun ch ic ->
+			write_ui16 ch ic.ic_inner_class_info_index;
+			write_ui16 ch ic.ic_outer_class_info_index;
+			write_ui16 ch ic.ic_inner_name_index;
+			write_ui16 ch ic.ic_inner_class_access_flags;
+		) icl;
+		"InnerClasses"
 	| AttributeSourceFile offset ->
 		write_ui16 ch offset;
 		"SourceFile";

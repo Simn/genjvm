@@ -26,6 +26,7 @@ class builder path_this path_super = object(self)
 	val mutable interface_offsets = []
 	val fields = DynArray.create ()
 	val methods = DynArray.create ()
+	val inner_classes = DynArray.create ()
 	val mutable closure_count = 0
 
 	method add_interface path =
@@ -41,10 +42,11 @@ class builder path_this path_super = object(self)
 
 	method get_this_path = path_this
 	method get_super_path = path_super
-
 	method get_jsig = jsig
-
 	method get_offset_super_ctor = offset_super_ctor
+	method get_offset_this = offset_this
+	method get_access_flags = access_flags
+
 	method set_offset_super_ctor offset = offset_super_ctor <- offset
 
 	method get_next_closure_name =
@@ -52,7 +54,30 @@ class builder path_this path_super = object(self)
 		closure_count <- closure_count + 1;
 		name
 
+	method spawn_inner_class path_super =
+		let path = ([],Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes)) in
+		let jc = new builder path path_super in
+		jc#add_access_flag 0x01;
+		let offset_name = pool#add_string (snd path) in
+		let offset_class = pool#add (ConstClass offset_name) in
+		DynArray.add inner_classes (jc,offset_name,offset_class);
+		jc
+
+	method private commit_inner_classes =
+		if DynArray.length inner_classes > 0 then begin
+		let open JvmAttribute in
+			let a = DynArray.to_array inner_classes in
+			let a = Array.map (fun (jc,offset_name,offset_class) -> {
+				ic_inner_class_info_index = offset_class;
+				ic_outer_class_info_index = self#get_offset_this;
+				ic_inner_name_index = offset_name;
+				ic_inner_class_access_flags = jc#get_access_flags;
+			}) a in
+			self#add_attribute (AttributeInnerClasses a)
+		end
+
 	method export_class =
+		self#commit_inner_classes;
 		let attributes = self#export_attributes pool in
 		let pool = pool#close in
 		{
