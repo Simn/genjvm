@@ -1433,7 +1433,9 @@ let generate_class gctx c =
 	jc#set_offset_super_ctor offset_super_constructor;
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
-			jc#add_method (generate_method gctx jc c mtype cf)
+			List.iter (fun cf ->
+				jc#add_method (generate_method gctx jc c mtype cf)
+			) (cf :: cf.cf_overloads)
 		| _ ->
 			jc#add_field (generate_field gctx jc c mtype cf)
 	in
