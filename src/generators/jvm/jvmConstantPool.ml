@@ -37,9 +37,9 @@ class constant_pool = object(self)
 		let path = path_map path in
 		match path with
 		| [],"Int" ->
-			self#add_field (["java";"lang"],"Integer") "TYPE" "Ljava/lang/Class;" true
+			self#add_field (["java";"lang"],"Integer") "TYPE" "Ljava/lang/Class;" FKField
 		| ["java"],"Int64" ->
-			self#add_field (["java";"lang"],"Long") "TYPE" "Ljava/lang/Class;" true
+			self#add_field (["java";"lang"],"Long") "TYPE" "Ljava/lang/Class;" FKField
 		| _ ->
 			let s = self#s_type_path path in
 			let offset = self#add (ConstUtf8 s) in
@@ -52,15 +52,15 @@ class constant_pool = object(self)
 		let offset = self#add_string s in
 		self#add (ConstString offset)
 
-	method add_field path name jsig is_field =
+	method add_field path name jsig field_kind =
 		let offset_class = self#add_path path in
 		let offset_name = self#add_string name in
 		let offset_desc = self#add_string jsig in
 		let offset_info = self#add (ConstNameAndType(offset_name,offset_desc)) in
-		let const = if is_field then
-			(ConstFieldref(offset_class,offset_info))
-		else
-			(ConstMethodref(offset_class,offset_info))
+		let const = match field_kind with
+			| FKField -> ConstFieldref(offset_class,offset_info)
+			| FKMethod -> ConstMethodref(offset_class,offset_info)
+			| FKInterfaceMethod -> ConstInterfaceMethodref(offset_class,offset_info)
 		in
 		self#add const
 

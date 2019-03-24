@@ -20,6 +20,11 @@ type jvm_constant =
 	| ConstMethodType of jvm_constant_pool_index
 	| ConstInvokeDynamic of jvm_bootstrap_method_index * jvm_constant_pool_index
 
+type field_kind =
+	| FKField
+	| FKMethod
+	| FKInterfaceMethod
+
 type numeric_range =
 	| Int8Range
 	| Int16Range

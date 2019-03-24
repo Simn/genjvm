@@ -26,7 +26,7 @@ let write_jvm_class ch jvmc =
 	write_ui16 ch jvmc.class_this_class;
 	write_ui16 ch jvmc.class_super_class;
 	write_ui16 ch (Array.length jvmc.class_interfaces);
-	Array.iter (write_byte ch) jvmc.class_interfaces;
+	Array.iter (write_ui16 ch) jvmc.class_interfaces;
 	write_ui16 ch (Array.length jvmc.class_fields);
 	Array.iter (write_jvm_field ch) jvmc.class_fields;
 	write_ui16 ch (Array.length jvmc.class_methods);
@@ -216,7 +216,7 @@ let write_opcode ch code =
     | OpInstanceof offset -> w 0xc1; bp offset
     | OpCheckcast offset -> w 0xc0; bp offset
     | OpInvokedynamic offset -> w 0xba; bp offset; w 0; w 0 (* ??? *)
-    | OpInvokeinterface(offset,c) -> w 0xb9; bp offset; w c
+    | OpInvokeinterface(offset,c) -> w 0xb9; bp offset; w c; w 0
     | OpInvokespecial offset -> w 0xb7; bp offset
     | OpInvokestatic offset -> w 0xb8; bp offset
     | OpInvokevirtual offset -> w 0xb6; bp offset
