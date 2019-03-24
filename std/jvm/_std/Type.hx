@@ -1,3 +1,6 @@
+import java.lang.invoke.*;
+import java.lang.NoSuchMethodException;
+
 enum ValueType {
 	TNull;
 	TInt;
@@ -44,8 +47,8 @@ class Type {
 		return try {
 			java.lang.Class.forName(name);
 		} catch (e:java.lang.ClassNotFoundException) {
-		return null;
-	}
+			return null;
+		}
 	}
 
 	public static function resolveEnum(name:String):Enum<Dynamic> {
@@ -53,6 +56,42 @@ class Type {
 	}
 
 	public static function createInstance<T>(cl:Class<T>, args:Array<Dynamic>):T {
+		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
+		var cl = cl.native();
+		for (i in 0...args.length) {
+			var arg = (cast args[i] : java.lang.Object);
+			argTypes[i] = arg.getClass();
+			args[i] = arg;
+		}
+		var methodType = MethodType.methodType(cast Void, argTypes);
+
+		var ctor2 = try {
+			MethodHandles.lookup().findConstructor(cl, methodType);
+		} catch (_:NoSuchMethodException) {
+			null;
+		}
+		if (ctor2 == null) {
+			for (ctor in cl.getConstructors()) {
+				var params = ctor.getParameterTypes();
+				if (params.length != args.length) {
+					continue;
+				}
+				var valid = true;
+				for (i in 0...params.length) {
+					if (!java.jvm.Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
+						valid = false;
+						break;
+					}
+				}
+				if (valid) {
+					ctor2 = MethodHandles.lookup().unreflectConstructor(ctor);
+					break;
+				}
+			}
+		}
+		if (ctor2 != null) {
+			return ctor2.invokeWithArguments(@:privateAccess args.__a);
+		}
 		return null;
 	}
 

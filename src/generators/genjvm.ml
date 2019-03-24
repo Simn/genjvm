@@ -1069,6 +1069,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			basic_path "Integer"
 		| [],"Float" ->
 			basic_path "Double"
+		| [],"Bool" ->
+			basic_path "Boolean"
 		(* TODO: other types *)
 		| _ ->
 			let path = path_map path in

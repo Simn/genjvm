@@ -12,6 +12,42 @@ private class SomeClassWithArgs {
 	}
 }
 
+private class SomeClassWithUnwrappedArgs {
+	public var value:String;
+
+	@:overload public function new(i:Int, s:String) {
+		value = i + s;
+	}
+
+	@:overload public function new(b:Bool, s:String) {
+		value = b + s;
+	}
+}
+
+private class SomeClassWithWrappedArgs {
+	public var value:String;
+
+	@:overload public function new(i:Null<Int>, s:String) {
+		value = i + s;
+	}
+
+	@:overload public function new(i:Null<Bool>, s:String) {
+		value = i + s;
+	}
+}
+
+private class SomeClassWithMixedArgs {
+	public var value:String;
+
+	@:overload public function new(i:Null<Int>, i2:Int) {
+		value = "" + i + i2;
+	}
+
+	@:overload public function new(i:Null<Bool>, i2:Null<Bool>) {
+		value = "" + i + i2;
+	}
+}
+
 class TestTypeApi extends BaseTest {
 	public function new() {
 		super();
@@ -19,6 +55,7 @@ class TestTypeApi extends BaseTest {
 		testGetSuperClass();
 		testGetClassName();
 		testResolveClass();
+		testCreateInstance();
 	}
 
 	function testGetClass() {
@@ -44,5 +81,30 @@ class TestTypeApi extends BaseTest {
 		eq(cast SomeClass, Type.resolveClass("test._TestTypeApi.SomeClass"));
 		eq(null, Type.resolveClass("i.dont.Exist"));
 		eq(null, Type.resolveClass("in valid %%#'#! String"));
+	}
+
+	function testCreateInstance() {
+		function wrap<T>(i:T):Null<T> {
+			return i;
+		}
+		eq("12foo", Type.createInstance(SomeClassWithUnwrappedArgs, [12, "foo"]).value);
+		eq("12foo", Type.createInstance(SomeClassWithUnwrappedArgs, [wrap(12), "foo"]).value);
+		eq("truefoo", Type.createInstance(SomeClassWithUnwrappedArgs, [true, "foo"]).value);
+		eq("truefoo", Type.createInstance(SomeClassWithUnwrappedArgs, [wrap(true), "foo"]).value);
+
+		eq("12foo", Type.createInstance(SomeClassWithWrappedArgs, [12, "foo"]).value);
+		eq("12foo", Type.createInstance(SomeClassWithWrappedArgs, [wrap(12), "foo"]).value);
+		eq("truefoo", Type.createInstance(SomeClassWithWrappedArgs, [true, "foo"]).value);
+		eq("truefoo", Type.createInstance(SomeClassWithWrappedArgs, [wrap(true), "foo"]).value);
+
+		eq("1212", Type.createInstance(SomeClassWithMixedArgs, [12, 12]).value);
+		eq("1212", Type.createInstance(SomeClassWithMixedArgs, [wrap(12), 12]).value);
+		eq("1212", Type.createInstance(SomeClassWithMixedArgs, [12, wrap(12)]).value);
+		eq("1212", Type.createInstance(SomeClassWithMixedArgs, [wrap(12), wrap(12)]).value);
+
+		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [true, true]).value);
+		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [wrap(true), true]).value);
+		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [true, wrap(true)]).value);
+		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [wrap(true), wrap(true)]).value);
 	}
 }

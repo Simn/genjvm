@@ -129,4 +129,20 @@ class Jvm {
 	static public function stringConcat<A:java.lang.Object, B:java.lang.Object>(a:A, b:B):String {
 		return (cast toString(a) : java.lang.JavaString.String).concat(toString(b));
 	}
+
+	static public function getWrapperClass<S, T>(c:java.lang.Class<S>):java.lang.Class<S> {
+		if (!c.isPrimitive()) {
+			return c;
+		}
+		// TODO: other basic types
+		return if (c == cast Int) {
+			cast java.lang.Integer.IntegerClass;
+		} else if (c == cast Float) {
+			cast java.lang.Double.DoubleClass;
+		} else if (c == cast Bool) {
+			cast java.lang.Boolean.BooleanClass;
+		} else {
+			c;
+		}
+	}
 }
