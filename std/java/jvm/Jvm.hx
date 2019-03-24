@@ -74,18 +74,28 @@ class Jvm {
 			field.setAccessible(true);
 			return field.get(obj);
 		} catch (_:java.lang.NoSuchFieldException) {
-			var methods = cl.getMethods();
-			for (m in methods) {
-				if (m.getName() == name) {
-					var method = java.lang.invoke.MethodHandles.lookup().unreflect(m);
-					if (!isStatic) {
-						method = method.bindTo(obj);
+			while (cl != null) {
+				var methods = cl.getMethods();
+				for (m in methods) {
+					if (m.getName() == name) {
+						var method = java.lang.invoke.MethodHandles.lookup().unreflect(m);
+						if (!isStatic || cl == cast java.lang.Class) {
+							method = method.bindTo(obj);
+						}
+						return method;
 					}
-					return method;
 				}
-			}
-			if (instanceof(obj, java.jvm.DynamicObject)) {
-				return (obj : java.jvm.DynamicObject)._hx_getField(name);
+				if (instanceof(obj, java.jvm.DynamicObject)) {
+					return (obj : java.jvm.DynamicObject)._hx_getField(name);
+				}
+				if (isStatic) {
+					if (cl == cast java.lang.Class) {
+						break;
+					}
+					cl = cast java.lang.Class;
+				} else {
+					cl = cl.getSuperclass();
+				}
 			}
 			return null;
 		}

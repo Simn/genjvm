@@ -259,7 +259,9 @@ module Initialize = struct
 					old_flush()
 				);
 				Java.before_generate com;
-				add_std "java"; "java"
+				if defined com Define.Jvm then add_std "jvm";
+				add_std "java";
+				"java"
 			| Python ->
 				add_std "python";
 				if not (Common.defined com Define.PythonVersion) then
