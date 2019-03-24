@@ -1144,7 +1144,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let jump_then = (self#condition e1 ()) in
 			let pop_scope = jm#push_scope in
 			self#texpr RVoid e2;
-			code#goto (ref (fp - code#get_fp));
+			if not jm#is_terminated then code#goto (ref (fp - code#get_fp));
 			pop_scope();
 			ignore(restore());
 			jump_then := code#get_fp - !jump_then;
