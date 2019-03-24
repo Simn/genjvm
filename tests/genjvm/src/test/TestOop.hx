@@ -17,6 +17,8 @@ class Base implements BaseInterface {
 }
 
 class Child extends Base implements ChildInterface {
+	public var field:String;
+
 	public function new() {
 		super();
 	}
@@ -30,6 +32,14 @@ class Child extends Base implements ChildInterface {
 	}
 }
 
+typedef TestStructure = {
+	function test(value:String):String;
+}
+
+typedef FieldStructure = {
+	var field:String;
+}
+
 class TestOop extends BaseTest {
 	public function new() {
 		super();
@@ -37,5 +47,16 @@ class TestOop extends BaseTest {
 		eq("Base.test(MainValue)Main.test(MainValue)", child.test("MainValue"));
 		eq("Base.test(MainValue)Main.test(MainValue)", (child : BaseInterface).test("MainValue"));
 		eq("Main.test2(MainValue)", (child : ChildInterface).test2("MainValue"));
+
+		function subtype(obj:TestStructure, value:String) {
+			return obj.test(value);
+		}
+		eq("Base.test(MainValue)Main.test(MainValue)", subtype(child, "MainValue"));
+
+		function subtype(obj:FieldStructure) {
+			return obj.field;
+		}
+		child.field = "FieldValue";
+		eq("FieldValue", subtype(child));
 	}
 }
