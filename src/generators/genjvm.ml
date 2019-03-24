@@ -1058,10 +1058,23 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		code#invokespecial offset t tl []
 
 	method type_expr path =
-		let path = path_map path in
-		let offset = pool#add_path path in
-		let t = TObject(path,[]) in
-		code#ldc offset (TObject(java_class_path,[TType(WNone,t)]))
+		let basic_path name =
+			let offset = pool#add_field (["java";"lang"],name) "TYPE" "Ljava/lang/Class;" FKField in
+			code#getstatic offset java_class_sig
+		in
+		match path with
+		| [],"Void" ->
+			basic_path "Void"
+		| [],"Int" ->
+			basic_path "Integer"
+		| [],"Float" ->
+			basic_path "Double"
+		(* TODO: other types *)
+		| _ ->
+			let path = path_map path in
+			let offset = pool#add_path path in
+			let t = TObject(path,[]) in
+			code#ldc offset (TObject(java_class_path,[TType(WNone,t)]))
 
 	method texpr ret e =
 		try
@@ -1490,14 +1503,26 @@ let generate_enum gctx en =
 	let jc = jc#export_class in
 	write_class gctx.jar en.e_path jc
 
+let generate_abstract gctx a =
+	let super_path = object_path in
+	let jc = new JvmClass.builder a.a_path super_path in
+	jc#add_access_flag 1; (* public *)
+	let jc = jc#export_class in
+	write_class gctx.jar a.a_path jc
+
 let debug_path path = match path with
 	(* | ([],"Main") | (["haxe";"jvm"],_) -> true *)
 	| (["haxe";"lang"],_) -> false (* Old Haxe/Java stuff that's weird *)
 	| _ -> true
 
+let is_extern_abstract a = match a.a_impl with
+	| Some {cl_extern = true} -> true
+	| _ -> false
+
 let generate_module_type ctx mt = match mt with
 	| TClassDecl c when not c.cl_extern && debug_path c.cl_path -> generate_class ctx c
 	| TEnumDecl en -> generate_enum ctx en
+	| TAbstractDecl a when not (is_extern_abstract a) && Meta.has Meta.CoreType a.a_meta -> generate_abstract ctx a
 	| _ -> ()
 
 let generate com =

@@ -33,17 +33,14 @@ class constant_pool = object(self)
 
 	method private s_type_path (p,s) = match p with [] -> s | _ -> String.concat "/" p ^ "/" ^ s
 
+	method add_type s =
+		let offset = self#add (ConstUtf8 s) in
+		self#add (ConstClass offset);
+
 	method add_path path =
 		let path = path_map path in
-		match path with
-		| [],"Int" ->
-			self#add_field (["java";"lang"],"Integer") "TYPE" "Ljava/lang/Class;" FKField
-		| ["java"],"Int64" ->
-			self#add_field (["java";"lang"],"Long") "TYPE" "Ljava/lang/Class;" FKField
-		| _ ->
-			let s = self#s_type_path path in
-			let offset = self#add (ConstUtf8 s) in
-			self#add (ConstClass offset);
+		let s = self#s_type_path path in
+		self#add_type s
 
 	method add_string s =
 		self#add (ConstUtf8 s)

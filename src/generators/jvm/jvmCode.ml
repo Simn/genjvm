@@ -404,6 +404,10 @@ class builder pool = object(self)
 		let tl = stack#get_stack_items 2 in
 		self#op OpSwap 1 tl (List.rev tl)
 
+	method checkcast_sig jsig =
+		let offset = pool#add_type (generate_signature false jsig) in
+		self#op (OpCheckcast offset) 3 [stack#top] [jsig]
+
 	method checkcast path =
 		let offset = pool#add_path path in
 		let jsig = match path with

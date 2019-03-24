@@ -19,7 +19,7 @@ class Type {
 		if (java.jvm.Jvm.instanceof(o, Class)) {
 			return null;
 		}
-		return cast(cast o : java.lang.Object).getClass();
+		return (cast o : java.lang.Object).getClass();
 	}
 
 	public static function getEnum(o:EnumValue):Enum<Dynamic> {
@@ -28,11 +28,12 @@ class Type {
 
 	public static function getSuperClass(c:Class<Dynamic>):Class<Dynamic> {
 		// TODO: we have to not report haxe.lang.Object for Haxe base types
-		return cast((cast c : java.lang.Class<Dynamic>).getSuperclass());
+		return c.native().getSuperclass();
 	}
 
 	public static function getClassName(c:Class<Dynamic>):String {
-		return null;
+		// TODO: java.lang.String has to become String somehow
+		return c.native().getName();
 	}
 
 	public static function getEnumName(e:Enum<Dynamic>):String {
@@ -40,7 +41,11 @@ class Type {
 	}
 
 	public static function resolveClass(name:String):Class<Dynamic> {
+		return try {
+			java.lang.Class.forName(name);
+		} catch (e:java.lang.ClassNotFoundException) {
 		return null;
+	}
 	}
 
 	public static function resolveEnum(name:String):Enum<Dynamic> {
