@@ -230,6 +230,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method mknull t = com.basic.tnull (follow t)
 
+	method add_haxe_field is_static path name =
+		let c,cf = resolve_method com is_static path name in
+		add_field pool c cf
+
 	(* locals *)
 
 	method add_local v init_state : (int * (unit -> unit) * (unit -> unit)) =
@@ -247,8 +251,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method expect_reference_type = jm#expect_reference_type
 
 	method cast t =
-		let vt = self#vtype t in
-		jm#cast vt
+		if follow t != t_dynamic then begin
+			let vt = self#vtype t in
+			jm#cast vt
+		end else
+			self#expect_reference_type
 
 	(* access *)
 
@@ -301,8 +308,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#string s;
 			code#invokestatic offset [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic];
 			self#cast t;
-		| _ ->
-			assert false
+		| FClosure(_,cf) ->
+			let offset = self#add_haxe_field true haxe_jvm_path "bindMethod" in
+			self#texpr RValue e1;
+			self#string cf.cf_name;
+			self#string (generate_method_signature false (self#vtype cf.cf_type));
+			code#invokestatic offset [self#vtype e1.etype;string_sig;string_sig] [method_handle_sig]
 
 	method read_write ret ak e (f : unit -> unit) (t : Type.t) =
 		let apply dup =
@@ -883,9 +894,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| _ ->
 			self#texpr RValue e1;
-			let t = self#vtype e1.etype in
+			code#checkcast method_handle_path;
 			let tl,tr = self#call_arguments e1.etype el in
-			let offset = pool#add_field method_handle_path "invoke" (generate_method_signature false t) FKMethod in
+			let offset = pool#add_field method_handle_path "invoke" (generate_method_signature false (TMethod(tl,tr))) FKMethod in
 			code#invokevirtual offset (self#vtype e1.etype) tl (retype tr);
 			tr
 		in

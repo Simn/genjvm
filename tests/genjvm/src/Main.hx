@@ -4,6 +4,7 @@ class Main {
 		new test.TestOop();
 		new test.TestMatch();
 		new test.TestExceptions();
+		new test.TestClosure();
 		trace('Done! ${test.BaseTest.numTests} tests with ${test.BaseTest.numFailures} failures');
 	}
 }

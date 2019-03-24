@@ -57,11 +57,18 @@ class Jvm {
 		return d == null ? false : (d : java.lang.Boolean).booleanValue();
 	}
 
+	static public function bindMethod<T:java.lang.Object>(obj:T, name:String, descriptor:String) {
+		return java.lang.invoke.MethodHandles.lookup()
+			.findVirtual(obj.getClass(), name,
+				java.lang.invoke.MethodType.fromMethodDescriptorString(descriptor, java.lang.ClassLoader.getSystemClassLoader())).bindTo(obj);
+	}
+
 	static public function readField(obj:Dynamic, name:String):Dynamic {
 		if (obj == null) {
 			return null;
 		}
-		var cl = instanceof(obj, java.lang.Class) ? obj : (obj : java.lang.Object).getClass();
+		var isStatic = instanceof(obj, java.lang.Class);
+		var cl = isStatic ? obj : (obj : java.lang.Object).getClass();
 		try {
 			var field = cl.getField(name);
 			field.setAccessible(true);
@@ -70,7 +77,11 @@ class Jvm {
 			var methods = cl.getMethods();
 			for (m in methods) {
 				if (m.getName() == name) {
-					return java.lang.invoke.MethodHandles.lookup().unreflect(m);
+					var method = java.lang.invoke.MethodHandles.lookup().unreflect(m);
+					if (!isStatic) {
+						method = method.bindTo(obj);
+					}
+					return method;
 				}
 			}
 			if (instanceof(obj, java.jvm.DynamicObject)) {
