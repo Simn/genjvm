@@ -1,5 +1,6 @@
 import java.lang.invoke.*;
 import java.lang.NoSuchMethodException;
+import java.jvm.annotation.EnumReflectionInformation;
 
 enum ValueType {
 	TNull;
@@ -116,6 +117,14 @@ class Type {
 	}
 
 	public static function getEnumConstructs(e:Enum<Dynamic>):Array<String> {
+		var clInfo:Class<Dynamic> = cast EnumReflectionInformation;
+		// TODO: We should use e.getAnnotation(clInfo) here, but our type system has some issues with that
+		var annotations = e.native().getAnnotations();
+		for (annotation in annotations) {
+			if (annotation.annotationType() == clInfo) {
+				return @:privateAccess Array.ofNative((cast annotation : EnumReflectionInformation).constructorNames());
+			}
+		}
 		return null;
 	}
 

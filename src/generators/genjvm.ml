@@ -1510,6 +1510,8 @@ let generate_enum gctx en =
 	jm#get_code#invokespecial offset_field jc#get_jsig [TInt;enum_ctor_sig] [];
 	jm#get_code#return_void;
 	jc#add_method jm#export_method;
+	let names = List.map (fun name -> JvmClass.AConst (ACString name)) en.e_names in
+	jc#add_annotation (TObject((["haxe";"jvm";"annotation"],"EnumReflectionInformation"),[])) (["constructorNames",AArray names]);
 	let jc = jc#export_class in
 	write_class gctx.jar en.e_path jc
 

@@ -56,6 +56,7 @@ class TestTypeApi extends BaseTest {
 		testGetClassName();
 		testResolveClass();
 		testCreateInstance();
+		testEnumConstructs();
 	}
 
 	function testGetClass() {
@@ -106,5 +107,11 @@ class TestTypeApi extends BaseTest {
 		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [wrap(true), true]).value);
 		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [true, wrap(true)]).value);
 		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [wrap(true), wrap(true)]).value);
+	}
+
+	function testEnumConstructs() {
+		var a = Type.getEnumConstructs(haxe.ds.Option);
+		eq("Some", a[0]);
+		eq("None", a[1]);
 	}
 }
