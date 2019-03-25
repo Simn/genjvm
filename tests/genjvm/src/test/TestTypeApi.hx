@@ -59,9 +59,14 @@ class TestTypeApi extends BaseTest {
 		testGetEnum();
 		testGetSuperClass();
 		testGetClassName();
+		testGetEnumName();
 		testResolveClass();
+		testResolveEnum();
 		testCreateInstance();
+		testCreateEmptyInstance();
 		testEnumConstructs();
+		testEnumIndex();
+		testEnumParameters();
 	}
 
 	function testGetClass() {
@@ -88,12 +93,25 @@ class TestTypeApi extends BaseTest {
 		eq("java.lang.String", Type.getClassName(String));
 	}
 
+	function testGetEnumName() {
+		eq("haxe.macro.ExprDef", Type.getEnumName(haxe.macro.Expr.ExprDef));
+	}
+
 	function testResolveClass() {
 		eq(cast String, Type.resolveClass("java.lang.String"));
 		// eq(cast String, Type.resolveClass("String")); // TODO
 		eq(cast SomeClass, Type.resolveClass("test._TestTypeApi.SomeClass"));
 		eq(null, Type.resolveClass("i.dont.Exist"));
 		eq(null, Type.resolveClass("in valid %%#'#! String"));
+	}
+
+	function testResolveEnum() {
+		eq(null, Type.resolveEnum("java.lang.String"));
+		eq(null, Type.resolveEnum("String")); // TODO
+		eq(null, Type.resolveEnum("test._TestTypeApi.SomeClass"));
+		eq(null, Type.resolveEnum("i.dont.Exist"));
+		eq(null, Type.resolveEnum("in valid %%#'#! String"));
+		eq(cast Option, Type.resolveEnum("haxe.ds.Option"));
 	}
 
 	function testCreateInstance() {
@@ -121,9 +139,25 @@ class TestTypeApi extends BaseTest {
 		eq("truetrue", Type.createInstance(SomeClassWithMixedArgs, [wrap(true), wrap(true)]).value);
 	}
 
+	function testCreateEmptyInstance() {
+		eq(cast SomeClass, Type.getClass(Type.createEmptyInstance(SomeClass)));
+		// TODO: ouch...
+		// eq(cast SomeClassWithArgs, Type.getClass(Type.createEmptyInstance(SomeClassWithArgs)));
+	}
+
 	function testEnumConstructs() {
 		var a = Type.getEnumConstructs(Option);
 		eq("Some", a[0]);
 		eq("None", a[1]);
+	}
+
+	function testEnumIndex() {
+		eq(1, Type.enumIndex(None));
+		eq(0, Type.enumIndex(Some(12)));
+	}
+
+	function testEnumParameters() {
+		eq(0, Type.enumParameters(None).length);
+		eq(12, Type.enumParameters(Some(12))[0]);
 	}
 }
