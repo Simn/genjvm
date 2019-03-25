@@ -3,6 +3,7 @@ package java.jvm;
 import java.jvm.Enum;
 import java.jvm.DynamicObject;
 import java.jvm.Exception;
+import java.jvm.annotation.ClassReflectionInformation;
 import java.jvm.annotation.EnumReflectionInformation;
 
 @:keep

@@ -1,5 +1,6 @@
 import java.lang.invoke.*;
 import java.lang.NoSuchMethodException;
+import java.jvm.annotation.ClassReflectionInformation;
 import java.jvm.annotation.EnumReflectionInformation;
 
 enum ValueType {
@@ -16,6 +17,17 @@ enum ValueType {
 
 @:coreApi
 class Type {
+	static function hackGetAnnotation<T:java.lang.annotation.Annotation>(c:java.lang.Class<Dynamic>, cAnnotation:java.lang.Class<T>):T {
+		// TODO: We should use e.getAnnotation(clInfo) here, but our type system has some issues with that
+		var annotations = c.getAnnotations();
+		for (annotation in annotations) {
+			if (cAnnotation == cast annotation.annotationType()) {
+				return cast annotation;
+			}
+		}
+		return null;
+	}
+
 	public static function getClass<T>(o:T):Class<T> {
 		if (o == null) {
 			return null;
@@ -44,8 +56,16 @@ class Type {
 	}
 
 	public static function getSuperClass(c:Class<Dynamic>):Class<Dynamic> {
-		// TODO: we have to not report haxe.lang.Object for Haxe base types
-		return c.native().getSuperclass();
+		var c = c.native();
+		var cSuper = c.getSuperclass();
+		if (cSuper == null) {
+			return null;
+		}
+		var annotation = hackGetAnnotation(c, (cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>));
+		if (annotation != null && annotation.hasSuperClass() == false) {
+			return null;
+		}
+		return cSuper;
 	}
 
 	public static function getClassName(c:Class<Dynamic>):String {
@@ -130,15 +150,9 @@ class Type {
 	}
 
 	public static function getEnumConstructs(e:Enum<Dynamic>):Array<String> {
-		var clInfo:Class<Dynamic> = cast EnumReflectionInformation;
-		// TODO: We should use e.getAnnotation(clInfo) here, but our type system has some issues with that
-		var annotations = e.native().getAnnotations();
-		for (annotation in annotations) {
-			if (annotation.annotationType() == clInfo) {
-				return @:privateAccess Array.ofNative((cast annotation : EnumReflectionInformation).constructorNames());
-			}
-		}
-		return null;
+		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
+		var annotation = hackGetAnnotation(e.native(), clInfo);
+		return @:privateAccess Array.ofNative(annotation.constructorNames());
 	}
 
 	public static function typeof(v:Dynamic):ValueType {

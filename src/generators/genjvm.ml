@@ -1451,8 +1451,9 @@ let generate_field gctx jc c mtype cf =
 	jm#export_field
 
 let generate_class gctx c =
+	let is_annotation = Meta.has Meta.Annotation c.cl_meta in
 	let path_super,sig_super_ctor = match c.cl_super with
-		| None -> (object_path),"()V"
+		| None -> object_path,"()V"
 		| Some(c,_) -> path_map c.cl_path,match c.cl_constructor with
 			| Some cf ->
 				generate_method_signature true (jsignature_of_type cf.cf_type)
@@ -1489,7 +1490,12 @@ let generate_class gctx c =
 			cf.cf_expr <- Some e;
 			field MStatic cf
 	end;
-	List.iter (fun (c,_) -> jc#add_interface c.cl_path) c.cl_implements;
+	List.iter (fun (c,_) ->
+		if is_annotation && c.cl_path = (["java";"lang";"annotation"],"Annotation") then
+			()
+		else
+			jc#add_interface c.cl_path
+	) c.cl_implements;
 	jc#add_attribute (AttributeSourceFile (pool#add_string c.cl_pos.pfile));
 	begin match c.cl_params with
 		| [] ->
@@ -1512,12 +1518,13 @@ let generate_class gctx c =
 		jc#add_access_flag 0x200;
 		jc#add_access_flag 0x400;
 	end;
-	if Meta.has Meta.Annotation c.cl_meta then begin
+	if is_annotation then begin
 		jc#add_access_flag 0x2000;
 		jc#add_interface (["java";"lang";"annotation"],"Annotation");
 		(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
 		jc#add_annotation retention_sig ["value",(JvmClass.AEnum(retention_policy_sig,"RUNTIME"))];
 	end;
+	jc#add_annotation (TObject((["haxe";"jvm";"annotation"],"ClassReflectionInformation"),[])) (["hasSuperClass",(JvmClass.AConst (ACBool (c.cl_super <> None)))]);
 	let jc = jc#export_class in
 	write_class gctx.jar (path_map c.cl_path) jc
 

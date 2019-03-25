@@ -50,6 +50,8 @@ private class SomeClassWithMixedArgs {
 	}
 }
 
+private class ActuallyExtendsObject extends java.lang.Object {}
+
 class TestTypeApi extends BaseTest {
 	public function new() {
 		super();
@@ -77,6 +79,8 @@ class TestTypeApi extends BaseTest {
 
 	function testGetSuperClass() {
 		eq(cast java.lang.Object, Type.getSuperClass(String));
+		eq(cast null, Type.getSuperClass(SomeClass));
+		eq(cast java.lang.Object, Type.getSuperClass(ActuallyExtendsObject));
 	}
 
 	function testGetClassName() {
