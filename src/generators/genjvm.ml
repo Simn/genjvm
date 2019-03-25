@@ -927,7 +927,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#dup;
 			code#instanceof haxe_exception_path;
 			jm#if_then_else
-				(fun () -> code#if_ref CmpNe)
+				(fun () -> code#if_ref CmpEq)
 				(fun () ->
 					code#checkcast haxe_exception_path;
 					let c,cf = resolve_method com false (["haxe";"jvm"],"Exception") "value" in
