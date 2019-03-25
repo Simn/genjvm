@@ -23,7 +23,13 @@ class Type {
 		if (java.jvm.Jvm.instanceof(o, Class)) {
 			return null;
 		}
-		return (cast o : java.lang.Object).getClass();
+		var c = (cast o : java.lang.Object).getClass();
+		// TODO: have to be careful if we ever decide to omit EnumReflectionInformation
+		// Maybe a separate HaxeEnum annotation would be better here
+		if (c.isAnnotationPresent(cast EnumReflectionInformation)) {
+			return null;
+		}
+		return c;
 	}
 
 	public static function getEnum(o:EnumValue):Enum<Dynamic> {

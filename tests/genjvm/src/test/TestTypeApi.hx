@@ -1,5 +1,7 @@
 package test;
 
+import haxe.ds.Option;
+
 private class SomeClass {
 	public function new() {}
 }
@@ -65,6 +67,7 @@ class TestTypeApi extends BaseTest {
 		eq(null, Type.getClass(java.lang.Object));
 		eq(cast SomeClass, Type.getClass(new SomeClass()));
 		eq(cast String, Type.getClass("foo"));
+		eq(null, Type.getClass(None));
 	}
 
 	function testGetSuperClass() {
@@ -110,7 +113,7 @@ class TestTypeApi extends BaseTest {
 	}
 
 	function testEnumConstructs() {
-		var a = Type.getEnumConstructs(haxe.ds.Option);
+		var a = Type.getEnumConstructs(Option);
 		eq("Some", a[0]);
 		eq("None", a[1]);
 	}
