@@ -3,6 +3,20 @@ open JvmData
 open JvmVerificationTypeInfo
 open JvmWriter
 
+type j_annotation = {
+	ann_type : int;
+	ann_elements : (int * j_annotation_element_value) array;
+}
+
+and j_annotation_element_value = char * j_annotation_value
+
+and j_annotation_value =
+	| ValConst of int (* B, C, D, E, F, I, J, S, Z, s *)
+	| ValEnum of int * int (* e *)
+	| ValClass of int (* c *) (* V -> Void *)
+	| ValAnnotation of j_annotation (* @ *)
+	| ValArray of j_annotation_element_value array (* [ *)
+
 (* https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.4 *)
 type j_stack_map_frame =
 	| StackSame of int
@@ -43,6 +57,7 @@ type j_attribute =
 	| AttributeSignature of jvm_constant_pool_index
 	| AttributeLocalVariableTable of jvm_local_debug array
 	| AttributeInnerClasses of jvm_inner_class array
+	| AttributeRuntimeVisibleAnnotations of j_annotation array
 
 let write_verification_type ch = function
 	| VTop -> write_byte ch 0
@@ -108,6 +123,28 @@ let write_constant pool ch const =
 	let offset = pool#add const in
 	write_ui16 ch offset
 
+let rec write_annotation ch ann =
+	write_ui16 ch ann.ann_type;
+	write_array16 ch (fun _ (i,v) ->
+		write_ui16 ch i;
+		let rec loop _ (c,v) =
+			write_byte ch (Char.code c);
+			match v with
+			| ValConst i ->
+				write_ui16 ch i
+			| ValEnum(i1,i2) ->
+				write_ui16 ch i1;
+				write_ui16 ch i2;
+			| ValClass i ->
+				write_ui16 ch i
+			| ValAnnotation a ->
+				write_annotation ch ann
+			| ValArray annl ->
+				write_array16 ch loop annl
+		in
+		loop ch v
+	) ann.ann_elements
+
 let write_attribute pool jvma =
 	let ch = IO.output_bytes () in
 	let name = match jvma with
@@ -154,6 +191,9 @@ let write_attribute pool jvma =
 			write_ui16 ch d.ld_index;
 		) table;
 		"LocalVariableTable"
+	| AttributeRuntimeVisibleAnnotations al ->
+		write_array16 ch write_annotation al;
+		"RuntimeVisibleAnnotations"
 	in
 	{
 		attr_index = pool#add (ConstUtf8 name);
