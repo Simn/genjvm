@@ -10,4 +10,13 @@ class Enum {
 		this.index = index;
 		this.parameters = parameters;
 	}
+
+	public function toString() {
+		var baseName = Type.getEnumConstructs(cast(cast this : java.lang.Object).getClass())[index];
+		if (parameters.length == 0) {
+			return baseName;
+		}
+		// TODO: creating arrays here is stupid
+		return '$baseName(${@:privateAccess Array.ofNative(parameters).join(", ")})';
+	}
 }
