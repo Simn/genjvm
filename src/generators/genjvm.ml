@@ -1482,6 +1482,12 @@ let generate_class gctx c =
 		jc#add_access_flag 0x200;
 		jc#add_access_flag 0x400;
 	end;
+	if Meta.has Meta.Annotation c.cl_meta then begin
+		jc#add_access_flag 0x2000;
+		jc#add_interface (["java";"lang";"annotation"],"Annotation");
+		(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
+		jc#add_annotation retention_sig ["value",(JvmClass.AEnum(retention_policy_sig,"RUNTIME"))];
+	end;
 	let jc = jc#export_class in
 	write_class gctx.jar (path_map c.cl_path) jc
 

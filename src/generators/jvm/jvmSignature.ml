@@ -153,6 +153,12 @@ module NativeSignatures = struct
 	let exception_path = (["java";"lang"],"Exception")
 	let exception_sig = TObject(exception_path,[])
 
+	let retention_path = (["java";"lang";"annotation"],"Retention")
+	let retention_sig = TObject(retention_path,[])
+
+	let retention_policy_path = (["java";"lang";"annotation"],"RetentionPolicy")
+	let retention_policy_sig = TObject(retention_policy_path,[])
+
 	(* numeric *)
 
 	let byte_path = ["java";"lang"],"Byte"
