@@ -932,7 +932,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| _ ->
 			self#texpr RValue e1;
-			code#checkcast method_handle_path;
+			jm#cast method_handle_sig;
 			let tl,tr = self#call_arguments e1.etype el in
 			let offset = pool#add_field method_handle_path "invoke" (generate_method_signature false (TMethod(tl,tr))) FKMethod in
 			code#invokevirtual offset (self#vtype e1.etype) tl (retype tr);
@@ -966,11 +966,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#if_then_else
 				(fun () -> code#if_ref CmpEq)
 				(fun () ->
-					code#checkcast haxe_exception_path;
+					jm#cast haxe_exception_sig;
 					let offset = self#add_haxe_field false (["haxe";"jvm"],"Exception") "value" in
 					code#getfield offset haxe_exception_sig object_sig;
 				)
-				(fun () -> code#checkcast object_path);
+				(fun () -> jm#cast object_sig);
 		in
 		let start_exception_block path jsig =
 			ignore(restore());
