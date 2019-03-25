@@ -266,7 +266,7 @@ class builder pool = object(self)
 		self#op (OpInvokevirtual offset) 3 (List.rev (t1 :: tl)) tr
 
 	method invokeinterface offset t1 tl tr =
-		self#op (OpInvokeinterface(offset,List.length tl + 1)) 3 (List.rev (t1 :: tl)) tr
+		self#op (OpInvokeinterface(offset,List.length tl + 1)) 5 (List.rev (t1 :: tl)) tr
 
 	method invokespecial offset t1 tl tr =
 		self#op (OpInvokespecial offset) 3 (List.rev (t1 :: tl)) tr
