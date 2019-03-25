@@ -271,13 +271,13 @@ class builder jc api name jsig = object(self)
 			let entry = match stack,locals_length - last_locals_length with
 			| [],0 ->
 				if last_locals = locals then begin
-					if cur <= 64 then StackSame cur
+					if cur < 64 then StackSame cur
 					else StackSameExtended cur
 				end else
 					default()
 			| [vt],0 ->
 				if last_locals = locals then begin
-					if cur <= 64 then Stack1StackItem(cur,vt)
+					if cur < 64 then Stack1StackItem(cur,vt)
 					else Stack1StackItemExtended(cur,vt)
 				end else
 					default()

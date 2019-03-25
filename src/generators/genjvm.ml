@@ -982,7 +982,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let path = match self#vtype (self#mknull v.v_type) with TObject(path,_) -> path | _ -> assert false in
 					code#instanceof path;
 					jm#if_then_else
-						(fun () -> code#if_ref CmpNe)
+						(fun () -> code#if_ref CmpEq)
 						(fun () ->
 							ignore(restore());
 							self#cast v.v_type;

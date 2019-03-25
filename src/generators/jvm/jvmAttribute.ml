@@ -76,10 +76,10 @@ let write_verification_type ch = function
 
 let write_stack_map_frame ch = function
 	| StackSame i ->
-		assert (i <= 64);
+		assert (i < 64);
 		write_byte ch i
 	| Stack1StackItem(i,t) ->
-		assert (i <= 64);
+		assert (i < 64);
 		write_byte ch (i + 64);
 		write_verification_type ch t;
 	| Stack1StackItemExtended(i,t) ->
