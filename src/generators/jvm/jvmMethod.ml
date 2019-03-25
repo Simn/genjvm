@@ -336,6 +336,7 @@ class builder jc api name jsig = object(self)
 		}
 
 	method export_method =
+		self#commit_annotations jc#get_pool;
 		if code#get_fp > 0 then begin
 			let code = self#get_jcode in
 			self#add_attribute (AttributeCode code);
