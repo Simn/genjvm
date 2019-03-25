@@ -2,6 +2,7 @@ open JvmGlobals
 open JvmData
 open JvmAttribute
 open JvmSignature
+open JvmBuilder
 
 (* High-level method builder. *)
 
@@ -15,7 +16,7 @@ type var_init_state =
 	| VarNeedDefault
 
 class builder jc api name jsig = object(self)
-	inherit JvmClass.base_builder
+	inherit base_builder
 	val code = new JvmCode.builder jc#get_pool
 
 	val mutable max_num_locals = 0

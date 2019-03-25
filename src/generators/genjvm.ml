@@ -8,6 +8,7 @@ open JvmData
 open JvmAttribute
 open JvmSignature
 open JvmMethod
+open JvmBuilder
 
 (* Haxe *)
 
@@ -1522,9 +1523,9 @@ let generate_class gctx c =
 		jc#add_access_flag 0x2000;
 		jc#add_interface (["java";"lang";"annotation"],"Annotation");
 		(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
-		jc#add_annotation retention_sig ["value",(JvmClass.AEnum(retention_policy_sig,"RUNTIME"))];
+		jc#add_annotation retention_path ["value",(AEnum(retention_policy_sig,"RUNTIME"))];
 	end;
-	jc#add_annotation (TObject((["haxe";"jvm";"annotation"],"ClassReflectionInformation"),[])) (["hasSuperClass",(JvmClass.AConst (ACBool (c.cl_super <> None)))]);
+	jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
 	let jc = jc#export_class in
 	write_class gctx.jar (path_map c.cl_path) jc
 
@@ -1547,8 +1548,8 @@ let generate_enum gctx en =
 	jm#get_code#invokespecial offset_field jc#get_jsig [TInt;enum_ctor_sig] [];
 	jm#get_code#return_void;
 	jc#add_method jm#export_method;
-	let names = List.map (fun name -> JvmClass.AConst (ACString name)) en.e_names in
-	jc#add_annotation (TObject((["haxe";"jvm";"annotation"],"EnumReflectionInformation"),[])) (["constructorNames",AArray names]);
+	let names = List.map (fun name -> AString name) en.e_names in
+	jc#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
 	let jc = jc#export_class in
 	write_class gctx.jar en.e_path jc
 
