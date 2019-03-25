@@ -10,6 +10,10 @@ class Exception<T> extends java.lang.Exception {
 		this.value = value;
 	}
 
+	@:overload override public function toString() {
+		return Std.string(value);
+	}
+
 	public function unwrap() {
 		return value;
 	}
