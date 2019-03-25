@@ -33,7 +33,14 @@ class Type {
 	}
 
 	public static function getEnum(o:EnumValue):Enum<Dynamic> {
-		return null;
+		if (o == null) {
+			return null;
+		}
+		var c = (cast o : java.lang.Object).getClass();
+		if (!c.isAnnotationPresent(cast EnumReflectionInformation)) {
+			return null;
+		}
+		return cast c;
 	}
 
 	public static function getSuperClass(c:Class<Dynamic>):Class<Dynamic> {

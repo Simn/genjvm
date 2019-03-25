@@ -54,6 +54,7 @@ class TestTypeApi extends BaseTest {
 	public function new() {
 		super();
 		testGetClass();
+		testGetEnum();
 		testGetSuperClass();
 		testGetClassName();
 		testResolveClass();
@@ -68,6 +69,10 @@ class TestTypeApi extends BaseTest {
 		eq(cast SomeClass, Type.getClass(new SomeClass()));
 		eq(cast String, Type.getClass("foo"));
 		eq(null, Type.getClass(None));
+	}
+
+	function testGetEnum() {
+		eq(cast Option, Type.getEnum(None));
 	}
 
 	function testGetSuperClass() {
