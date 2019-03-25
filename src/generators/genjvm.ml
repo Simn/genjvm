@@ -35,6 +35,54 @@ type access_kind =
 	| AKPre
 	| AKNone
 
+module NativeArray = struct
+	let read code ja je = match je with
+		| TBool | TByte -> code#baload ja
+		| TChar -> code#caload ja
+		| TDouble -> code#daload ja
+		| TFloat -> code#faload ja
+		| TInt -> code#iaload ja
+		| TLong -> code#laload ja
+		| TShort -> code#saload ja
+		| _ -> code#aaload ja je
+
+	let write code ja je = match je with
+		| TBool | TByte -> code#bastore ja
+		| TChar -> code#castore ja
+		| TDouble -> code#dastore ja
+		| TFloat -> code#fastore ja
+		| TInt -> code#iastore ja
+		| TLong -> code#lastore ja
+		| TShort -> code#sastore ja
+		| _ -> code#aastore ja je
+
+	let create code pool je =
+		let ja = (TArray(je,None)) in
+		let primitive i =
+			code#newarray ja i
+		in
+		let reference path =
+			let offset = pool#add_path path in
+			code#anewarray ja offset;
+		in
+		begin match je with
+		| TBool -> primitive 4
+		| TChar -> primitive 5
+		| TFloat -> primitive 6
+		| TDouble -> primitive 7
+		| TByte -> primitive 8
+		| TShort -> primitive 9
+		| TInt -> primitive 10
+		| TLong -> primitive 11
+		| TObject(path,_) -> reference path
+		| TMethod _ -> reference NativeSignatures.method_handle_path
+		| TTypeParameter _ -> reference NativeSignatures.object_path
+		| TArray _ -> assert false (* TODO: hmm... *)
+		| TObjectInner _ -> assert false
+		end;
+		ja
+end
+
 open NativeSignatures
 
 let rec jsignature_of_type t = match t with
@@ -74,8 +122,7 @@ let rec jsignature_of_type t = match t with
 		let t = get_boxed_type (jsignature_of_type t) in
 		TObject(([],"Array"),[TType(WNone,t)])
 	| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
-		let t = get_boxed_type (jsignature_of_type t) in (* TODO: ? *)
-		TArray(t,None)
+		TArray(jsignature_of_type t,None)
 	| TInst({cl_kind = KTypeParameter _; cl_path = (_,name)},_) -> TTypeParameter name
 	| TInst(c,tl) -> TObject(c.cl_path,List.map jtype_argument_of_type tl)
 	| TEnum(en,tl) -> TObject(en.e_path,List.map jtype_argument_of_type tl)
@@ -259,6 +306,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* access *)
 
+	method read_native_array vta vte =
+		NativeArray.read code vta vte
+
+	method write_native_array vta vte =
+		NativeArray.write code vta vte
+
 	method read_static_closure name =
 		let c',cf' = resolve_method com true haxe_jvm_path "readField" in
 		let offset = add_field pool c' cf' in
@@ -382,7 +435,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#cast t;
 					code#invokevirtual offset_set vta [TInt;vte] []
 				| TInst({cl_path = (["java"],"NativeArray")},_) ->
-					let t = self#mknull t in
 					let vte = self#vtype t in
 					let vta = self#vtype e1.etype in
 					self#texpr RValue e1;
@@ -390,11 +442,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#texpr RValue e2;
 					if ak <> AKNone then begin
 						code#dup_x1;
-						code#aaload vta vte;
+						self#read_native_array vta vte
 					end;
 					apply (fun () -> code#dup_x2);
 					self#cast t;
-					code#aastore vta vte
+					self#write_native_array vta vte
 				| t ->
 					Error.error (s_type (print_context()) t) e.epos;
 				end
@@ -883,15 +935,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				assert false
 			end
-		| TIdent "__array__" ->
-			begin match follow tr with
-			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
-				code#iconst (Int32.of_int (List.length el));
-				let jasig,_ = self#new_native_array (self#vtype (self#mknull t)) el in
-				Some jasig
-			| _ ->
-				assert false
-			end
 		| _ ->
 			self#texpr RValue e1;
 			code#checkcast method_handle_path;
@@ -1027,27 +1070,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TSuper -> failwith "Invalid super access"
 
 	method new_native_array jsig el =
-		let path = match jsig with
-			| TObject(path,_) -> path
-			| TTypeParameter name -> object_path
-			| TMethod _ -> method_handle_path
-			| _ ->
-				print_endline (generate_signature true jsig);
-				assert false
-		in
-		let offset = pool#add_path path in
-		let jasig = TArray(jsig,None) in
-		code#anewarray jasig offset;
-		let init f =
-			List.iteri (fun i e ->
-				code#dup;
-				code#iconst (Int32.of_int i);
-				self#texpr RValue e;
-				jm#cast jsig;
-				f();
-			) el
-		in
-		init (fun () -> code#aastore jasig jsig);
+		let jasig = NativeArray.create code pool jsig in
+		List.iteri (fun i e ->
+			code#dup;
+			code#iconst (Int32.of_int i);
+			self#texpr RValue e;
+			jm#cast jsig;
+			self#write_native_array jasig jsig
+		) el;
 		jasig,jsig
 
 	method construct ret path t f =
@@ -1173,7 +1203,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
 			self#texpr RValue e1;
 			(* Technically this could throw... but whatever *)
-			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type (self#mknull t)) [])
+			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
 		| TNew(c,tl,el) ->
 			begin match c.cl_constructor with
 			| None ->
@@ -1240,9 +1270,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| TInst({cl_path = (["java"],"NativeArray")},_) ->
 				self#texpr RValue e1;
 				let vt = self#vtype e1.etype in
-				let vte = self#vtype (self#mknull e.etype) in
+				let vte = self#vtype e.etype in
 				self#texpr RValue e2;
-				code#aaload vt vte
+				self#read_native_array vt vte
 			| t ->
 				Error.error (s_type (print_context()) t) e.epos;
 			end
@@ -1288,7 +1318,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let ta = TArray(tobj,None) in
 			code#getfield offset vtobj ta;
 			code#iconst (Int32.of_int i);
-			code#aaload ta tobj;
+			self#read_native_array ta tobj;
 			self#cast e.etype;
 		| TThrow e1 ->
 			self#texpr RValue e1;

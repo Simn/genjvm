@@ -234,6 +234,18 @@ class builder pool = object(self)
 	method aastore ta te = self#op OpAastore 1 [te;TInt;ta] []
 	method aaload ta te = self#op OpAaload 1 [TInt;ta] [te]
 
+	method castore ta = self#op OpCastore 1 [TChar;TChar;ta] []
+	method caload ta = self#op OpCaload 1 [TChar;ta] [TChar]
+
+	method fastore ta = self#op OpFastore 1 [TFloat;TFloat;ta] []
+	method faload ta = self#op OpFaload 1 [TFloat;ta] [TFloat]
+
+	method lastore ta = self#op OpLastore 1 [TLong;TLong;ta] []
+	method laload ta = self#op OpLaload 1 [TLong;ta] [TLong]
+
+	method sastore ta = self#op OpSastore 1 [TShort;TShort;ta] []
+	method saload ta = self#op OpSaload 1 [TShort;ta] [TShort]
+
 	method iastore ta = self#op OpIastore 1 [TInt;TInt;ta] []
 	method iaload ta = self#op OpIaload 1 [TInt;ta] [TInt]
 
