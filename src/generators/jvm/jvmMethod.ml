@@ -166,9 +166,7 @@ class builder jc api name jsig = object(self)
 		let old_terminated = terminated in
 		(fun () ->
 			code#get_stack#restore save;
-			let was_terminated = terminated in
 			terminated <- old_terminated;
-			was_terminated
 		)
 
 	method if_then_else f_if (f_then : unit -> unit) (f_else : unit -> unit) =
@@ -178,14 +176,15 @@ class builder jc api name jsig = object(self)
 		f_then();
 		pop();
 		let r_then = ref code#get_fp in
-		if not self#is_terminated then code#goto r_then;
+		let term_then = self#is_terminated in
+		if not term_then then code#goto r_then;
 		jump_then := code#get_fp - !jump_then;
-		let term1 = restore() in
+		restore();
 		self#add_stack_frame;
 		let pop = self#push_scope in
 		f_else();
 		pop();
-		self#set_terminated (term1 && self#is_terminated);
+		self#set_terminated (term_then && self#is_terminated);
 		r_then := code#get_fp - !r_then;
 		if not self#is_terminated then self#add_stack_frame
 
@@ -195,7 +194,7 @@ class builder jc api name jsig = object(self)
 		let pop = self#push_scope in
 		f_then();
 		pop();
-		ignore(restore());
+		restore();
 		jump_then := code#get_fp - !jump_then;
 		self#add_stack_frame
 

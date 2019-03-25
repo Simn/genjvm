@@ -538,7 +538,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 		let rec loop acc cases = match cases with
 		| (rl,e) :: cases ->
-			ignore(restore());
+			restore();
 			jm#add_stack_frame;
 			List.iter (fun r -> r := code#get_fp - !r) rl;
 			self#texpr ret e;
@@ -973,7 +973,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				(fun () -> jm#cast object_sig);
 		in
 		let start_exception_block path jsig =
-			ignore(restore());
+			restore();
 			let fp_target = code#get_fp in
 			let offset = pool#add_path path in
 			jm#add_exception {
@@ -1020,7 +1020,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					jm#if_then_else
 						(fun () -> code#if_ref CmpEq)
 						(fun () ->
-							ignore(restore());
+							restore();
 							self#cast v.v_type;
 							let term = run_catch_expr v e in
 							rl := (term,ref 0) :: !rl;
@@ -1171,7 +1171,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr RVoid e2;
 			if not jm#is_terminated then code#goto (ref (fp - code#get_fp));
 			pop_scope();
-			ignore(restore());
+			restore();
 			jump_then := code#get_fp - !jump_then;
 			jm#add_stack_frame;
 			let fp' = code#get_fp in
