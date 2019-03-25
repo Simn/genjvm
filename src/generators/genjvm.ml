@@ -29,7 +29,6 @@ type method_type =
 	| MInstance
 	| MConstructor
 	| MConstructorTop
-	| MMain
 
 type access_kind =
 	| AKPost
@@ -79,7 +78,7 @@ module NativeArray = struct
 		| TMethod _ -> reference NativeSignatures.method_handle_path
 		| TTypeParameter _ -> reference NativeSignatures.object_path
 		| TArray _ -> assert false (* TODO: hmm... *)
-		| TObjectInner _ -> assert false
+		| TObjectInner _ | TUninitialized _ -> assert false
 		end;
 		ja
 end
@@ -347,7 +346,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| FEnum(en,ef) ->
 			let path = en.e_path in
 			let offset = pool#add_path path in
-			code#new_ (TObject(path,[])) offset;
+			code#new_ offset;
 			code#dup;
 			code#iconst (Int32.of_int ef.ef_index);
 			code#iconst Int32.zero;
@@ -905,7 +904,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TField(_,FEnum(en,ef)) ->
 			let path = en.e_path in
 			let offset = pool#add_path path in
-			code#new_ (TObject(path,[])) offset;
+			code#new_ offset;
 			code#dup;
 			code#iconst (Int32.of_int ef.ef_index);
 			code#iconst (Int32.of_int (List.length el));
@@ -914,7 +913,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] [];
 			Some (TObject(path,[]))
 		| TConst TSuper ->
-			code#aload jc#get_jsig 0;
+			code#aload (TUninitialized None) 0;
 			begin match follow e1.etype with
 			| TInst(c,_) ->
 				begin match c.cl_constructor with
@@ -1075,7 +1074,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method construct ret path t f =
 		let offset_class = pool#add_path (path_map path) in
-		code#new_ t offset_class;
+		code#new_ offset_class;
 		if ret <> RVoid then code#dup;
 		let tl,offset = f() in
 		code#invokespecial offset t tl []
@@ -1351,7 +1350,14 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 			e,[],t_dynamic
 	in
 	let handler = new texpr_to_jvm gctx jc jm tr in
-	if (mtype <> MStatic) then ignore(jm#add_local "this" jc#get_jsig VarArgument);
+	begin match mtype with
+	| MStatic ->
+		()
+	| MInstance ->
+		ignore(jm#add_local "this" jc#get_jsig VarArgument)
+	| MConstructor | MConstructorTop ->
+		ignore(jm#add_local "this" (TUninitialized None) VarArgument)
+	end;
 	if is_main then ignore(jm#add_local "args" (TArray(string_sig,None)) VarArgument);
 	List.iter (fun (v,_) ->
 		ignore(handler#add_local v VarArgument);

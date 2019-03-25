@@ -2,9 +2,24 @@ package test;
 
 import haxe.ds.StringMap;
 
+private class ChaosConstructor {
+	public var value:Int;
+
+	public function new(value:Int) {
+		this.value = value;
+	}
+}
+
+private class ChaosConstructorChild extends ChaosConstructor {
+	public function new(value:Int) {
+		super(value > 0 ? 1 : 0);
+	}
+}
+
 @:analyzer(ignore)
 class TestChaos extends BaseTest {
 	var intField:Int;
+
 	static var staticIntField:Int;
 	static var trueValue = true;
 	static var falseValue = false;
@@ -17,6 +32,7 @@ class TestChaos extends BaseTest {
 		testStringMap();
 		testObjectDecl();
 		testStringConcat();
+		testBranchingCtorArgs();
 	}
 
 	function testAssignment() {
@@ -258,5 +274,12 @@ class TestChaos extends BaseTest {
 		eq("truea", true + "a");
 		eq("a1.0", "a" + 1.0);
 		eq("1.0a", 1.0 + "a");
+	}
+
+	function testBranchingCtorArgs() {
+		eq(1, new ChaosConstructor(trueValue ? 1 : 0).value);
+
+		eq(1, new ChaosConstructorChild(1).value);
+		eq(0, new ChaosConstructorChild(-1).value);
 	}
 }

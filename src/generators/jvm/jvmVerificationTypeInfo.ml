@@ -21,6 +21,8 @@ let of_signature pool jsig = match jsig with
 	| TMethod _ -> VObject (pool#add_path (["java";"lang";"invoke"],"MethodHandle"))
 	| TArray _ -> VObject (pool#add_path ([],generate_signature false jsig))
 	| TTypeParameter _ -> VObject (pool#add_path (["java";"lang"],"Object"))
+	| TUninitialized (Some i) -> VUninitialized i
+	| TUninitialized None -> VUninitializedThis
     | _ -> assert false
 
 let to_string vtt = match vtt with

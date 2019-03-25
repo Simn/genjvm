@@ -25,6 +25,7 @@ and jsignature =
 	| TArray of jsignature * int option (* [ *)
 	| TMethod of jmethod_signature (* ( *)
 	| TTypeParameter of string (* T *)
+	| TUninitialized of int option
 
 (* ( jsignature list ) ReturnDescriptor (| V | jsignature) *)
 and jmethod_signature = jsignature list * jsignature option
@@ -94,6 +95,8 @@ and write_signature full ch jsig = match jsig with
 			write_byte ch (Char.code ';')
 		end else
 			write_string ch "Ljava/lang/Object;"
+	| TUninitialized _ ->
+		()
 
 let generate_signature full jsig =
 	let ch = IO.output_bytes () in

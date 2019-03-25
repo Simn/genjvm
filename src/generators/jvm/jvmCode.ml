@@ -121,6 +121,7 @@ class builder pool = object(self)
 			| TInt,TBool -> ()
 			| TDouble,TInt -> ()
 			| TInt,(TChar | TShort | TByte) -> ()
+			| (TObject _ | TTypeParameter _),TUninitialized _ -> ()
 			| _ ->
 				if js <> js' then self#stack_error opcode expect cur
 		) expect;
@@ -283,8 +284,8 @@ class builder pool = object(self)
 	method invokespecial offset t1 tl tr =
 		self#op (OpInvokespecial offset) 3 (List.rev (t1 :: tl)) tr
 
-	method new_ t offset =
-		self#op (OpNew offset) 3 [] [t]
+	method new_ offset =
+		self#op (OpNew offset) 3 [] [TUninitialized (Some fp)]
 
 	(* return *)
 
