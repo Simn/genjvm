@@ -167,7 +167,7 @@ let resolve_class com path =
 	in
 	loop com.types
 
-let resolve_method com static path name =
+let resolve_field com static path name =
 	let c = resolve_class com path in
 	try
 		c,PMap.find name (if static then c.cl_statics else c.cl_fields)
@@ -191,8 +191,8 @@ let add_field pool c cf =
 
 let make_resolve_api com jc =
 	let api = {
-		resolve_method = (fun static path name ->
-			let c,cf = resolve_method com static path name in
+		resolve_field = (fun static path name ->
+			let c,cf = resolve_field com static path name in
 			add_field jc#get_pool c cf
 		)
 	} in
@@ -279,7 +279,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method mknull t = com.basic.tnull (follow t)
 
 	method add_haxe_field is_static path name =
-		let c,cf = resolve_method com is_static path name in
+		let c,cf = resolve_field com is_static path name in
 		add_field pool c cf
 
 	(* locals *)
@@ -314,8 +314,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		NativeArray.write code vta vte
 
 	method read_static_closure name =
-		let c',cf' = resolve_method com true haxe_jvm_path "readField" in
-		let offset = add_field pool c' cf' in
+		let offset = self#add_haxe_field true haxe_jvm_path "readField" in
 		let t = code#get_stack#top in
 		self#string name;
 		code#invokestatic offset [t;self#vtype com.basic.tstring] [self#vtype t_dynamic];
@@ -356,8 +355,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let offset_field = pool#add_field path "<init>" (generate_method_signature false enum_ctor_sig) FKMethod in
 			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] []
 		| FDynamic s | FAnon {cf_name = s} ->
-			let c,cf = resolve_method com true haxe_jvm_path "readField" in
-			let offset = add_field pool c cf in
+			let offset = self#add_haxe_field true haxe_jvm_path "readField" in
 			self#texpr RValue e1;
 			self#string s;
 			code#invokestatic offset [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic];
@@ -399,10 +397,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			apply (fun () -> code#dup_x1);
 			code#putfield offset vtobj vt
 		| TField(e1,(FDynamic s | FAnon {cf_name = s})) ->
-			let c,cf_write = resolve_method com true haxe_jvm_path "writeField" in
-			let offset_write = add_field pool c cf_write in
-			let c,cf_read = resolve_method com true haxe_jvm_path "readField" in
-			let offset_read = add_field pool c cf_read in
+			let offset_write = self#add_haxe_field true haxe_jvm_path "writeField" in
+			let offset_read = self#add_haxe_field true haxe_jvm_path "readField" in
 			self#texpr RValue e1;
 			if ak <> AKNone then code#dup;
 			self#string s;
@@ -618,8 +614,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2;t1]
 		| [t1;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2] ->
 			(fun () ->
-				let c,cf = resolve_method com true haxe_jvm_path "equals" in
-				let offset = add_field pool c cf in
+				let offset = self#add_haxe_field true haxe_jvm_path "equals" in
 				code#invokestatic offset [t1;t2] [TBool];
 				code#if_ref (flip_cmp_op op)
 			)
@@ -662,8 +657,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TDouble;TDouble] -> opd ()
 		| [TLong;TLong] -> opl ()
 		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[]);] ->
-			let c,cf = resolve_method com true (["haxe";"jvm"],"Jvm") "stringConcat" in
-			let offset = add_field jc#get_pool c cf in
+			let offset = self#add_haxe_field true (["haxe";"jvm"],"Jvm") "stringConcat" in
 			code#invokestatic offset [string_sig;string_sig] [string_sig]
 		| [t1;t2] -> jerror (Printf.sprintf "Can't numop %s and %s" (generate_signature false t1) (generate_signature false t2))
 		| tl -> jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
@@ -954,8 +948,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method throw vt =
 		jm#expect_reference_type;
-		let c,cf = resolve_method com true (["haxe";"jvm"],"Exception") "wrap" in
-		let offset = add_field pool c cf in
+		let offset = self#add_haxe_field true (["haxe";"jvm"],"Exception") "wrap" in
 		code#invokestatic offset [vt] [exception_sig];
 		code#athrow;
 		jm#set_terminated true
@@ -974,8 +967,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				(fun () -> code#if_ref CmpEq)
 				(fun () ->
 					code#checkcast haxe_exception_path;
-					let c,cf = resolve_method com false (["haxe";"jvm"],"Exception") "value" in
-					let offset = add_field pool c cf in
+					let offset = self#add_haxe_field false (["haxe";"jvm"],"Exception") "value" in
 					code#getfield offset haxe_exception_sig object_sig;
 				)
 				(fun () -> code#checkcast object_path);
@@ -1331,8 +1323,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				[],offset
 			in
 			self#construct ret haxe_dynamic_object_path object_sig f;
-			let c,cf = resolve_method com false (["haxe";"jvm"],"DynamicObject") "_hx_setField" in
-			let offset = add_field pool c cf in
+			let offset = self#add_haxe_field false (["haxe";"jvm"],"DynamicObject") "_hx_setField" in
 			List.iter (fun ((name,_,_),e) ->
 				code#dup;
 				self#string name;

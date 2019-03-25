@@ -7,7 +7,7 @@ open JvmBuilder
 (* High-level method builder. *)
 
 type builder_api = {
-	resolve_method : bool -> Globals.path -> string -> jvm_constant_pool_index;
+	resolve_field : bool -> Globals.path -> string -> jvm_constant_pool_index;
 }
 
 type var_init_state =
@@ -88,7 +88,7 @@ class builder jc api name jsig = object(self)
 	method expect_reference_type =
 		let wrap_null jsig name =
 			let path = (["java";"lang"],name) in
-			let offset = api.resolve_method true path "valueOf" in
+			let offset = api.resolve_field true path "valueOf" in
 			code#invokestatic offset [jsig] [TObject(path,[])]
 		in
 		match code#get_stack#top with
@@ -105,7 +105,7 @@ class builder jc api name jsig = object(self)
 		let unwrap_null tname name =
 			let path = (["java";"lang"],tname) in
 			let tp = TObject(path,[]) in
-			let offset = api.resolve_method true (["haxe";"jvm"],"Jvm") name in
+			let offset = api.resolve_field true (["haxe";"jvm"],"Jvm") name in
 			code#invokestatic offset [tp] [t]
 		in
 		match t with
@@ -142,7 +142,7 @@ class builder jc api name jsig = object(self)
 			()
 		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
 			self#expect_reference_type;
-			let offset = api.resolve_method true (["haxe";"jvm"],"Jvm") "toString" in
+			let offset = api.resolve_field true (["haxe";"jvm"],"Jvm") "toString" in
 			code#invokestatic offset [code#get_stack#top] [vt]
 		| TObject(path1,_),TObject(path2,_) ->
 			code#checkcast path1;
