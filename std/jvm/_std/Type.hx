@@ -152,7 +152,7 @@ class Type {
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
 		// TODO: review this if we ever do nadako-enums
-		return cast new jvm.Enum(index, params == null ? java.NativeArray.make(0) : @:privateAccess params.__a);
+		return cast new jvm.Enum(index, params == null ? new java.NativeArray(0) : @:privateAccess params.__a);
 	}
 
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
