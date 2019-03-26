@@ -1264,7 +1264,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TMethod _ ->
 			let offset = pool#add_path method_handle_path in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,method_handle_sig)]))
-		| TTypeParameter _ ->
+		| TTypeParameter _ | TArray _ ->
 			let offset = pool#add_path object_path in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,object_sig)]))
 		| jsig ->
@@ -1517,7 +1517,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	(* api *)
 
 	method object_constructor =
-		let path = object_path in
+		let path = jc#get_super_path in
 		let offset = pool#add_field path "<init>" "()V" FKMethod in
 		code#aload jc#get_jsig 0;
 		code#invokespecial offset jc#get_jsig [] []
@@ -1629,19 +1629,24 @@ let generate_field gctx jc c mtype cf =
 	jm#add_attribute (AttributeSignature offset);
 	jm#export_field
 
+type super_situation =
+	| SuperNo
+	| SuperNoConstructor
+	| SuperGood of string
+
 let generate_class gctx c =
 	let is_annotation = Meta.has Meta.Annotation c.cl_meta in
 	let path_super,sig_super_ctor = match c.cl_super with
-		| None -> object_path,"()V"
+		| None -> object_path,SuperNo
 		| Some(c,_) -> path_map c.cl_path,match c.cl_constructor with
 			| Some cf ->
-				generate_method_signature true (jsignature_of_type cf.cf_type)
+				SuperGood (generate_method_signature true (jsignature_of_type cf.cf_type))
 			| None ->
-				"()V"
+				SuperNoConstructor
 	in
 	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
 	let pool = jc#get_pool in
-	let offset_super_constructor = pool#add_field path_super "<init>" sig_super_ctor FKMethod in
+	let offset_super_constructor = pool#add_field path_super "<init>" (match sig_super_ctor with SuperGood jsig -> jsig | _ ->  "()V") FKMethod in
 	jc#set_offset_super_ctor offset_super_constructor;
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
@@ -1653,7 +1658,20 @@ let generate_class gctx c =
 	in
 	List.iter (field MStatic) c.cl_ordered_statics;
 	List.iter (field MInstance) c.cl_ordered_fields;
-	Option.may (field (if c.cl_super = None then MConstructorTop else MConstructor)) c.cl_constructor;
+	begin match c.cl_constructor,sig_super_ctor with
+		| Some cf,SuperGood _ -> field MConstructor cf
+		| Some cf,_ -> field MConstructorTop cf
+		| None,_ when c.cl_descendants <> [] ->
+			let api = make_resolve_api gctx.com jc in
+			let jm = new JvmMethod.builder jc api "<init>" (TMethod([],None)) in
+			jm#add_access_flag 1; (* public *)
+			ignore(jm#add_local "this" jc#get_jsig VarArgument);
+			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
+			handler#object_constructor;
+			jm#get_code#return_void;
+			jc#add_method jm#export_method;
+		| _ -> ()
+	end;
 	begin match c.cl_init with
 		| None ->
 			()
