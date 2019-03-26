@@ -1,4 +1,5 @@
-package java.jvm;
+package jvm;
+
 import haxe.ds.StringMap;
 
 @:keep
@@ -7,14 +8,14 @@ class DynamicObject {
 	public var _hx_fields:Null<StringMap<Dynamic>>;
 	public var _hx_deletedAField:Null<Int>;
 
-	public function new() {	}
+	public function new() {}
 
 	final public function _hx_deleteField(name:String) {
 		_hx_initReflection();
 		_hx_deletedAField = 1;
 		try {
 			Reflect.setField(this, name, null);
-		} catch(_:Dynamic) { }
+		} catch (_:Dynamic) {}
 		return _hx_fields.remove(name);
 	}
 

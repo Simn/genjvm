@@ -1,4 +1,4 @@
-package java.jvm;
+package jvm;
 
 @:keep
 @:native('haxe.jvm.Exception')

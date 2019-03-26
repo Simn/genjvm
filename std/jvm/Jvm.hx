@@ -1,10 +1,10 @@
-package java.jvm;
+package jvm;
 
-import java.jvm.Enum;
-import java.jvm.DynamicObject;
-import java.jvm.Exception;
-import java.jvm.annotation.ClassReflectionInformation;
-import java.jvm.annotation.EnumReflectionInformation;
+import Enum;
+import jvm.DynamicObject;
+import jvm.Exception;
+import jvm.annotation.ClassReflectionInformation;
+import jvm.annotation.EnumReflectionInformation;
 
 @:keep
 @:native('haxe.jvm.Jvm')
@@ -87,8 +87,8 @@ class Jvm {
 						return method;
 					}
 				}
-				if (instanceof(obj, java.jvm.DynamicObject)) {
-					return (obj : java.jvm.DynamicObject)._hx_getField(name);
+				if (instanceof(obj, DynamicObject)) {
+					return (obj : DynamicObject)._hx_getField(name);
 				}
 				if (isStatic) {
 					if (cl == cast java.lang.Class) {
@@ -113,8 +113,8 @@ class Jvm {
 			field.setAccessible(true);
 			field.set(obj, value);
 		} catch (_:java.lang.NoSuchFieldException) {
-			if (instanceof(obj, java.jvm.DynamicObject)) {
-				return (obj : java.jvm.DynamicObject)._hx_setField(name, value);
+			if (instanceof(obj, DynamicObject)) {
+				return (obj : DynamicObject)._hx_setField(name, value);
 			}
 			return;
 		}

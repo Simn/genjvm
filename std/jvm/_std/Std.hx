@@ -26,7 +26,7 @@ class Std {
 	}
 
 	public static function string(s:Dynamic):String {
-		return java.jvm.Jvm.toString(s);
+		return jvm.Jvm.toString(s);
 	}
 
 	public static function int(x:Float):Int {

@@ -1,7 +1,7 @@
 import java.lang.invoke.*;
 import java.lang.NoSuchMethodException;
-import java.jvm.annotation.ClassReflectionInformation;
-import java.jvm.annotation.EnumReflectionInformation;
+import jvm.annotation.ClassReflectionInformation;
+import jvm.annotation.EnumReflectionInformation;
 
 enum ValueType {
 	TNull;
@@ -38,7 +38,7 @@ class Type {
 		if (o == null) {
 			return null;
 		}
-		if (java.jvm.Jvm.instanceof(o, Class)) {
+		if (jvm.Jvm.instanceof(o, Class)) {
 			return null;
 		}
 		var c = (cast o : java.lang.Object).getClass();
@@ -125,7 +125,7 @@ class Type {
 				}
 				var valid = true;
 				for (i in 0...params.length) {
-					if (!java.jvm.Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
+					if (!jvm.Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
 						valid = false;
 						break;
 					}
@@ -152,7 +152,7 @@ class Type {
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
 		// TODO: review this if we ever do nadako-enums
-		return cast new java.jvm.Enum(index, params == null ? java.NativeArray.make(0) : @:privateAccess params.__a);
+		return cast new jvm.Enum(index, params == null ? java.NativeArray.make(0) : @:privateAccess params.__a);
 	}
 
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
@@ -182,11 +182,11 @@ class Type {
 	}
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
-		return @:privateAccess Array.ofNative((cast e : java.jvm.Enum).parameters);
+		return @:privateAccess Array.ofNative((cast e : jvm.Enum).parameters);
 	}
 
 	public static function enumIndex(e:EnumValue):Int {
-		return (cast e : java.jvm.Enum).index;
+		return (cast e : jvm.Enum).index;
 	}
 
 	public static function allEnums<T>(e:Enum<T>):Array<T> {

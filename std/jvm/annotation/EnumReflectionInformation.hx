@@ -1,4 +1,4 @@
-package java.jvm.annotation;
+package jvm.annotation;
 
 @:annotation
 @:native("haxe.jvm.annotation.EnumReflectionInformation")

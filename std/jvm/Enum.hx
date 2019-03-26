@@ -1,4 +1,6 @@
-package java.jvm;
+package jvm;
+
+import java.NativeArray;
 
 @:keep
 @:native('haxe.jvm.Enum')
