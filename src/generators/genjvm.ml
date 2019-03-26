@@ -929,6 +929,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				assert false
 			end
+		| TIdent "__array__" ->
+			begin match follow tr with
+			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
+				code#iconst (Int32.of_int (List.length el));
+				let jasig,_ = self#new_native_array (self#vtype t) el in
+				Some jasig
+			| _ ->
+				assert false
+			end
 		| _ ->
 			self#texpr RValue e1;
 			jm#cast method_handle_sig;
