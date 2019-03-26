@@ -253,8 +253,8 @@ class builder pool = object(self)
 	method dastore ta = self#op OpDastore 1 [TDouble;TInt;ta] []
 	method daload ta = self#op OpDaload 1 [TInt;ta] [TDouble]
 
-	method bastore ta = self#op OpBastore 1 [TInt;TInt;ta] []
-	method baload ta = self#op OpBaload 1 [TInt;ta] [TInt]
+	method bastore jsig ta = self#op OpBastore 1 [jsig;jsig;ta] []
+	method baload jsig ta = self#op OpBaload 1 [jsig;ta] [jsig]
 
 	(* fields *)
 

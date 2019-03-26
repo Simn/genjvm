@@ -37,7 +37,8 @@ type access_kind =
 
 module NativeArray = struct
 	let read code ja je = match je with
-		| TBool | TByte -> code#baload ja
+		| TBool -> code#baload TBool ja
+		| TByte -> code#baload TByte ja
 		| TChar -> code#caload ja
 		| TDouble -> code#daload ja
 		| TFloat -> code#faload ja
@@ -47,7 +48,8 @@ module NativeArray = struct
 		| _ -> code#aaload ja je
 
 	let write code ja je = match je with
-		| TBool | TByte -> code#bastore ja
+		| TBool -> code#bastore TBool ja
+		| TByte -> code#bastore TByte ja
 		| TChar -> code#castore ja
 		| TDouble -> code#dastore ja
 		| TFloat -> code#fastore ja
