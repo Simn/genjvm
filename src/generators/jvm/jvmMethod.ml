@@ -357,10 +357,15 @@ class builder jc api name jsig = object(self)
 	method set_terminated b = terminated <- b
 
 	method private get_jcode =
-		let lines = AttributeLineNumberTable (DynArray.to_array code#get_lines) in
+		let attributes = DynArray.create () in
+		let lines = code#get_lines in
+		if DynArray.length lines > 0 then
+			DynArray.add attributes (AttributeLineNumberTable (DynArray.to_array lines));
+		let stack_map_table = self#get_stack_map_table in
+		if Array.length stack_map_table > 0 then
+			DynArray.add attributes (AttributeStackMapTable stack_map_table);
 		let exceptions = Array.of_list (List.rev exceptions) in
-		let attributes = [lines;AttributeStackMapTable self#get_stack_map_table] in
-		let attributes = List.map (JvmAttribute.write_attribute jc#get_pool) attributes in
+		let attributes = List.map (JvmAttribute.write_attribute jc#get_pool) (DynArray.to_list attributes) in
 		{
 			code_max_stack = code#get_max_stack_size;
 			code_max_locals = max_num_locals;
