@@ -215,15 +215,24 @@ class builder pool = object(self)
 
 	(* conversions *)
 
+	method d2f = self#op OpD2f 1 [TDouble] [TFloat]
 	method d2i = self#op OpD2i 1 [TDouble] [TInt]
 	method d2l = self#op OpD2l 1 [TDouble] [TLong]
-	method d2f = self#op OpD2f 1 [TDouble] [TFloat]
 
+	method f2d = self#op OpF2d 1 [TFloat] [TDouble]
+	method f2i = self#op OpF2i 1 [TFloat] [TInt]
+	method f2l = self#op OpF2l 1 [TFloat] [TLong]
+
+	method i2b jsig = self#op OpI2b 1 [TInt] [jsig]
+	method i2c = self#op OpI2c 1 [TInt] [TChar]
 	method i2d = self#op OpI2d 1 [TInt] [TDouble]
-	method i2l = self#op OpI2d 1 [TInt] [TLong]
+	method i2f = self#op OpI2f 1 [TInt] [TFloat]
+	method i2l = self#op OpI2l 1 [TInt] [TLong]
+	method i2s = self#op OpI2s 1 [TInt] [TShort]
 
-	method l2i = self#op OpL2i 1 [TLong] [TInt]
 	method l2d = self#op OpL2d 1 [TLong] [TDouble]
+	method l2f = self#op OpL2f 1 [TLong] [TFloat]
+	method l2i = self#op OpL2i 1 [TLong] [TInt]
 
 	(* arrays *)
 
@@ -235,17 +244,17 @@ class builder pool = object(self)
 	method aastore ta te = self#op OpAastore 1 [te;TInt;ta] []
 	method aaload ta te = self#op OpAaload 1 [TInt;ta] [te]
 
-	method castore ta = self#op OpCastore 1 [TChar;TChar;ta] []
-	method caload ta = self#op OpCaload 1 [TChar;ta] [TChar]
+	method castore ta = self#op OpCastore 1 [TChar;TInt;ta] []
+	method caload ta = self#op OpCaload 1 [TInt;ta] [TChar]
 
-	method fastore ta = self#op OpFastore 1 [TFloat;TFloat;ta] []
-	method faload ta = self#op OpFaload 1 [TFloat;ta] [TFloat]
+	method fastore ta = self#op OpFastore 1 [TFloat;TInt;ta] []
+	method faload ta = self#op OpFaload 1 [TInt;ta] [TFloat]
 
-	method lastore ta = self#op OpLastore 1 [TLong;TLong;ta] []
-	method laload ta = self#op OpLaload 1 [TLong;ta] [TLong]
+	method lastore ta = self#op OpLastore 1 [TLong;TInt;ta] []
+	method laload ta = self#op OpLaload 1 [TInt;ta] [TLong]
 
-	method sastore ta = self#op OpSastore 1 [TShort;TShort;ta] []
-	method saload ta = self#op OpSaload 1 [TShort;ta] [TShort]
+	method sastore ta = self#op OpSastore 1 [TShort;TInt;ta] []
+	method saload ta = self#op OpSaload 1 [TInt;ta] [TShort]
 
 	method iastore ta = self#op OpIastore 1 [TInt;TInt;ta] []
 	method iaload ta = self#op OpIaload 1 [TInt;ta] [TInt]
@@ -253,8 +262,8 @@ class builder pool = object(self)
 	method dastore ta = self#op OpDastore 1 [TDouble;TInt;ta] []
 	method daload ta = self#op OpDaload 1 [TInt;ta] [TDouble]
 
-	method bastore jsig ta = self#op OpBastore 1 [jsig;jsig;ta] []
-	method baload jsig ta = self#op OpBaload 1 [jsig;ta] [jsig]
+	method bastore jsig ta = self#op OpBastore 1 [jsig;TInt;ta] []
+	method baload jsig ta = self#op OpBaload 1 [TInt;ta] [jsig]
 
 	(* fields *)
 
@@ -294,7 +303,7 @@ class builder pool = object(self)
 
 	method return_value t =
 		let op = match t with
-		| TInt | TBool -> OpIreturn
+		| TInt | TBool | TByte | TChar | TShort -> OpIreturn
 		| TLong -> OpLreturn
 		| TFloat -> OpFreturn
 		| TDouble -> OpDreturn

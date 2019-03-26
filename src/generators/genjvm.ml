@@ -784,7 +784,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method binop_numeric (opi,opd,opl) cast_type f1 f2 =
 		self#binop_exprs cast_type f1 f2;
 		begin match code#get_stack#get_stack_items 2 with
-		| [TInt;TInt] -> opi ()
+		| [TInt | TByte | TShort;TInt | TByte | TShort] -> opi ()
 		| [TDouble;TDouble] -> opd ()
 		| [TLong;TLong] -> opl ()
 		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[]);] ->

@@ -21,11 +21,7 @@
  */
  package java.lang;
 
-#if jvm
-@:native("java.lang.Long")
-#else
 @:native("") // make sure the generator won't see this
-#end
 @:forwardStatics
 @:forward abstract Long(LongClass) from LongClass to LongClass
 {

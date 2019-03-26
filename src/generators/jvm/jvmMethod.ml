@@ -103,13 +103,14 @@ class builder jc api name jsig = object(self)
 			code#invokestatic offset [jsig] [TObject(path,[])]
 		in
 		match code#get_stack#top with
-		| TBool as t -> wrap_null t "Boolean"
 		| TByte as t -> wrap_null t "Byte"
-		| TShort as t -> wrap_null t "Short"
+		| TChar as t -> wrap_null t "Character"
+		| TDouble as t -> wrap_null t "Double"
+		| TFloat as t -> wrap_null t "Float"
 		| TInt as t -> wrap_null t "Integer"
 		| TLong as t -> wrap_null t "Long"
-		| TFloat as t -> wrap_null t "Float"
-		| TDouble as t -> wrap_null t "Double"
+		| TShort as t -> wrap_null t "Short"
+		| TBool as t -> wrap_null t "Boolean"
 		| _ -> ()
 
 	method private expect_basic_type t =
@@ -120,13 +121,14 @@ class builder jc api name jsig = object(self)
 			code#invokestatic offset [tp] [t]
 		in
 		match t with
-		| TBool -> unwrap_null "Boolean" "toBoolean"
 		| TByte -> unwrap_null "Byte" "toByte"
-		| TShort -> unwrap_null "Short" "toShort"
+		| TChar -> unwrap_null "Character" "toChar"
+		| TDouble -> unwrap_null "Double" "toDouble"
+		| TFloat -> unwrap_null "Float" "toFloat"
 		| TInt -> unwrap_null "Integer" "toInt"
 		| TLong -> unwrap_null "Long" "toLong"
-		| TFloat -> unwrap_null "Float" "toFloat"
-		| TDouble -> unwrap_null "Double" "toDouble"
+		| TShort -> unwrap_null "Short" "toShort"
+		| TBool -> unwrap_null "Boolean" "toBoolean"
 		| _ -> ()
 
 	(** Casts the top of the stack to [jsig]. If [allow_to_string] is true, Jvm.toString is called. **)
@@ -136,18 +138,40 @@ class builder jc api name jsig = object(self)
 		| TObject((["java";"lang"],"Double"),_),TInt ->
 			code#i2d;
 			self#expect_reference_type;
-		| TDouble,TInt ->
-			code#i2d;
+		(* from double *)
+		| TFloat,TDouble ->
+			code#d2f
 		| TInt,TDouble ->
 			code#d2i;
 		| TLong,TDouble ->
 			code#d2l;
-		| TDouble,TLong ->
-			code#l2d;
-		| TFloat,TDouble ->
-			code#d2f;
+		(* from float *)
+		| TDouble,TFloat ->
+			code#f2d
+		| TInt,TFloat ->
+			code#f2i;
+		| TLong,TFloat ->
+			code#f2l;
+		(* from int *)
+		| TBool,TInt ->
+			code#i2b TBool
+		| TByte,TInt ->
+			code#i2b TByte
+		| TChar,TInt ->
+			code#i2c
+		| TDouble,TInt ->
+			code#i2d;
+		| TFloat,TInt ->
+			code#i2f
 		| TLong,TInt ->
 			code#i2l;
+		| TShort,TInt ->
+			code#i2s
+		(* from long *)
+		| TDouble,TLong ->
+			code#l2d;
+		| TFloat,TLong ->
+			code#l2f
 		| TInt,TLong ->
 			code#l2i;
 		| TObject(path1,_),TObject(path2,_) when path1 = path2 ->

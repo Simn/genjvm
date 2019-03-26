@@ -43,8 +43,14 @@ class Jvm {
 		return lut.findStatic(on, name, mt);
 	}
 
-	static public function toInt(d:Dynamic) {
-		return d == null ? 0 : (d : java.lang.Number).intValue();
+	// casts
+
+	static public function toByte(d:Dynamic) {
+		return d == null ? 0 : (d : java.lang.Byte).byteValue();
+	}
+
+	static public function toChar(d:Dynamic) {
+		return d == null ? 0 : (d : java.lang.Character).charValue();
 	}
 
 	static public function toDouble(d:Dynamic) {
@@ -53,6 +59,18 @@ class Jvm {
 
 	static public function toFloat(d:Dynamic):Single {
 		return d == null ? 0. : (d : java.lang.Number).floatValue();
+	}
+
+	static public function toInt(d:Dynamic) {
+		return d == null ? 0 : (d : java.lang.Number).intValue();
+	}
+
+	static public function toLong(d:Dynamic) {
+		return d == null ? 0 : (d : java.lang.Long).longValue();
+	}
+
+	static public function toShort(d:Dynamic) {
+		return d == null ? 0 : (d : java.lang.Short).shortValue();
 	}
 
 	static public function toBoolean(d:Dynamic) {
