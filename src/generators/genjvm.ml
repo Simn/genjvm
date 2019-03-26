@@ -665,8 +665,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				with Not_found -> offset_def
 			) in
 			code#tableswitch offset_def !imin !imax offsets
-		end else
-			code#lookupswitch offset_def (DynArray.to_array flat_cases);
+		end else begin
+			let a = DynArray.to_array flat_cases in
+			Array.sort (fun (i1,_) (i2,_) -> compare i1 i2) a;
+			code#lookupswitch offset_def a;
+		end;
 		let restore = jm#start_branch in
 		offset_def := code#get_fp - !offset_def;
 		let r_def = match def with
