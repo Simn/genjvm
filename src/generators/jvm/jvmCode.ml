@@ -506,6 +506,7 @@ class builder pool = object(self)
 	method sconst t offset =
 		self#ldc offset t
 
+	method get_pool : JvmConstantPool.constant_pool = pool
 	method get_fp = fp
 	method get_stack = stack
 	method get_max_stack_size = stack#get_max_stack_size

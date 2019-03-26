@@ -262,6 +262,81 @@ class haxe_exception gctx (t : Type.t) = object(self)
 	method get_type = t
 end
 
+class closure_context (jsig : jsignature) = object(self)
+	val lut = Hashtbl.create 0
+	val path = match jsig with TObject(path,_) -> path | _ -> assert false
+	val sigs = DynArray.create()
+
+	method add (var_id : int) (var_name : string) (var_sig : jsignature) =
+		DynArray.add sigs var_sig;
+		Hashtbl.add lut var_id (var_sig,var_name)
+
+	method get (code : JvmCode.builder) (var_id : int) =
+		let var_sig,var_name = Hashtbl.find lut var_id in
+		(-1),
+		(fun () ->
+			code#aload jsig 0;
+			let offset = code#get_pool#add_field path var_name (generate_signature false var_sig) FKField in
+			code#getfield offset jsig var_sig
+		),
+		(fun () ->
+			code#aload jsig 0;
+			let offset = code#get_pool#add_field path var_name (generate_signature false var_sig) FKField in
+			code#putfield offset jsig var_sig
+		)
+
+	method get_constructor_sig =
+		TMethod(DynArray.to_list sigs,None)
+
+	method get_jsig = jsig
+	method get_path = path
+end
+
+let create_context_class gctx jc jm name vl =
+	let jc = jc#spawn_inner_class jm object_path in
+	let path = jc#get_this_path in
+	let jsig = TObject(path,[]) in
+	let api = make_resolve_api gctx.com jc in
+	let rec loop sigs offsets vl = match vl with
+		| v :: vl ->
+			let jsig = jsignature_of_type v.v_type in
+			let jf = new JvmMethod.builder jc api v.v_name jsig in
+			jf#add_access_flag 1; (* public *)
+			let jf = jf#export_field in
+			jc#add_field jf;
+			let offset = jc#get_pool#add_field path v.v_name (generate_signature false jsig) FKField in
+			loop (jsig :: sigs) (offset :: offsets) vl
+		| [] ->
+			List.rev sigs,List.rev offsets
+	in
+	let sigs,offsets = loop [] [] vl in
+	jc#add_access_flag 1; (* public *)
+	let jm = new JvmMethod.builder jc api "<init>" (TMethod(sigs,None)) in
+	let pop_scope = jm#push_scope in
+	jm#add_access_flag 1; (* public *)
+	let _,load0,_ = jm#add_local "this" jsig VarArgument in
+	load0();
+	let offset_field = jc#get_pool#add_field object_path "<init>" "()V" FKMethod in
+	jm#get_code#invokespecial offset_field object_sig [] [];
+	let ctx_class = new closure_context jsig in
+	let rec loop vl sigs offsets = match vl,sigs,offsets with
+		| v :: vl,jsig_var :: sigs,offset :: offsets ->
+			let _,load,_ = jm#add_local v.v_name jsig_var VarArgument in
+			load0();
+			load();
+			jm#get_code#putfield offset jsig jsig_var;
+			ctx_class#add v.v_id v.v_name jsig_var;
+			loop vl sigs offsets
+		| _ ->
+			()
+	in
+	loop vl sigs offsets;
+	jm#get_code#return_void;
+	pop_scope();
+	jc#add_method jm#export_method;
+	write_class gctx.jar path jc#export_class;
+	ctx_class
+
 class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return_type : Type.t) = object(self)
 	val com = gctx.com
 	val code = jm#get_code
@@ -273,6 +348,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	val mutable breaks = []
 	val mutable continue = 0
 	val mutable caught_exceptions = []
+	val mutable env = None
 
 	method vtype t =
 		jsignature_of_type t
@@ -285,6 +361,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* locals *)
 
+	method add_named_local (name : string) (jsig : jsignature) =
+		jm#add_local name jsig VarArgument
+
 	method add_local v init_state : (int * (unit -> unit) * (unit -> unit)) =
 		let t = self#vtype v.v_type in
 		let slot,load,store = jm#add_local v.v_name t init_state in
@@ -292,8 +371,21 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		slot,load,store
 
 	method get_local v =
-		try Hashtbl.find local_lookup v.v_id
-		with Not_found -> failwith ("Unbound local " ^ v.v_name)
+		try
+			Hashtbl.find local_lookup v.v_id
+		with Not_found -> try
+			begin match env with
+			| Some env ->
+				env#get code v.v_id
+			| None ->
+				raise Not_found
+			end
+		with Not_found ->
+			failwith ("Unbound local: " ^ v.v_name)
+
+
+	method set_context (ctx : closure_context) =
+		env <- Some ctx
 
 	(* casting *)
 
@@ -305,6 +397,43 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#cast vt
 		end else
 			self#expect_reference_type
+
+	method tfunction e tf =
+		let name = jc#get_next_closure_name in
+		let outside = match Texpr.collect_captured_vars e with
+			| [] ->
+				None
+			| vl ->
+				let ctx_class = create_context_class gctx jc jm name vl in
+				Some (ctx_class,vl)
+		in
+		let jsig =
+			let args = List.map (fun (v,_) -> self#vtype v.v_type) tf.tf_args in
+			let args = match outside with
+				| None -> args
+				| Some(ctx_class,_) -> ctx_class#get_jsig :: args
+			in
+			TMethod(args,if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
+		in
+		let jm = new JvmMethod.builder jc (make_resolve_api com jc) name jsig in
+		jm#add_access_flag 0x1;
+		jm#add_access_flag 0x8;
+		let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
+		begin match outside with
+		| None -> ()
+		| Some(ctx_class,_) ->
+			handler#set_context ctx_class;
+			ignore(handler#add_named_local "_hx_ctx" ctx_class#get_jsig)
+		end;
+		List.iter (fun (v,_) ->
+			ignore(handler#add_local v VarArgument);
+		) tf.tf_args;
+		jm#finalize_arguments;
+		handler#texpr RReturn tf.tf_expr;
+		jc#add_method jm#export_method;
+		self#type_expr jc#get_this_path;
+		self#read_static_closure name;
+		outside
 
 	(* access *)
 
@@ -319,6 +448,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let t = code#get_stack#top in
 		self#string name;
 		code#invokestatic offset [t;self#vtype com.basic.tstring] [self#vtype t_dynamic];
+		jm#cast method_handle_sig
 
 	method read t e1 fa =
 		match fa with
@@ -1236,20 +1366,23 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#return_value vt;
 			jm#set_terminated true;
 		| TFunction tf ->
-			let t = tfun (List.map (fun (v,_) -> v.v_type) tf.tf_args) tf.tf_type in
-			let name = jc#get_next_closure_name in
-			let jm = new JvmMethod.builder jc (make_resolve_api com jc) name (self#vtype t) in
-			jm#add_access_flag 0x1;
-			jm#add_access_flag 0x8;
-			let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
-			List.iter (fun (v,_) ->
-				ignore(handler#add_local v VarArgument);
-			) tf.tf_args;
-			jm#finalize_arguments;
-			handler#texpr RReturn tf.tf_expr;
-			jc#add_method jm#export_method;
-			self#type_expr jc#get_this_path;
-			self#read_static_closure name
+			begin match self#tfunction e tf with
+			| None ->
+				()
+			| Some(ctx_class,vl) ->
+				let f () =
+					let tl = List.map (fun v ->
+						let _,load,_ = self#get_local v in
+						load();
+						self#vtype v.v_type
+					) vl in
+					let offset = pool#add_field ctx_class#get_path "<init>" (generate_method_signature false ctx_class#get_constructor_sig) FKMethod in
+					tl,offset
+				in
+				self#construct RValue ctx_class#get_path ctx_class#get_jsig f;
+				let offset = pool#add_field method_handle_path "bindTo" (generate_method_signature false (TMethod([object_sig],Some method_handle_sig))) FKMethod in
+				code#invokevirtual offset method_handle_sig [ctx_class#get_jsig] [method_handle_sig]
+			end
 		| TArrayDecl el when ret = RVoid ->
 			List.iter (self#texpr ret) el
 		| TArrayDecl el ->
