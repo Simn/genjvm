@@ -135,12 +135,12 @@ class builder pool = object(self)
 
 	(* variables *)
 
-	method iload ?(vt=TInt) i = match i with
-		| 0 -> self#op OpIload_0 1 [] [vt]
-		| 1 -> self#op OpIload_1 1 [] [vt]
-		| 2 -> self#op OpIload_2 1 [] [vt]
-		| 3 -> self#op OpIload_3 1 [] [vt]
-		| i -> self#op_maybe_wide (OpIload i) (OpWIload i) i [] [vt]
+	method iload ?(jsig=TInt) i = match i with
+		| 0 -> self#op OpIload_0 1 [] [jsig]
+		| 1 -> self#op OpIload_1 1 [] [jsig]
+		| 2 -> self#op OpIload_2 1 [] [jsig]
+		| 3 -> self#op OpIload_3 1 [] [jsig]
+		| i -> self#op_maybe_wide (OpIload i) (OpWIload i) i [] [jsig]
 
 	method lload i = match i with
 		| 0 -> self#op OpLload_0 1 [] [TLong]

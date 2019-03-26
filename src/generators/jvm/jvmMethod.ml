@@ -26,11 +26,14 @@ class builder jc api name jsig = object(self)
 	val mutable argument_locals = []
 	val mutable thrown_exceptions = Hashtbl.create 0
 
+	(* per-branch *)
+	val mutable terminated = false
+
 	(* per-frame *)
 	val mutable locals = []
 	val mutable local_offset = 0
-	val mutable terminated = false
 
+	(** Pushes a new scope onto the stack. Returns a function which when called reverts to the previous state. **)
 	method push_scope =
 		let old_locals = locals in
 		let old_offset = local_offset in
@@ -64,13 +67,14 @@ class builder jc api name jsig = object(self)
 			local_offset <- old_offset;
 		)
 
-	method get_locals_for_stack_frame locals =
+	method private get_locals_for_stack_frame locals =
 		List.map (fun (init,_,t) ->
 			match !init with
 			| None -> JvmVerificationTypeInfo.VTop
 			| _ -> JvmVerificationTypeInfo.of_signature jc#get_pool t
 		) locals
 
+	(** Adds the current state of locals and stack as a stack frame. This has to be called on every branch target. **)
 	method add_stack_frame =
 		let locals = self#get_locals_for_stack_frame locals in
 		let astack = List.map (JvmVerificationTypeInfo.of_signature jc#get_pool) (code#get_stack#get_stack) in
@@ -81,14 +85,17 @@ class builder jc api name jsig = object(self)
 			| (r',_,_) :: stack_frames when r' = r -> ff :: stack_frames
 			| _ -> ff :: stack_frames)
 
+	(** Adds [exc] as an exception. This will be added to the Code attribute. **)
 	method add_exception (exc : jvm_exception) =
 		exceptions <- exc :: exceptions
 
+	(** Adds [path] as a thrown exception for this method. Deals with duplicates. **)
 	method add_thrown_exception (path : jpath) =
 		Hashtbl.replace thrown_exceptions (jc#get_pool#add_path path) true
 
 	(* casting *)
 
+	(** Checks if the stack top is a basic type and wraps accordingly. **)
 	method expect_reference_type =
 		let wrap_null jsig name =
 			let path = (["java";"lang"],name) in
@@ -122,9 +129,10 @@ class builder jc api name jsig = object(self)
 		| TDouble -> unwrap_null "Double" "toDouble"
 		| _ -> ()
 
-	method cast ?(allow_to_string=false) vt =
-		let vt' = code#get_stack#top in
-		begin match vt,vt' with
+	(** Casts the top of the stack to [jsig]. If [allow_to_string] is true, Jvm.toString is called. **)
+	method cast ?(allow_to_string=false) jsig =
+		let jsig' = code#get_stack#top in
+		begin match jsig,jsig' with
 		| TObject((["java";"lang"],"Double"),_),TInt ->
 			code#i2d;
 			self#expect_reference_type;
@@ -147,7 +155,7 @@ class builder jc api name jsig = object(self)
 		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
 			self#expect_reference_type;
 			let offset = api.resolve_field true (["haxe";"jvm"],"Jvm") "toString" in
-			code#invokestatic offset [code#get_stack#top] [vt]
+			code#invokestatic offset [code#get_stack#top] [jsig]
 		| TObject(path1,_),TObject(path2,_) ->
 			code#checkcast path1;
 		| TObject(path,_),TTypeParameter _ ->
@@ -165,6 +173,11 @@ class builder jc api name jsig = object(self)
 
 	(* branches *)
 
+	(** Starts a branch. Returns a restore function which reverts the stack and termination status back
+	    to the previous state. The restore function can be called multiple times for multiple branches.
+
+		This function has no effect on locals. Use [push_scope] for them.
+	**)
 	method start_branch =
 		let save = code#get_stack#save in
 		let old_terminated = terminated in
@@ -173,7 +186,8 @@ class builder jc api name jsig = object(self)
 			terminated <- old_terminated;
 		)
 
-	method if_then_else f_if (f_then : unit -> unit) (f_else : unit -> unit) =
+	(** Generates code which executes [f_if()] and then branches into [f_then()] and [f_else()]. **)
+	method if_then_else (f_if : unit -> jbranchoffset ref) (f_then : unit -> unit) (f_else : unit -> unit) =
 		let jump_then = f_if () in
 		let restore = self#start_branch in
 		let pop = self#push_scope in
@@ -192,7 +206,8 @@ class builder jc api name jsig = object(self)
 		r_then := code#get_fp - !r_then;
 		if not self#is_terminated then self#add_stack_frame
 
-	method if_then f_if (f_then : unit -> unit) =
+	(** Generates code which executes [f_if()] and then branches into [f_then()], if the condition holds. **)
+	method if_then (f_if : unit -> jbranchoffset ref) (f_then : unit -> unit) =
 		let jump_then = f_if () in
 		let restore = self#start_branch in
 		let pop = self#push_scope in
@@ -202,15 +217,26 @@ class builder jc api name jsig = object(self)
 		jump_then := code#get_fp - !jump_then;
 		self#add_stack_frame
 
-	method add_local (name : string) t (init_state : var_init_state) =
+	(** Adds a local with a given [name], signature [jsig] and an [init_state].
+	    This function returns a tuple consisting of:
+
+		  * The slot of the local
+		  * The function to load the value
+		  * The function to store a value
+
+		If [init_state = VarNeedDefault], the local is initialized to a default value matching [jsig].
+		If [init_state = VarArgument], the local is considered initialized.
+		If [init_state = VarWillInit], this function assumes that the returned [store] function will be called appropriately.
+	**)
+	method add_local (name : string) (jsig : jsignature) (init_state : var_init_state) =
 		let slot = local_offset in
-		let load,store,d = match t with
+		let load,store,d = match jsig with
 			| TInt | TBool ->
 				if init_state = VarNeedDefault then begin
 					code#iconst Int32.zero;
 					code#istore slot
 				end;
-				(fun () -> code#iload ~vt:t slot),(fun () -> code#istore slot),1
+				(fun () -> code#iload ~jsig slot),(fun () -> code#istore slot),1
 			| TLong ->
 				if init_state = VarNeedDefault then begin
 					code#lconst Int64.zero;
@@ -231,13 +257,13 @@ class builder jc api name jsig = object(self)
 				(fun () -> code#dload slot),(fun () -> code#dstore slot),2
 			| _ ->
 				if init_state = VarNeedDefault then begin
-					code#aconst_null t;
-					code#astore t slot
+					code#aconst_null jsig;
+					code#astore jsig slot
 				end;
-				(fun () -> code#aload t slot),(fun () -> code#astore t slot),1
+				(fun () -> code#aload jsig slot),(fun () -> code#astore jsig slot),1
 		in
 		let init = ref None in
-		locals <- (init,name,t) :: locals;
+		locals <- (init,name,jsig) :: locals;
 		local_offset <- local_offset + d;
 		if local_offset > max_num_locals then max_num_locals <- local_offset;
 		let check_store =
@@ -260,10 +286,12 @@ class builder jc api name jsig = object(self)
 			store()
 		)
 
+	(** This function has to be called once all arguments are declared. *)
 	method finalize_arguments =
 		argument_locals <- locals
 
-	method get_stack_map_table =
+
+	method private get_stack_map_table =
 		let argument_locals = self#get_locals_for_stack_frame argument_locals in
 		let stack_map = List.fold_left (fun ((last_offset,last_locals,last_locals_length),acc) (offset,locals,stack) ->
 			let cur = offset - last_offset - 1 in
@@ -339,6 +367,7 @@ class builder jc api name jsig = object(self)
 			code_attributes = Array.of_list attributes;
 		}
 
+	(** Exports the method as a [jvm_field]. No other functions should be called on this object afterwards. *)
 	method export_method =
 		self#commit_annotations jc#get_pool;
 		if code#get_fp > 0 then begin
@@ -365,12 +394,9 @@ class builder jc api name jsig = object(self)
 			field_attributes = attributes;
 		}
 
+	(** Exports the method as a [jvm_field]. No other functions should be called on this object afterwards. *)
 	method export_field =
 		assert (code#get_fp = 0);
-		if code#get_fp > 0 then begin
-			let code = self#get_jcode in
-			self#add_attribute (AttributeCode code);
-		end;
 		let attributes = self#export_attributes jc#get_pool in
 		let offset_name = jc#get_pool#add_string name in
 		let jsig = generate_signature false jsig in
