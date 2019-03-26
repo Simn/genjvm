@@ -43,10 +43,18 @@ class builder path_this path_super = object(self)
 		closure_count <- closure_count + 1;
 		name
 
-	method spawn_inner_class path_super =
+	method spawn_inner_class (jm : JvmMethod.builder) path_super =
 		let path = ([],Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes)) in
 		let jc = new builder path path_super in
 		jc#add_access_flag 0x01;
+		let _ =
+			let pool = jc#get_pool in
+			let offset_class = pool#add_path path_this in
+			let offset_name = pool#add_string jm#get_name in
+			let offset_desc = pool#add_string (generate_signature false jm#get_jsig) in
+			let offset_info = pool#add (ConstNameAndType(offset_name,offset_desc)) in
+			jc#add_attribute (JvmAttribute.AttributeEnclosingMethod(offset_class,offset_info));
+		in
 		let offset_name = pool#add_string (snd path) in
 		let offset_class = pool#add (ConstClass offset_name) in
 		DynArray.add inner_classes (jc,offset_name,offset_class);

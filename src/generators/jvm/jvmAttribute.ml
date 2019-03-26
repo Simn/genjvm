@@ -58,6 +58,7 @@ type j_attribute =
 	| AttributeSignature of jvm_constant_pool_index
 	| AttributeLocalVariableTable of jvm_local_debug array
 	| AttributeInnerClasses of jvm_inner_class array
+	| AttributeEnclosingMethod of jvm_constant_pool_index * jvm_constant_pool_index
 	| AttributeRuntimeVisibleAnnotations of j_annotation array
 
 let write_verification_type ch = function
@@ -174,6 +175,10 @@ let write_attribute pool jvma =
 			write_ui16 ch ic.ic_inner_class_access_flags;
 		) icl;
 		"InnerClasses"
+	| AttributeEnclosingMethod(i1,i2) ->
+		write_ui16 ch i1;
+		write_ui16 ch i2;
+		"EnclosingMethod"
 	| AttributeSourceFile offset ->
 		write_ui16 ch offset;
 		"SourceFile";

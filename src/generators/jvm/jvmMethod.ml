@@ -352,6 +352,8 @@ class builder jc api name jsig = object(self)
 
 	method get_code = code
 	method is_terminated = terminated
+	method get_name = name
+	method get_jsig = jsig
 	method set_terminated b = terminated <- b
 
 	method private get_jcode =
