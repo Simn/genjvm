@@ -52,6 +52,7 @@ type j_attribute =
 	| AttributeConstantValue of jvm_constant_pool_index
 	| AttributeCode of jvm_code
 	| AttributeStackMapTable of j_stack_map_frame array
+	| AttributeExceptions of jvm_constant_pool_index array
 	| AttributeSourceFile of jvm_constant_pool_index
 	| AttributeLineNumberTable of (int * int) array
 	| AttributeSignature of jvm_constant_pool_index
@@ -162,6 +163,9 @@ let write_attribute pool jvma =
 	| AttributeStackMapTable stack_map ->
 		write_array16 ch write_stack_map_frame stack_map;
 		"StackMapTable"
+	| AttributeExceptions a ->
+		write_array16 ch (fun _ offset -> write_ui16 ch offset) a;
+		"Exceptions"
 	| AttributeInnerClasses icl ->
 		write_array16 ch (fun ch ic ->
 			write_ui16 ch ic.ic_inner_class_info_index;

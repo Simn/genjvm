@@ -24,6 +24,7 @@ class builder jc api name jsig = object(self)
 	val mutable stack_frames = []
 	val mutable exceptions = []
 	val mutable argument_locals = []
+	val mutable thrown_exceptions = Hashtbl.create 0
 
 	(* per-frame *)
 	val mutable locals = []
@@ -82,6 +83,9 @@ class builder jc api name jsig = object(self)
 
 	method add_exception (exc : jvm_exception) =
 		exceptions <- exc :: exceptions
+
+	method add_thrown_exception (path : jpath) =
+		Hashtbl.replace thrown_exceptions (jc#get_pool#add_path path) true
 
 	(* casting *)
 
@@ -341,6 +345,8 @@ class builder jc api name jsig = object(self)
 			let code = self#get_jcode in
 			self#add_attribute (AttributeCode code);
 		end;
+		if Hashtbl.length thrown_exceptions > 0 then
+			self#add_attribute (AttributeExceptions (Array.of_list (Hashtbl.fold (fun k _ c -> k :: c) thrown_exceptions [])));
 		begin match debug_locals with
 		| [] ->
 			()

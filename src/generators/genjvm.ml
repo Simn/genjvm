@@ -270,7 +270,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	val mutable breaks = []
 	val mutable continue = 0
-
+	val mutable caught_exceptions = []
 
 	method vtype t =
 		jsignature_of_type t
@@ -955,7 +955,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method try_catch ret e1 catches =
 		let restore = jm#start_branch in
 		let fp_from = code#get_fp in
+		let old_exceptions = caught_exceptions in
+		let excl = List.map (fun (v,e) ->
+			let exc = new haxe_exception gctx v.v_type in
+			caught_exceptions <- exc :: caught_exceptions;
+			exc,v,e
+		) catches in
 		self#texpr ret e1;
+		caught_exceptions <- old_exceptions;
 		let term_try = jm#is_terminated in
 		let r_try = self#maybe_make_jump in
 		let fp_to = code#get_fp in
@@ -1029,7 +1036,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			loop excl;
 			!rl
 		in
-		let excl = List.map (fun (v,e) -> new haxe_exception gctx v.v_type,v,e) catches in
 		let rec loop acc excl = match excl with
 			| (exc,v,e) :: excl ->
 				if List.exists (fun (exc',_,_) -> exc'#is_assignable_to exc) excl || excl = [] && not exc#is_native_exception then begin
@@ -1314,8 +1320,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#cast e.etype;
 		| TThrow e1 ->
 			self#texpr RValue e1;
-			let vt = self#vtype (self#mknull e1.etype) in
-			self#throw vt
+			let exc = new haxe_exception gctx e1.etype in
+			if not (List.exists (fun exc' -> exc#is_assignable_to exc') caught_exceptions) then jm#add_thrown_exception exc#get_native_exception_path;
+			if not exc#is_native_exception then begin
+				let vt = self#vtype (self#mknull e1.etype) in
+				self#throw vt
+			end else begin
+				code#athrow;
+				jm#set_terminated true
+			end
 		| TObjectDecl fl ->
 			let f () =
 				let offset = pool#add_field haxe_dynamic_object_path "<init>" "()V" FKMethod in
