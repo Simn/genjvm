@@ -431,8 +431,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jm#finalize_arguments;
 		handler#texpr RReturn tf.tf_expr;
 		jc#add_method jm#export_method;
-		self#type_expr jc#get_this_path;
-		self#read_static_closure name;
+		self#read_static_closure jc#get_jsig name jsig;
 		outside
 
 	(* access *)
@@ -443,18 +442,30 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method write_native_array vta vte =
 		NativeArray.write code vta vte
 
-	method read_static_closure name =
-		let offset = self#add_haxe_field true haxe_jvm_path "readField" in
-		let t = code#get_stack#top in
+	method read_static_closure jsig name jsig_method =
+		self#type_expr jsig;
 		self#string name;
-		code#invokestatic offset [t;self#vtype com.basic.tstring] [self#vtype t_dynamic];
-		jm#cast method_handle_sig
+		let jasig = match jsig_method with
+		| TMethod(tl,tr) ->
+			begin match tr with
+			| None -> self#basic_type_path "Void"
+			| Some jsig -> self#type_expr jsig
+			end;
+			code#iconst (Int32.of_int (List.length tl));
+			let jasig,_ = self#new_native_array_f java_class_sig (List.map (fun t -> fun () -> self#type_expr t) tl) in
+			jasig
+		| _ ->
+			assert false
+		in
+		let offset = self#add_haxe_field true haxe_jvm_path "getMethodHandle" in
+		let stack = jc#get_jsig :: string_sig :: java_class_sig :: [jasig] in
+		code#invokestatic offset stack [method_handle_sig]
 
 	method read t e1 fa =
 		match fa with
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			self#texpr RValue e1;
-			self#read_static_closure cf.cf_name;
+			self#read_static_closure (TObject(c.cl_path,[])) cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
 		| FStatic(c,cf) ->
 			let offset = add_field pool c cf in
@@ -1208,16 +1219,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TString s -> self#string s
 		| TSuper -> failwith "Invalid super access"
 
-	method new_native_array jsig el =
+	method new_native_array_f jsig (fl : (unit -> unit) list) =
 		let jasig = NativeArray.create code pool jsig in
-		List.iteri (fun i e ->
+		List.iteri (fun i f ->
 			code#dup;
 			code#iconst (Int32.of_int i);
-			self#texpr RValue e;
+			f();
 			jm#cast jsig;
 			self#write_native_array jasig jsig
-		) el;
+		) fl;
 		jasig,jsig
+
+	method new_native_array jsig el =
+		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr RValue e) el)
 
 	method construct ret path t f =
 		let offset_class = pool#add_path (path_map path) in
@@ -1226,26 +1240,33 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let tl,offset = f() in
 		code#invokespecial offset t tl []
 
-	method type_expr path =
-		let basic_path name =
-			let offset = pool#add_field (["java";"lang"],name) "TYPE" "Ljava/lang/Class;" FKField in
-			code#getstatic offset java_class_sig
-		in
-		match path with
-		| [],"Void" ->
-			basic_path "Void"
-		| [],"Int" ->
-			basic_path "Integer"
-		| [],"Float" ->
-			basic_path "Double"
-		| [],"Bool" ->
-			basic_path "Boolean"
-		(* TODO: other types *)
-		| _ ->
+	method basic_type_path name =
+		let offset = pool#add_field (["java";"lang"],name) "TYPE" "Ljava/lang/Class;" FKField in
+		code#getstatic offset java_class_sig
+
+	method type_expr = function
+		| TByte -> self#basic_type_path "Byte"
+		| TChar -> self#basic_type_path "Character"
+		| TDouble -> self#basic_type_path "Double"
+		| TFloat -> self#basic_type_path "Float"
+		| TInt -> self#basic_type_path "Integer"
+		| TLong -> self#basic_type_path "Long"
+		| TShort -> self#basic_type_path "Short"
+		| TBool -> self#basic_type_path "Boolean"
+		| TObject(path,_) ->
 			let path = path_map path in
 			let offset = pool#add_path path in
 			let t = TObject(path,[]) in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,t)]))
+		| TMethod _ ->
+			let offset = pool#add_path method_handle_path in
+			code#ldc offset (TObject(java_class_path,[TType(WNone,method_handle_sig)]))
+		| TTypeParameter _ ->
+			let offset = pool#add_path object_path in
+			code#ldc offset (TObject(java_class_path,[TType(WNone,object_sig)]))
+		| jsig ->
+			print_endline (generate_signature false jsig);
+			assert false
 
 	method texpr ret e =
 		try
@@ -1269,7 +1290,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let _,load,_ = self#get_local v in
 			load()
 		| TTypeExpr mt ->
-			self#type_expr (t_infos mt).mt_path
+			self#type_expr (jsignature_of_type (type_of_module_type mt))
 		| TUnop(op,flag,e1) ->
 			begin match op with
 			| Not | Neg | NegBits when ret = RVoid -> self#texpr ret e1
