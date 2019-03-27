@@ -447,21 +447,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method read_static_closure jsig name jsig_method =
 		self#type_expr jsig;
 		self#string name;
-		let jasig = match jsig_method with
+		begin match jsig_method with
 		| TMethod(tl,tr) ->
 			begin match tr with
 			| None -> self#basic_type_path "Void"
 			| Some jsig -> self#type_expr jsig
 			end;
 			code#iconst (Int32.of_int (List.length tl));
-			let jasig,_ = self#new_native_array_f java_class_sig (List.map (fun t -> fun () -> self#type_expr t) tl) in
-			jasig
+			ignore(self#new_native_array_f java_class_sig (List.map (fun t -> fun () -> self#type_expr t) tl))
 		| _ ->
 			assert false
-		in
-		let offset = self#add_haxe_field true haxe_jvm_path "getMethodHandle" in
-		let stack = jc#get_jsig :: string_sig :: java_class_sig :: [jasig] in
-		code#invokestatic offset stack [method_handle_sig]
+		end;
+		jm#invokestatic haxe_jvm_path "getMethodHandle" (method_sig [java_class_sig;string_sig;java_class_sig;array_sig java_class_sig] (Some method_handle_sig))
 
 	method read t e1 fa =
 		match fa with
@@ -497,17 +494,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
 			code#invokespecial offset_field (object_path_sig path) [TInt;jasig] []
 		| FDynamic s | FAnon {cf_name = s} ->
-			let offset = self#add_haxe_field true haxe_jvm_path "readField" in
 			self#texpr RValue e1;
 			self#string s;
-			code#invokestatic offset [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic];
+			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 			self#cast t;
 		| FClosure(_,cf) ->
-			let offset = self#add_haxe_field true haxe_jvm_path "bindMethod" in
 			self#texpr RValue e1;
 			self#string cf.cf_name;
 			self#string (generate_method_signature false (self#vtype cf.cf_type));
-			code#invokestatic offset [self#vtype e1.etype;string_sig;string_sig] [method_handle_sig]
+			jm#invokestatic haxe_jvm_path "bindMethod" (method_sig [object_sig;string_sig;string_sig] (Some method_handle_sig))
 
 	method read_write ret ak e (f : unit -> unit) (t : Type.t) =
 		let apply dup =
@@ -539,19 +534,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			apply (fun () -> code#dup_x1);
 			code#putfield offset vtobj vt
 		| TField(e1,(FDynamic s | FAnon {cf_name = s})) ->
-			let offset_write = self#add_haxe_field true haxe_jvm_path "writeField" in
-			let offset_read = self#add_haxe_field true haxe_jvm_path "readField" in
 			self#texpr RValue e1;
 			if ak <> AKNone then code#dup;
 			self#string s;
 			if ak <> AKNone then begin
 				code#dup_x1;
-				code#invokestatic offset_read [self#vtype e1.etype;self#vtype com.basic.tstring] [self#vtype t_dynamic];
+				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 				self#cast e.etype;
 			end;
 			apply (fun () -> code#dup_x2);
 			self#cast (self#mknull e.etype);
-			code#invokestatic offset_write [self#vtype e1.etype;self#vtype com.basic.tstring;code#get_stack#top] []
+			jm#invokestatic haxe_jvm_path "writeField" (method_sig [object_sig;string_sig;object_sig] None)
 		| TArray(e1,e2) ->
 			begin match follow e1.etype with
 				| TInst({cl_path = ([],"Array")} as c,[t]) ->
@@ -757,8 +750,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2;t1]
 		| [t1;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2] ->
 			(fun () ->
-				let offset = self#add_haxe_field true haxe_jvm_path "equals" in
-				code#invokestatic offset [t1;t2] [TBool];
+				jm#invokestatic haxe_jvm_path "equals" (method_sig [t1;t2] (Some TBool));
 				code#if_ref (flip_cmp_op op)
 			)
 		| [TObject _ as t1;TObject _ as t2] ->
@@ -800,8 +792,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TDouble;TDouble] -> opd ()
 		| [TLong;TLong] -> opl ()
 		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[]);] ->
-			let offset = self#add_haxe_field true (["haxe";"jvm"],"Jvm") "stringConcat" in
-			code#invokestatic offset [string_sig;string_sig] [string_sig]
+			jm#invokestatic haxe_jvm_path "stringConcat" (method_sig [object_sig;object_sig] (Some string_sig))
 		| [t1;t2] -> jerror (Printf.sprintf "Can't numop %s and %s" (generate_signature false t1) (generate_signature false t2))
 		| tl -> jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
 		end
@@ -1044,9 +1035,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| _ -> Error.error "Type expression expected" e1.epos
 			end;
 		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
-			let offset = add_field pool c cf in
 			let tl,tr = self#call_arguments cf.cf_type el in
-			code#invokestatic offset tl (retype tr);
+			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
 			tr
 		| TField(e1,FInstance(c,tl,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let offset = add_field pool c cf in
@@ -1119,8 +1109,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method throw vt =
 		jm#expect_reference_type;
-		let offset = self#add_haxe_field true (["haxe";"jvm"],"Exception") "wrap" in
-		code#invokestatic offset [vt] [exception_sig];
+		jm#invokestatic (["haxe";"jvm"],"Exception") "wrap" (method_sig [object_sig] (Some exception_sig));
 		code#athrow;
 		jm#set_terminated true
 
@@ -1435,10 +1424,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match follow e.etype with
 			| TInst({cl_path = ([],"Array")},[t]) ->
 				code#iconst (Int32.of_int length);
-				let jasig,jsig = self#new_native_array (jsignature_of_type (self#mknull t)) el in
-				let offset_field = pool#add_field ([],"Array") "ofNative" (method_sig [array_sig object_sig] (Some (object_path_sig ([],"Array")))) FKMethod in
-				let vta = self#vtype e.etype in
-				code#invokestatic offset_field [jasig] [vta]
+				ignore(self#new_native_array (jsignature_of_type (self#mknull t)) el);
+				jm#invokestatic ([],"Array") "ofNative" (method_sig [array_sig object_sig] (Some (object_path_sig ([],"Array"))));
+				self#cast e.etype
 			| _ ->
 				assert false
 			end
@@ -1463,8 +1451,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| t ->
 				self#texpr RValue e1;
 				self#texpr RValue e2;
-				let offset = self#add_haxe_field true (["haxe";"jvm"],"Jvm") "arrayRead" in
-				code#invokestatic offset [object_sig;TInt] [object_sig];
+				jm#invokestatic (["haxe";"jvm"],"Jvm") "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
 				self#cast e.etype;
 			end
 		| TBlock [] ->

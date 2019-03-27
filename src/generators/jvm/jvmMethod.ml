@@ -99,6 +99,12 @@ class builder jc api name jsig = object(self)
 			code#invokevirtual offset jsig tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	method invokestatic (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
+		| TMethod(tl,tr) ->
+			let offset = code#get_pool#add_field path name jsigm FKMethod in
+			code#invokestatic offset tl (match tr with None -> [] | Some tr -> [tr])
+		| _ -> assert false
+
 	(* casting *)
 
 	(** Checks if the stack top is a basic type and wraps accordingly. **)
