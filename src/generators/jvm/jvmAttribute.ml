@@ -47,6 +47,11 @@ type jvm_inner_class = {
 	ic_inner_class_access_flags : int;
 }
 
+type j_bootstrap_method = {
+	bm_method_ref : jvm_constant_pool_index;
+	bm_arguments : jvm_constant_pool_index array;
+}
+
 (* https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7 *)
 type j_attribute =
 	| AttributeConstantValue of jvm_constant_pool_index
@@ -60,6 +65,7 @@ type j_attribute =
 	| AttributeInnerClasses of jvm_inner_class array
 	| AttributeEnclosingMethod of jvm_constant_pool_index * jvm_constant_pool_index
 	| AttributeRuntimeVisibleAnnotations of j_annotation array
+	| AttributeBootstrapMethods of j_bootstrap_method array
 
 let write_verification_type ch = function
 	| VTop -> write_byte ch 0
@@ -203,6 +209,12 @@ let write_attribute pool jvma =
 	| AttributeRuntimeVisibleAnnotations al ->
 		write_array16 ch write_annotation al;
 		"RuntimeVisibleAnnotations"
+	| AttributeBootstrapMethods a ->
+		write_array16 ch (fun _ bm ->
+			write_ui16 ch bm.bm_method_ref;
+			write_array16 ch (fun _ i -> write_ui16 ch i) bm.bm_arguments;
+		) a;
+		"BootstrapMethods"
 	in
 	{
 		attr_index = pool#add (ConstUtf8 name);
