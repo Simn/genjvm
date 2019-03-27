@@ -12,6 +12,8 @@ open JvmBuilder
 
 (* Haxe *)
 
+exception HarderFailure of string
+
 type generation_context = {
 	com : Common.context;
 	jar : Zip.out_file;
@@ -1302,7 +1304,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		try
 			if not jm#is_terminated then self#texpr' ret e
 		with Failure s ->
-			failwith (Printf.sprintf "Expr %s\n%s" (s_expr_pretty false "" false (s_type (print_context())) e) s)
+			raise (HarderFailure (Printf.sprintf "Expr %s\n%s" (s_expr_pretty false "" false (s_type (print_context())) e) s))
 
 	method texpr' ret e =
 		code#set_line (Lexer.get_error_line e.epos);
@@ -1613,7 +1615,7 @@ let generate_method gctx jc c mtype cf =
 		end;
 		close_scope();
 		jm#export_method
-	with Failure s ->
+	with Failure s | HarderFailure s ->
 		failwith (Printf.sprintf "Method %s.%s:\n%s" (s_type_path c.cl_path) cf.cf_name s)
 
 let generate_field gctx jc c mtype cf =
