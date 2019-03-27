@@ -110,7 +110,11 @@ let rec jsignature_of_type t = match t with
 				| [t] -> TArray(jsignature_of_type t,None)
 				| _ -> assert false
 				end
-			| _ -> TObject(a.a_path,List.map jtype_argument_of_type tl)
+			| _ ->
+				if Meta.has Meta.CoreType a.a_meta then
+					TObject(a.a_path,List.map jtype_argument_of_type tl)
+				else
+					jsignature_of_type (Abstract.get_underlying_type a tl)
 		end
 	| TDynamic t' when t' == t_dynamic -> object_sig
 	| TDynamic _ -> assert false (* TODO: hmm... *)
