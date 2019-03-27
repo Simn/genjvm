@@ -11,7 +11,6 @@ class builder path_this path_super = object(self)
 	val jsig = TObject(path_this,[])
 	val mutable offset_this = 0
 	val mutable offset_super = 0
-	val mutable offset_super_ctor = 0
 	val mutable interface_offsets = []
 	val fields = DynArray.create ()
 	val methods = DynArray.create ()
@@ -32,11 +31,8 @@ class builder path_this path_super = object(self)
 	method get_this_path = path_this
 	method get_super_path = path_super
 	method get_jsig = jsig
-	method get_offset_super_ctor = offset_super_ctor
 	method get_offset_this = offset_this
 	method get_access_flags = access_flags
-
-	method set_offset_super_ctor offset = offset_super_ctor <- offset
 
 	method get_next_closure_name =
 		let name = Printf.sprintf "hx_closure$%i" closure_count in

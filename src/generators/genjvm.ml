@@ -1659,8 +1659,6 @@ let generate_class gctx c =
 	in
 	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
 	let pool = jc#get_pool in
-	let offset_super_constructor = pool#add_field path_super "<init>" (match sig_super_ctor with SuperGood jsig -> jsig | _ ->  method_sig [] None) FKMethod in
-	jc#set_offset_super_ctor offset_super_constructor;
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
 			List.iter (fun cf ->
