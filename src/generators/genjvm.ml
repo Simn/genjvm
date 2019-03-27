@@ -808,12 +808,23 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| tl -> jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
 		end
 
-	method binop_basic ret op cast_type f1 f2 = match op with
+	method binop_basic ret op cast_type f1 f2 =
+		let long_op_int () =
+			let is_long = match cast_type with
+				| Some TLong -> true
+				| _ -> false
+			in
+			f1();
+			jm#cast (if is_long then TLong else TInt);
+			f2();
+			jm#cast TInt; (* ! *)
+			is_long
+		in
+		match op with
 		| OpAdd -> self#binop_numeric ((fun () -> code#iadd),(fun () -> code#dadd),(fun () -> code#ladd)) cast_type f1 f2
 		| OpSub -> self#binop_numeric ((fun () -> code#isub),(fun () -> code#dsub),(fun () -> code#lsub)) cast_type f1 f2
 		| OpMult -> self#binop_numeric ((fun () -> code#imul),(fun () -> code#dmul),(fun () -> code#lmul)) cast_type f1 f2
 		| OpDiv ->
-
 			let operand f =
 				f ();
 				begin match cast_type with
@@ -830,9 +841,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| OpAnd -> self#binop_numeric ((fun () -> code#iand),(fun () -> assert false),(fun () -> code#land_)) cast_type f1 f2
 		| OpOr -> self#binop_numeric ((fun () -> code#ior),(fun () -> assert false),(fun () -> code#lor_)) cast_type f1 f2
 		| OpXor -> self#binop_numeric ((fun () -> code#ixor),(fun () -> assert false),(fun () -> code#lxor_)) cast_type f1 f2
-		| OpShl -> self#binop_numeric ((fun () -> code#ishl),(fun () -> assert false),(fun () -> code#lshl)) cast_type f1 f2
-		| OpShr -> self#binop_numeric ((fun () -> code#ishr),(fun () -> assert false),(fun () -> code#lshr)) cast_type f1 f2
-		| OpUShr -> self#binop_numeric ((fun () -> code#iushr),(fun () -> assert false),(fun () -> code#lushr)) cast_type f1 f2
+		| OpShl ->
+			let is_long = long_op_int () in
+			if is_long then code#lshl else code#ishl
+		| OpShr ->
+			let is_long = long_op_int () in
+			if is_long then code#lshr else code#ishr
+		| OpUShr ->
+			let is_long = long_op_int () in
+			if is_long then code#lushr else code#iushr
 		| OpMod -> self#binop_numeric ((fun () -> code#irem),(fun () -> code#drem),(fun () -> code#lrem)) cast_type f1 f2
 		| OpBoolAnd ->
 			let operand f =

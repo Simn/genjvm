@@ -375,9 +375,9 @@ class builder pool = object(self)
 	method land_ = self#op OpLand 1 [TLong;TLong] [TLong]
 	method lor_ = self#op OpLor 1 [TLong;TLong] [TLong]
 	method lxor_ = self#op OpLxor 1 [TLong;TLong] [TLong]
-	method lshl = self#op OpLshl 1 [TLong;TLong] [TLong]
-	method lshr = self#op OpLshr 1 [TLong;TLong] [TLong]
-	method lushr = self#op OpLushr 1 [TLong;TLong] [TLong]
+	method lshl = self#op OpLshl 1 [TInt;TLong] [TLong]
+	method lshr = self#op OpLshr 1 [TInt;TLong] [TLong]
+	method lushr = self#op OpLushr 1 [TInt;TLong] [TLong]
 	method lrem = self#op OpLrem 1 [TLong;TLong] [TLong]
 	method lneg = self#op OpLneg 1 [TLong] [TLong]
 
