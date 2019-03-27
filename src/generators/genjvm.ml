@@ -182,13 +182,11 @@ let resolve_field com static path name =
 		jerror (Printf.sprintf "No such field: %s.%s" (s_type_path path) name)
 
 let add_field pool c cf =
-	let field_kind =
-		if c.cl_interface then
-			FKInterfaceMethod
-		else match cf.cf_kind with
+	let field_kind = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
-			FKMethod
+			if c.cl_interface then FKInterfaceMethod else FKMethod
 		| _ ->
+			if c.cl_interface then jerror (Printf.sprintf "Interface field access is not supported on JVM (for %s.%s)" (s_type_path c.cl_path) cf.cf_name);
 			FKField
 	in
 	let t =
@@ -1627,7 +1625,6 @@ let generate_field gctx jc c mtype cf =
 	let jsig = jsignature_of_type cf.cf_type in
 	let jm = new JvmMethod.builder jc api cf.cf_name jsig in
 	jm#add_access_flag 1; (* public *)
-	if c.cl_interface then jm#add_access_flag 0x0400; (* abstact *)
 	if mtype = MStatic then jm#add_access_flag 0x8;
 	if has_class_field_flag cf CfFinal then jm#add_access_flag 0x10;
 	begin match cf.cf_expr with
@@ -1688,7 +1685,7 @@ let generate_class gctx c =
 				jc#add_method (generate_method gctx jc c mtype cf)
 			) (cf :: cf.cf_overloads)
 		| _ ->
-			jc#add_field (generate_field gctx jc c mtype cf)
+			if not c.cl_interface then jc#add_field (generate_field gctx jc c mtype cf)
 	in
 	List.iter (field MStatic) c.cl_ordered_statics;
 	List.iter (field MInstance) c.cl_ordered_fields;
