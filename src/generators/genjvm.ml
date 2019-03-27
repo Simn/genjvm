@@ -119,7 +119,7 @@ let rec jsignature_of_type t = match t with
 					jsignature_of_type (Abstract.get_underlying_type a tl)
 		end
 	| TDynamic t' when t' == t_dynamic -> object_sig
-	| TDynamic _ -> assert false (* TODO: hmm... *)
+	| TDynamic _ -> object_sig (* TODO: hmm... *)
 	| TMono r ->
 		begin match !r with
 		| Some t -> jsignature_of_type t
@@ -470,7 +470,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method read t e1 fa =
 		match fa with
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
-			self#texpr RValue e1;
 			self#read_static_closure (TObject(c.cl_path,[])) cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
 		| FStatic(c,cf) ->

@@ -1,6 +1,7 @@
 package test;
 
 import haxe.ds.Option;
+import Type.ValueType;
 
 private class SomeClass {
 	public function new() {}
@@ -65,6 +66,7 @@ class TestTypeApi extends BaseTest {
 		testCreateInstance();
 		testCreateEmptyInstance();
 		testEnumConstructs();
+		testTypeof();
 		testEnumIndex();
 		testEnumParameters();
 	}
@@ -149,6 +151,22 @@ class TestTypeApi extends BaseTest {
 		var a = Type.getEnumConstructs(Option);
 		eq("Some", a[0]);
 		eq("None", a[1]);
+	}
+
+	function testTypeof() {
+		// enum comparison is broken
+		// eq(TNull, Type.typeof(null));
+		// eq(TInt, Type.typeof(0));
+		// eq(TInt, Type.typeof(0.)); // is this right?
+		// eq(TFloat, Type.typeof(0.1));
+		// // eq(Type.typeof(false)); // TODO
+		// // eq(Type.typeof(true));
+		// eq(TFunction, Type.typeof(testTypeof));
+		// eq(TFunction, Type.typeof(function() {}));
+		// // eq(Type.typeof(haxe.ds.Option.None));
+		// // eq(Type.typeof(haxe.ds.Option.Some(1)));
+		// eq(TObject, Type.typeof({}));
+		// eq(Type.typeof("foo"));
 	}
 
 	function testEnumIndex() {

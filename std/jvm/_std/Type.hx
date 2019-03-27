@@ -170,7 +170,32 @@ class Type {
 	}
 
 	public static function typeof(v:Dynamic):ValueType {
-		return null;
+		// could optimize this with an annotation on Haxe classes
+		if (v == null) {
+			return TNull;
+		}
+		if (jvm.Jvm.instanceof(v, java.lang.Number)) {
+			var v:java.lang.Number = cast v;
+			if (v.intValue() == v.doubleValue()) {
+				return TInt;
+			}
+			return TFloat;
+		}
+		if (jvm.Jvm.instanceof(v, java.lang.Boolean)) {
+			return TBool;
+		}
+		if (jvm.Jvm.instanceof(v, jvm.DynamicObject)) {
+			return TObject;
+		}
+		if (jvm.Jvm.instanceof(v, java.lang.invoke.MethodHandle)) {
+			return TFunction;
+		}
+		var c = (cast v : java.lang.Object).getClass();
+		// TODO: native enums?
+		if (isEnum(c)) {
+			return TEnum(cast c);
+		}
+		return TClass(c);
 	}
 
 	public static function enumEq<T>(a:T, b:T):Bool {
