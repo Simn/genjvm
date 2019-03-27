@@ -1070,10 +1070,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#aload jsig 0;
 			begin match follow e1.etype with
 			| TInst(c,_) ->
-				begin match c.cl_constructor with
-				| None ->
-					jerror (Printf.sprintf "%s does not have a constructor" (s_type_path c.cl_path));
-				| Some cf ->
+				begin match get_constructor (fun cf -> cf.cf_type) c with
+				| _,cf ->
 					let hack_cf = ref cf in
 					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
 					let offset = add_field pool c !hack_cf in
@@ -1379,10 +1377,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			(* Technically this could throw... but whatever *)
 			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
 		| TNew(c,tl,el) ->
-			begin match c.cl_constructor with
-			| None ->
-				jerror (Printf.sprintf "%s does not have a constructor" (s_type_path c.cl_path));
-			| Some cf ->
+			begin match get_constructor (fun cf -> cf.cf_type) c with
+			| _,cf ->
 				let f () =
 					let hack_cf = ref cf in
 					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
@@ -1672,7 +1668,7 @@ let generate_class gctx c =
 	begin match c.cl_constructor,sig_super_ctor with
 		| Some cf,SuperGood _ -> field MConstructor cf
 		| Some cf,_ -> field MConstructorTop cf
-		| None,_ when c.cl_descendants <> [] ->
+		| None,_ ->
 			let api = make_resolve_api gctx.com jc in
 			let jm = new JvmMethod.builder jc api "<init>" (method_sig [] None) in
 			jm#add_access_flag 1; (* public *)
@@ -1681,7 +1677,6 @@ let generate_class gctx c =
 			handler#object_constructor;
 			jm#get_code#return_void;
 			jc#add_method jm#export_method;
-		| _ -> ()
 	end;
 	begin match c.cl_init with
 		| None ->

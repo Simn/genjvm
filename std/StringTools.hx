@@ -463,7 +463,7 @@ class StringTools {
 		#elseif flash
 		return untyped s.cca(index);
 		#elseif java
-		return ( index < s.length ) ? (cast _charAt(s, index) : Int) : -1;
+		return ( index < s.length ) ? cast(_charAt(s, index), Int) : -1;
 		#elseif cs
 		return ( cast(index, UInt) < s.length ) ? cast(s[index], Int) : -1;
 		#elseif js

@@ -1433,7 +1433,7 @@ let init_class ctx c p context_init herits fields =
 	end;
 	if not has_struct_init then
 		(* add_constructor does not deal with overloads correctly *)
-		TypeloadFunction.add_constructor ctx c cctx.force_constructor p;
+		if not ctx.com.config.pf_overload then TypeloadFunction.add_constructor ctx c cctx.force_constructor p;
 	(* check overloaded constructors *)
 	(if ctx.com.config.pf_overload && not cctx.is_lib then match c.cl_constructor with
 	| Some ctor ->

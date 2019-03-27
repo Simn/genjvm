@@ -375,7 +375,7 @@ import java.NativeArray;
 			this.flags = newFlags;
 			this.nBuckets = newNBuckets;
 			this.nOccupied = size;
-			this.upperBound = cast (newNBuckets * HASH_UPPER + .5);
+			this.upperBound = Std.int(newNBuckets * HASH_UPPER + .5);
 		}
 	}
 
@@ -397,7 +397,7 @@ import java.NativeArray;
 		return new IntMapValueIterator(this);
 	}
 
-	@:runtime public inline function keyValueIterator() : KeyValueIterator<Int, T>
+	@:runtime public inline function keyValueIterator() : KeyValueIterator<Int, T> 
 	{
 		return new haxe.iterators.MapKeyValueIterator(this);
 	}
@@ -419,7 +419,7 @@ import java.NativeArray;
 		for( i in it ) {
 			s.add(i);
 			s.add(" => ");
-			s.add((get(i)));
+			s.add(Std.string(get(i)));
 			if( it.hasNext() )
 				s.add(", ");
 		}

@@ -36,7 +36,6 @@ import java.internal.Exceptions;
 			return false;
 		var name:String = clt.getName();
 
-		#if !jvm
 		switch(name)
 		{
 			case "double", "java.lang.Double":
@@ -52,17 +51,10 @@ import java.internal.Exceptions;
 		var clv:java.lang.Class<Dynamic> = untyped __java__('v.getClass()');
 
 		return clt.isAssignableFrom(clv);
-		#else
-		return false;
-		#end
 	}
 
 	public static function string( s : Dynamic ) : String {
-		#if jvm
-		return java.jvm.Jvm.toString(s);
-		#else
 		return cast(s, String) + "";
-		#end
 	}
 
 	public static function int( x : Float ) : Int {

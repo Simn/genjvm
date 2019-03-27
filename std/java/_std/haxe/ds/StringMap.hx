@@ -279,7 +279,7 @@ import java.NativeArray;
 			this.hashes = newHash;
 			this.nBuckets = newNBuckets;
 			this.nOccupied = size;
-			this.upperBound = cast (newNBuckets * HASH_UPPER + .5);
+			this.upperBound = Std.int(newNBuckets * HASH_UPPER + .5);
 		}
 	}
 
@@ -420,7 +420,7 @@ import java.NativeArray;
 		for( i in it ) {
 			s.add(i);
 			s.add(" => ");
-			s.add((get(i)));
+			s.add(Std.string(get(i)));
 			if( it.hasNext() )
 				s.add(", ");
 		}
@@ -454,7 +454,7 @@ import java.NativeArray;
 	//guarantee: Whatever this function is, it will never return 0 nor 1
 	extern private static inline function hash(s:String):HashType
 	{
-		var k:Int = (untyped s : java.lang.JavaString.String).hashCode();
+		var k:Int = untyped s.hashCode();
 		//k *= 357913941;
 		//k ^= k << 24;
 		//k += ~357913941;
