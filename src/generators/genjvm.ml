@@ -1615,7 +1615,7 @@ let generate_method gctx jc c mtype cf =
 		close_scope();
 		jm#export_method
 	with Failure s | HarderFailure s ->
-		failwith (Printf.sprintf "Method %s.%s:\n%s" (s_type_path c.cl_path) cf.cf_name s)
+		failwith (Printf.sprintf "%s\nMethod %s.%s" s (s_type_path c.cl_path) cf.cf_name)
 
 let generate_field gctx jc c mtype cf =
 	let api = make_resolve_api gctx.com jc in

@@ -86,12 +86,12 @@ class builder pool = object(self)
 	method stack_error opcode expected actual =
 		let s_ops = self#debug_stack in
 		jerror
-			(Printf.sprintf "Stack error\n\t     line: %i\n\toperation: %s\n\texpected : %s\n\tactual   : %s\n\tops      :\n\t\t%s"
+			(Printf.sprintf "Stack error\n\tops      :\n\t\t%s\n\t     line: %i\n\toperation: %s\n\texpected : %s\n\tactual   : %s"
+				s_ops
 				current_line
 				(JvmDebug.s_jcode pool opcode)
 				(s_vtl expected)
 				(s_vtl actual)
-				s_ops
 			)
 
 	method op opcode length expect return =
@@ -114,6 +114,7 @@ class builder pool = object(self)
 			| (TObject _ | TTypeParameter _),(TObject _ | TTypeParameter _ | TArray _) -> () (* TODO ??? *)
 			| TMethod _,TMethod _ -> ()
 			| TMethod _,TObject((["java";"lang";"invoke"],"MethodHandle"),[]) -> ()
+			| TTypeParameter _,TMethod _ -> ()
 			| TObject _,TMethod _ -> ()
 			| TMethod _,TObject _ -> ()
 			| TArray _,TArray _ -> ()
