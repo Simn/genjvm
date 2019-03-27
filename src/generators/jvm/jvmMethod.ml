@@ -322,6 +322,10 @@ class builder jc api name jsig = object(self)
 		in
 		locals <- loop [] locals
 
+	method set_top_initialized jsig =
+		ignore(code#get_stack#pop);
+		code#get_stack#push jsig
+
 	(** This function has to be called once all arguments are declared. *)
 	method finalize_arguments =
 		argument_locals <- locals

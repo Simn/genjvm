@@ -1265,7 +1265,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		code#new_ offset_class;
 		if ret <> RVoid then code#dup;
 		let tl,offset = f() in
-		code#invokespecial offset t tl []
+		code#invokespecial offset t tl [];
+		if ret <> RVoid then jm#set_top_initialized (TObject(path,[]))
 
 	method basic_type_path name =
 		let offset = pool#add_field (["java";"lang"],name) "TYPE" "Ljava/lang/Class;" FKField in
