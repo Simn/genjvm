@@ -990,17 +990,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let rec loop cfl = match cfl with
 				| cf :: cfl ->
 					begin match follow cf.cf_type with
-						| TFun(tl,_) ->
+						| TFun(tl'',_) ->
 							let rec loop2 tl' tl = match tl',tl with
 								| t' :: tl',(_,_,t) :: tl ->
 									(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
 								| [],[] ->
 									rcf := cf;
-									tl
+									tl''
 								| _ ->
 									loop cfl
 							in
-							loop2 tl' tl
+							loop2 tl' tl''
 						| _ ->
 							assert false
 					end;
