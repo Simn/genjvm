@@ -1285,8 +1285,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TMethod _ ->
 			let offset = pool#add_path method_handle_path in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,method_handle_sig)]))
-		| TTypeParameter _ | TArray _ ->
+		| TTypeParameter _ ->
 			let offset = pool#add_path object_path in
+			code#ldc offset (TObject(java_class_path,[TType(WNone,object_sig)]))
+		| TArray _ as t ->
+			(* TODO: this seems hacky *)
+			let offset = pool#add_path ([],generate_signature false t) in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,object_sig)]))
 		| jsig ->
 			print_endline (generate_signature false jsig);
