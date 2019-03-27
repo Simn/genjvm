@@ -473,10 +473,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let t = self#vtype cf.cf_type in
 			code#getstatic offset t
 		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
-			let offset = pool#add_field string_path "length" (method_sig [] (Some TInt)) FKMethod in
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
-			code#invokevirtual offset vtobj [] [TInt]
+			jm#invokevirtual string_path "length" vtobj (method_sig [] (Some TInt))
 		| FInstance({cl_path = (["java"],"NativeArray")},_,{cf_name = "length"}) ->
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
@@ -746,15 +745,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [t2;TObject((["java";"lang"],"String"),[]) as t1] ->
 			(* TODO: We need a slow compare if java.lang.Object is involved because it could refer to String *)
 			(fun () ->
-				let offset = pool#add_field string_path "equals" (method_sig [object_sig] (Some TBool)) FKMethod in
-				code#invokevirtual offset t1 [t2] [TBool];
+				jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
 				code#if_ref (flip_cmp_op op)
 			)
 		| [TObject((["java";"lang"],"String"),[]) as t1;t2] ->
 			(fun () ->
-				let offset = pool#add_field string_path "equals" (method_sig [object_sig] (Some TBool)) FKMethod in
 				code#swap;
-				code#invokevirtual offset t1 [t2] [TBool];
+				jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
 				code#if_ref (flip_cmp_op op)
 			)
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2;t1]
@@ -1109,8 +1106,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr RValue e1;
 			jm#cast method_handle_sig;
 			let tl,tr = self#call_arguments e1.etype el in
-			let offset = pool#add_field method_handle_path "invoke" ((method_sig tl tr)) FKMethod in
-			code#invokevirtual offset (self#vtype e1.etype) tl (retype tr);
+			jm#invokevirtual method_handle_path "invoke" (self#vtype e1.etype) (method_sig tl tr);
 			tr
 		in
 		match ret = RVoid,tro with
@@ -1430,8 +1426,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					tl,offset
 				in
 				self#construct RValue ctx_class#get_path ctx_class#get_jsig f;
-				let offset = pool#add_field method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig)) FKMethod in
-				code#invokevirtual offset method_handle_sig [ctx_class#get_jsig] [method_handle_sig]
+				jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 			end
 		| TArrayDecl el when ret = RVoid ->
 			List.iter (self#texpr ret) el

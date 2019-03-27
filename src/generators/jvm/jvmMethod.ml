@@ -93,6 +93,12 @@ class builder jc api name jsig = object(self)
 	method add_thrown_exception (path : jpath) =
 		Hashtbl.replace thrown_exceptions (jc#get_pool#add_path path) true
 
+	method invokevirtual (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
+		| TMethod(tl,tr) ->
+			let offset = code#get_pool#add_field path name jsigm FKMethod in
+			code#invokevirtual offset jsig tl (match tr with None -> [] | Some tr -> [tr])
+		| _ -> assert false
+
 	(* casting *)
 
 	(** Checks if the stack top is a basic type and wraps accordingly. **)
