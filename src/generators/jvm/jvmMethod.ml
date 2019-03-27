@@ -188,6 +188,10 @@ class builder jc api name jsig = object(self)
 			()
 		| TMethod _,_ ->
 			code#checkcast (["java";"lang";"invoke"],"MethodHandle")
+		| TArray(jsig1,_),TArray(jsig2,_) when jsig1 = jsig2 ->
+			()
+		| TArray _,_ ->
+			code#checkcast_sig jsig
 		| t1,t2 ->
 			match NativeSignatures.is_unboxed t1,NativeSignatures.is_unboxed t2 with
 			| true,false -> self#expect_basic_type t1
