@@ -50,11 +50,14 @@ class constant_pool = object(self)
 		let offset = self#add_string s in
 		self#add (ConstString offset)
 
-	method add_field path name jsig field_kind =
-		let offset_class = self#add_path path in
+	method add_name_and_type name jsig field_kind =
 		let offset_name = self#add_string name in
 		let offset_desc = self#add_string ((if field_kind = FKField then generate_signature else generate_method_signature) false jsig) in
-		let offset_info = self#add (ConstNameAndType(offset_name,offset_desc)) in
+		self#add (ConstNameAndType(offset_name,offset_desc))
+
+	method add_field path name jsig field_kind =
+		let offset_class = self#add_path path in
+		let offset_info = self#add_name_and_type name jsig field_kind in
 		let const = match field_kind with
 			| FKField -> ConstFieldref(offset_class,offset_info)
 			| FKMethod -> ConstMethodref(offset_class,offset_info)

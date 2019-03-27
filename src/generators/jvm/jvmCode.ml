@@ -294,6 +294,9 @@ class builder pool = object(self)
 	method invokespecial offset t1 tl tr =
 		self#op (OpInvokespecial offset) 3 (List.rev (t1 :: tl)) tr
 
+	method invokedynamic offset tl tr =
+		self#op (OpInvokedynamic(offset)) 5 (List.rev tl) tr
+
 	method new_ offset =
 		self#op (OpNew offset) 3 [] [TUninitialized (Some fp)]
 

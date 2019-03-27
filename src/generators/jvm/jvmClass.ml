@@ -1,6 +1,7 @@
 open JvmGlobals
 open JvmData
 open JvmSignature
+open JvmAttribute
 open JvmBuilder
 
 (* High-level class builder. *)
@@ -16,6 +17,8 @@ class builder path_this path_super = object(self)
 	val methods = DynArray.create ()
 	val inner_classes = DynArray.create ()
 	val mutable closure_count = 0
+	val mutable bootstrap_methods = []
+	val mutable num_bootstrap_methods = 0
 
 	method add_interface path =
 		interface_offsets <- (pool#add_path path) :: interface_offsets
@@ -25,6 +28,20 @@ class builder path_this path_super = object(self)
 
 	method add_method (m : jvm_field) =
 		DynArray.add methods m
+
+	method get_bootstrap_method path name jsig (consts : jvm_constant list) =
+		try
+			fst (List.assoc (path,name) bootstrap_methods)
+		with Not_found ->
+			let offset = pool#add_field path name jsig FKMethod in
+			let offset = pool#add (ConstMethodHandle(6, offset)) in
+			let bm = {
+				bm_method_ref = offset;
+				bm_arguments = Array.of_list (List.map pool#add consts);
+			} in
+			bootstrap_methods <- ((path,name),(offset,bm)) :: bootstrap_methods;
+			num_bootstrap_methods <- num_bootstrap_methods + 1;
+			num_bootstrap_methods - 1
 
 	method get_pool = pool
 
@@ -69,7 +86,16 @@ class builder path_this path_super = object(self)
 			self#add_attribute (AttributeInnerClasses a)
 		end
 
+	method private commit_bootstrap_methods =
+		match bootstrap_methods with
+		| [] ->
+			()
+		| _ ->
+			let l = List.fold_left (fun acc (_,(_,bm)) -> bm :: acc) [] bootstrap_methods in
+			self#add_attribute (AttributeBootstrapMethods (Array.of_list l))
+
 	method export_class =
+		self#commit_bootstrap_methods;
 		self#commit_inner_classes;
 		self#commit_annotations pool;
 		let attributes = self#export_attributes pool in
