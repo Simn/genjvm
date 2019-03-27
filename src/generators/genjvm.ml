@@ -446,20 +446,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		NativeArray.write code vta vte
 
 	method read_static_closure jsig name jsig_method =
-		self#type_expr jsig;
-		self#string name;
-		begin match jsig_method with
-		| TMethod(tl,tr) ->
-			begin match tr with
-			| None -> self#basic_type_path "Void"
-			| Some jsig -> self#type_expr jsig
-			end;
-			code#iconst (Int32.of_int (List.length tl));
-			ignore(self#new_native_array_f java_class_sig (List.map (fun t -> fun () -> self#type_expr t) tl))
-		| _ ->
-			assert false
-		end;
-		jm#invokestatic haxe_jvm_path "getMethodHandle" (method_sig [java_class_sig;string_sig;java_class_sig;array_sig java_class_sig] (Some method_handle_sig))
+		let offset = pool#add_field jc#get_this_path name jsig_method FKMethod in
+		let offset = pool#add (ConstMethodHandle(6, offset)) in
+		code#ldc offset jsig_method
 
 	method read t e1 fa =
 		match fa with
