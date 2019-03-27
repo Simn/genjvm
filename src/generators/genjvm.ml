@@ -357,10 +357,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method mknull t = com.basic.tnull (follow t)
 
-	method add_haxe_field is_static path name =
-		let c,cf = resolve_field com is_static path name in
-		add_field pool c cf
-
 	(* locals *)
 
 	method add_named_local (name : string) (jsig : jsignature) =
@@ -1134,8 +1130,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				(fun () -> code#if_ref CmpEq)
 				(fun () ->
 					jm#cast haxe_exception_sig;
-					let offset = self#add_haxe_field false (["haxe";"jvm"],"Exception") "value" in
-					code#getfield offset haxe_exception_sig object_sig;
+					jm#getfield (["haxe";"jvm"],"Exception") "value" object_sig;
 				)
 				(fun () -> jm#cast object_sig);
 		in
@@ -1515,13 +1510,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				[],offset
 			in
 			self#construct ret haxe_dynamic_object_path object_sig f;
-			let offset = self#add_haxe_field false (["haxe";"jvm"],"DynamicObject") "_hx_setField" in
 			List.iter (fun ((name,_,_),e) ->
 				code#dup;
 				self#string name;
 				self#texpr RValue e;
 				self#expect_reference_type;
-				code#invokevirtual offset haxe_dynamic_object_sig [string_sig;self#vtype (self#mknull e.etype)] [];
+				jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
 			) fl;
 		| TIdent _ ->
 			Error.error (s_expr_ast false "" (s_type (print_context())) e) e.epos;

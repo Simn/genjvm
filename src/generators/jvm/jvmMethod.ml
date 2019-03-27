@@ -105,6 +105,10 @@ class builder jc api name jsig = object(self)
 			code#invokestatic offset tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	method getfield (path : jpath) (name : string) (jsigf : jsignature) =
+		let offset = code#get_pool#add_field path name jsigf FKField in
+		code#getfield offset (NativeSignatures.object_path_sig path) jsigf
+
 	(* casting *)
 
 	(** Checks if the stack top is a basic type and wraps accordingly. **)
