@@ -182,6 +182,14 @@ module NativeSignatures = struct
 	let double_path = ["java";"lang"],"Double"
 	let double_sig = TObject(double_path,[])
 
+	(* compound *)
+
+	let array_sig jsig = TArray(jsig,None)
+
+	let method_sig jsigs jsig = TMethod(jsigs,jsig)
+
+	let object_path_sig path = TObject(path,[])
+
 	let get_boxed_type jsig = match jsig with
 		| TBool -> boolean_sig
 		| TChar -> character_sig

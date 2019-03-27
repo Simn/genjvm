@@ -134,7 +134,7 @@ let rec jsignature_of_type t = match t with
 	| TInst({cl_kind = KTypeParameter _; cl_path = (_,name)},_) -> TTypeParameter name
 	| TInst(c,tl) -> TObject(c.cl_path,List.map jtype_argument_of_type tl)
 	| TEnum(en,tl) -> TObject(en.e_path,List.map jtype_argument_of_type tl)
-	| TFun(tl,tr) -> TMethod(List.map (fun (_,_,t) -> jsignature_of_type t) tl,if ExtType.is_void (follow tr) then None else Some (jsignature_of_type tr))
+	| TFun(tl,tr) -> method_sig (List.map (fun (_,_,t) -> jsignature_of_type t) tl) (if ExtType.is_void (follow tr) then None else Some (jsignature_of_type tr))
 	| TAnon an -> object_sig
 	| TType(td,tl) -> jsignature_of_type (apply_params td.t_params tl td.t_type)
 	| TLazy f -> jsignature_of_type (lazy_type f)
@@ -144,7 +144,7 @@ and jtype_argument_of_type t =
 
 let enum_ctor_sig =
 	let ta = TArray(object_sig,None) in
-	(TMethod([TInt;ta],None))
+	method_sig [TInt;ta] None
 
 let convert_cmp_op = function
 	| OpEq -> CmpEq
@@ -189,9 +189,7 @@ let add_field pool c cf =
 			if c.cl_interface then jerror (Printf.sprintf "Interface field access is not supported on JVM (for %s.%s)" (s_type_path c.cl_path) cf.cf_name);
 			FKField
 	in
-	let t =
-		(if field_kind = FKField then generate_signature else generate_method_signature) false (jsignature_of_type cf.cf_type)
-	in
+	let t = jsignature_of_type cf.cf_type in
 	pool#add_field (path_map c.cl_path) (if cf.cf_name = "new" then "<init>" else cf.cf_name) t field_kind
 
 let make_resolve_api com jc =
@@ -280,17 +278,17 @@ class closure_context (jsig : jsignature) = object(self)
 		(-1),
 		(fun () ->
 			code#aload jsig 0;
-			let offset = code#get_pool#add_field path var_name (generate_signature false var_sig) FKField in
+			let offset = code#get_pool#add_field path var_name var_sig FKField in
 			code#getfield offset jsig var_sig
 		),
 		(fun () ->
 			code#aload jsig 0;
-			let offset = code#get_pool#add_field path var_name (generate_signature false var_sig) FKField in
+			let offset = code#get_pool#add_field path var_name var_sig FKField in
 			code#putfield offset jsig var_sig
 		)
 
 	method get_constructor_sig =
-		TMethod(DynArray.to_list sigs,None)
+		method_sig (DynArray.to_list sigs) None
 
 	method get_jsig = jsig
 	method get_path = path
@@ -299,7 +297,7 @@ end
 let create_context_class gctx jc jm name vl =
 	let jc = jc#spawn_inner_class jm object_path in
 	let path = jc#get_this_path in
-	let jsig = TObject(path,[]) in
+	let jsig = object_path_sig path in
 	let api = make_resolve_api gctx.com jc in
 	let rec loop sigs offsets vl = match vl with
 		| v :: vl ->
@@ -308,19 +306,19 @@ let create_context_class gctx jc jm name vl =
 			jf#add_access_flag 1; (* public *)
 			let jf = jf#export_field in
 			jc#add_field jf;
-			let offset = jc#get_pool#add_field path v.v_name (generate_signature false jsig) FKField in
+			let offset = jc#get_pool#add_field path v.v_name jsig FKField in
 			loop (jsig :: sigs) (offset :: offsets) vl
 		| [] ->
 			List.rev sigs,List.rev offsets
 	in
 	let sigs,offsets = loop [] [] vl in
 	jc#add_access_flag 1; (* public *)
-	let jm = new JvmMethod.builder jc api "<init>" (TMethod(sigs,None)) in
+	let jm = new JvmMethod.builder jc api "<init>" (method_sig sigs None) in
 	let pop_scope = jm#push_scope in
 	jm#add_access_flag 1; (* public *)
 	let _,load0,_ = jm#add_local "this" jsig VarArgument in
 	load0();
-	let offset_field = jc#get_pool#add_field object_path "<init>" "()V" FKMethod in
+	let offset_field = jc#get_pool#add_field object_path "<init>" (method_sig [] None) FKMethod in
 	jm#get_code#invokespecial offset_field object_sig [] [];
 	let ctx_class = new closure_context jsig in
 	let rec loop vl sigs offsets = match vl,sigs,offsets with
@@ -344,7 +342,7 @@ let create_context_class gctx jc jm name vl =
 class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return_type : Type.t) = object(self)
 	val com = gctx.com
 	val code = jm#get_code
-	val pool = jc#get_pool
+	val pool : JvmConstantPool.constant_pool = jc#get_pool
 
 	val mutable local_lookup = Hashtbl.create 0;
 	val mutable last_line = 0
@@ -417,7 +415,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| None -> args
 				| Some(ctx_class,_) -> ctx_class#get_jsig :: args
 			in
-			TMethod(args,if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
+			method_sig args (if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
 		in
 		let jm = new JvmMethod.builder jc (make_resolve_api com jc) name jsig in
 		jm#add_access_flag 0x1;
@@ -468,14 +466,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method read t e1 fa =
 		match fa with
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
-			self#read_static_closure (TObject(c.cl_path,[])) cf.cf_name (jsignature_of_type cf.cf_type);
+			self#read_static_closure (object_path_sig c.cl_path) cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
 		| FStatic(c,cf) ->
 			let offset = add_field pool c cf in
 			let t = self#vtype cf.cf_type in
 			code#getstatic offset t
 		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
-			let offset = pool#add_field string_path "length" "()I" FKMethod in
+			let offset = pool#add_field string_path "length" (method_sig [] (Some TInt)) FKMethod in
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
 			code#invokevirtual offset vtobj [] [TInt]
@@ -497,8 +495,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#iconst (Int32.of_int ef.ef_index);
 			code#iconst Int32.zero;
 			let jasig,jsig = self#new_native_array object_sig [] in
-			let offset_field = pool#add_field path "<init>" (generate_method_signature false enum_ctor_sig) FKMethod in
-			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] []
+			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
+			code#invokespecial offset_field (object_path_sig path) [TInt;jasig] []
 		| FDynamic s | FAnon {cf_name = s} ->
 			let offset = self#add_haxe_field true haxe_jvm_path "readField" in
 			self#texpr RValue e1;
@@ -748,13 +746,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [t2;TObject((["java";"lang"],"String"),[]) as t1] ->
 			(* TODO: We need a slow compare if java.lang.Object is involved because it could refer to String *)
 			(fun () ->
-				let offset = pool#add_field string_path "equals" "(Ljava/lang/Object;)Z" FKMethod in
+				let offset = pool#add_field string_path "equals" (method_sig [object_sig] (Some TBool)) FKMethod in
 				code#invokevirtual offset t1 [t2] [TBool];
 				code#if_ref (flip_cmp_op op)
 			)
 		| [TObject((["java";"lang"],"String"),[]) as t1;t2] ->
 			(fun () ->
-				let offset = pool#add_field string_path "equals" "(Ljava/lang/Object;)Z" FKMethod in
+				let offset = pool#add_field string_path "equals" (method_sig [object_sig] (Some TBool)) FKMethod in
 				code#swap;
 				code#invokevirtual offset t1 [t2] [TBool];
 				code#if_ref (flip_cmp_op op)
@@ -1075,9 +1073,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#iconst (Int32.of_int ef.ef_index);
 			code#iconst (Int32.of_int (List.length el));
 			let jasig,jsig = self#new_native_array object_sig el in
-			let offset_field = pool#add_field path "<init>" (generate_method_signature false enum_ctor_sig) FKMethod in
-			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] [];
-			Some (TObject(path,[]))
+			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
+			let jsig = object_path_sig path in
+			code#invokespecial offset_field jsig [TInt;jasig] [];
+			Some jsig
 		| TConst TSuper ->
 			let jsig = (TUninitialized None) in
 			code#aload jsig 0;
@@ -1110,7 +1109,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr RValue e1;
 			jm#cast method_handle_sig;
 			let tl,tr = self#call_arguments e1.etype el in
-			let offset = pool#add_field method_handle_path "invoke" (generate_method_signature false (TMethod(tl,tr))) FKMethod in
+			let offset = pool#add_field method_handle_path "invoke" ((method_sig tl tr)) FKMethod in
 			code#invokevirtual offset (self#vtype e1.etype) tl (retype tr);
 			tr
 		in
@@ -1264,10 +1263,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		if ret <> RVoid then code#dup;
 		let tl,offset = f() in
 		code#invokespecial offset t tl [];
-		if ret <> RVoid then jm#set_top_initialized (TObject(path,[]))
+		if ret <> RVoid then jm#set_top_initialized (object_path_sig path)
 
 	method basic_type_path name =
-		let offset = pool#add_field (["java";"lang"],name) "TYPE" "Ljava/lang/Class;" FKField in
+		let offset = pool#add_field (["java";"lang"],name) "TYPE" java_class_sig FKField in
 		code#getstatic offset java_class_sig
 
 	method type_expr = function
@@ -1282,7 +1281,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TObject(path,_) ->
 			let path = path_map path in
 			let offset = pool#add_path path in
-			let t = TObject(path,[]) in
+			let t = object_path_sig path in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,t)]))
 		| TMethod _ ->
 			let offset = pool#add_path method_handle_path in
@@ -1427,11 +1426,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						load();
 						self#vtype v.v_type
 					) vl in
-					let offset = pool#add_field ctx_class#get_path "<init>" (generate_method_signature false ctx_class#get_constructor_sig) FKMethod in
+					let offset = pool#add_field ctx_class#get_path "<init>" (ctx_class#get_constructor_sig) FKMethod in
 					tl,offset
 				in
 				self#construct RValue ctx_class#get_path ctx_class#get_jsig f;
-				let offset = pool#add_field method_handle_path "bindTo" (generate_method_signature false (TMethod([object_sig],Some method_handle_sig))) FKMethod in
+				let offset = pool#add_field method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig)) FKMethod in
 				code#invokevirtual offset method_handle_sig [ctx_class#get_jsig] [method_handle_sig]
 			end
 		| TArrayDecl el when ret = RVoid ->
@@ -1442,7 +1441,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| TInst({cl_path = ([],"Array")},[t]) ->
 				code#iconst (Int32.of_int length);
 				let jasig,jsig = self#new_native_array (jsignature_of_type (self#mknull t)) el in
-				let offset_field = pool#add_field ([],"Array") "ofNative" (Printf.sprintf "([Ljava/lang/Object;)LArray;") FKMethod in
+				let offset_field = pool#add_field ([],"Array") "ofNative" (method_sig [array_sig object_sig] (Some (object_path_sig ([],"Array")))) FKMethod in
 				let vta = self#vtype e.etype in
 				code#invokestatic offset_field [jasig] [vta]
 			| _ ->
@@ -1504,13 +1503,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
 			let path = match vtobj with TObject(path,_) -> path | _ -> assert false in
-			let offset = pool#add_field path "index" "I" FKField in
+			let offset = pool#add_field path "index" TInt FKField in
 			code#getfield offset vtobj TInt
 		| TEnumParameter(e1,_,i) ->
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
 			let path = match vtobj with TObject(path,_) -> path | _ -> assert false in
-			let offset = pool#add_field path "parameters" "[Ljava/lang/Object;" FKField in
+			let offset = pool#add_field path "parameters" (array_sig object_sig) FKField in
 			let tobj = object_sig in
 			let ta = TArray(tobj,None) in
 			code#getfield offset vtobj ta;
@@ -1530,7 +1529,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| TObjectDecl fl ->
 			let f () =
-				let offset = pool#add_field haxe_dynamic_object_path "<init>" "()V" FKMethod in
+				let offset = pool#add_field haxe_dynamic_object_path "<init>" (method_sig [] None) FKMethod in
 				[],offset
 			in
 			self#construct ret haxe_dynamic_object_path object_sig f;
@@ -1549,7 +1548,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method object_constructor =
 		let path = jc#get_super_path in
-		let offset = pool#add_field path "<init>" "()V" FKMethod in
+		let offset = pool#add_field path "<init>" (method_sig [] None) FKMethod in
 		code#aload jc#get_jsig 0;
 		code#invokespecial offset jc#get_jsig [] [];
 		jm#set_this_initialized
@@ -1588,7 +1587,7 @@ let generate_method gctx jc c mtype cf =
 	try
 		let api = make_resolve_api gctx.com jc in
 		let jsig = if cf.cf_name = "main" then
-			TMethod([TArray(string_sig,None)],None)
+			method_sig [array_sig string_sig] None
 		else
 			jsignature_of_type cf.cf_type
 		in
@@ -1663,7 +1662,7 @@ let generate_field gctx jc c mtype cf =
 type super_situation =
 	| SuperNo
 	| SuperNoConstructor
-	| SuperGood of string
+	| SuperGood of jsignature
 
 let generate_class gctx c =
 	let is_annotation = Meta.has Meta.Annotation c.cl_meta in
@@ -1671,13 +1670,13 @@ let generate_class gctx c =
 		| None -> object_path,SuperNo
 		| Some(c,_) -> path_map c.cl_path,match c.cl_constructor with
 			| Some cf ->
-				SuperGood (generate_method_signature true (jsignature_of_type cf.cf_type))
+				SuperGood (jsignature_of_type cf.cf_type)
 			| None ->
 				SuperNoConstructor
 	in
 	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
 	let pool = jc#get_pool in
-	let offset_super_constructor = pool#add_field path_super "<init>" (match sig_super_ctor with SuperGood jsig -> jsig | _ ->  "()V") FKMethod in
+	let offset_super_constructor = pool#add_field path_super "<init>" (match sig_super_ctor with SuperGood jsig -> jsig | _ ->  method_sig [] None) FKMethod in
 	jc#set_offset_super_ctor offset_super_constructor;
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
@@ -1694,7 +1693,7 @@ let generate_class gctx c =
 		| Some cf,_ -> field MConstructorTop cf
 		| None,_ when c.cl_descendants <> [] ->
 			let api = make_resolve_api gctx.com jc in
-			let jm = new JvmMethod.builder jc api "<init>" (TMethod([],None)) in
+			let jm = new JvmMethod.builder jc api "<init>" (method_sig [] None) in
 			jm#add_access_flag 1; (* public *)
 			ignore(jm#add_local "this" jc#get_jsig VarArgument);
 			let handler = new texpr_to_jvm gctx jc jm t_dynamic in

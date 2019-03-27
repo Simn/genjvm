@@ -1,6 +1,7 @@
 open IO
 open IO.BigEndian
 open JvmGlobals
+open JvmSignature
 
 (* High-level constant pool *)
 
@@ -52,7 +53,7 @@ class constant_pool = object(self)
 	method add_field path name jsig field_kind =
 		let offset_class = self#add_path path in
 		let offset_name = self#add_string name in
-		let offset_desc = self#add_string jsig in
+		let offset_desc = self#add_string ((if field_kind = FKField then generate_signature else generate_method_signature) false jsig) in
 		let offset_info = self#add (ConstNameAndType(offset_name,offset_desc)) in
 		let const = match field_kind with
 			| FKField -> ConstFieldref(offset_class,offset_info)
