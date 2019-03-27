@@ -434,7 +434,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jm#finalize_arguments;
 		handler#texpr RReturn tf.tf_expr;
 		jc#add_method jm#export_method;
-		self#read_static_closure jc#get_jsig name jsig;
+		self#read_closure true jc#get_this_path name jsig;
 		outside
 
 	(* access *)
@@ -445,15 +445,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method write_native_array vta vte =
 		NativeArray.write code vta vte
 
-	method read_static_closure jsig name jsig_method =
-		let offset = pool#add_field jc#get_this_path name jsig_method FKMethod in
-		let offset = pool#add (ConstMethodHandle(6, offset)) in
+	method read_closure is_static path name jsig_method =
+		let offset = pool#add_field path name jsig_method FKMethod in
+		let offset = pool#add (ConstMethodHandle((if is_static then 6 else 5), offset)) in
 		code#ldc offset jsig_method
 
 	method read t e1 fa =
 		match fa with
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
-			self#read_static_closure (object_path_sig c.cl_path) cf.cf_name (jsignature_of_type cf.cf_type);
+			self#read_closure true c.cl_path cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
 		| FStatic(c,cf) ->
 			let offset = add_field pool c cf in
@@ -488,11 +488,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 			self#cast t;
-		| FClosure(_,cf) ->
+		| FClosure((Some(c,_)),cf) ->
+			let jsig = self#vtype cf.cf_type in
+			self#read_closure false c.cl_path cf.cf_name jsig;
 			self#texpr RValue e1;
-			self#string cf.cf_name;
-			self#string (generate_method_signature false (self#vtype cf.cf_type));
-			jm#invokestatic haxe_jvm_path "bindMethod" (method_sig [object_sig;string_sig;string_sig] (Some method_handle_sig))
+			jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+		| _ ->
+			assert false
 
 	method read_write ret ak e (f : unit -> unit) (t : Type.t) =
 		let apply dup =

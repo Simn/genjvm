@@ -95,19 +95,6 @@ class Jvm {
 		throw 'Cannot array-read on $obj';
 	}
 
-	static public function getMethodHandle(on:java.lang.Class<Dynamic>, name:String, rtype:java.lang.Class<Dynamic>,
-			types:java.NativeArray<java.lang.Class<Dynamic>>) {
-		var lut = java.lang.invoke.MethodHandles.lookup();
-		var mt = java.lang.invoke.MethodType.methodType(rtype, types);
-		return lut.findStatic(on, name, mt);
-	}
-
-	static public function bindMethod<T:java.lang.Object>(obj:T, name:String, descriptor:String) {
-		return java.lang.invoke.MethodHandles.lookup()
-			.findVirtual(obj.getClass(), name,
-				java.lang.invoke.MethodType.fromMethodDescriptorString(descriptor, java.lang.ClassLoader.getSystemClassLoader())).bindTo(obj);
-	}
-
 	static public function readField(obj:Dynamic, name:String):Dynamic {
 		if (obj == null) {
 			return null;
