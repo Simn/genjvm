@@ -1080,7 +1080,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#invokespecial offset_field (TObject(path,[])) [TInt;jasig] [];
 			Some (TObject(path,[]))
 		| TConst TSuper ->
-			code#aload (TUninitialized None) 0;
+			let jsig = (TUninitialized None) in
+			code#aload jsig 0;
 			begin match follow e1.etype with
 			| TInst(c,_) ->
 				begin match c.cl_constructor with
@@ -1090,7 +1091,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let hack_cf = ref cf in
 					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
 					let offset = add_field pool c !hack_cf in
-					code#invokespecial offset jc#get_jsig tl [];
+					code#invokespecial offset jsig tl [];
+					jm#set_this_initialized;
 					None
 				end;
 			| _ ->
@@ -1545,7 +1547,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let path = jc#get_super_path in
 		let offset = pool#add_field path "<init>" "()V" FKMethod in
 		code#aload jc#get_jsig 0;
-		code#invokespecial offset jc#get_jsig [] []
+		code#invokespecial offset jc#get_jsig [] [];
+		jm#set_this_initialized
 end
 
 let generate_expr gctx jc jm e is_main is_method mtype =

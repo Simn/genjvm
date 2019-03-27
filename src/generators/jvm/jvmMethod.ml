@@ -310,10 +310,17 @@ class builder jc api name jsig = object(self)
 			store()
 		)
 
+	method set_this_initialized =
+		let rec loop acc locals = match locals with
+			| [(init,name,_)] -> List.rev ((init,name,jc#get_jsig) :: acc)
+			| [] -> assert false
+			| l :: locals -> loop (l :: acc) locals
+		in
+		locals <- loop [] locals
+
 	(** This function has to be called once all arguments are declared. *)
 	method finalize_arguments =
 		argument_locals <- locals
-
 
 	method private get_stack_map_table =
 		let argument_locals = self#get_locals_for_stack_frame argument_locals in
