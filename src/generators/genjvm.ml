@@ -1469,7 +1469,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr RValue e2;
 				self#read_native_array vt vte
 			| t ->
-				Error.error (s_type (print_context()) t) e.epos;
+				self#texpr RValue e1;
+				self#texpr RValue e2;
+				let offset = self#add_haxe_field true (["haxe";"jvm"],"Jvm") "arrayRead" in
+				code#invokestatic offset [object_sig;TInt] [object_sig];
+				self#cast e.etype;
 			end
 		| TBlock [] ->
 			if ret = RReturn && not jm#is_terminated then code#return_void;

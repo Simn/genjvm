@@ -36,13 +36,6 @@ class Jvm {
 		return false;
 	}
 
-	static public function getMethodHandle(on:java.lang.Class<Dynamic>, name:String, rtype:java.lang.Class<Dynamic>,
-			types:java.NativeArray<java.lang.Class<Dynamic>>) {
-		var lut = java.lang.invoke.MethodHandles.lookup();
-		var mt = java.lang.invoke.MethodType.methodType(rtype, types);
-		return lut.findStatic(on, name, mt);
-	}
-
 	// casts
 
 	static public function toByte(d:Dynamic) {
@@ -75,6 +68,38 @@ class Jvm {
 
 	static public function toBoolean(d:Dynamic) {
 		return d == null ? false : (d : java.lang.Boolean).booleanValue();
+	}
+
+	static public function getWrapperClass<S, T>(c:java.lang.Class<S>):java.lang.Class<S> {
+		if (!c.isPrimitive()) {
+			return c;
+		}
+		// TODO: other basic types
+		return if (c == cast Int) {
+			cast java.lang.Integer.IntegerClass;
+		} else if (c == cast Float) {
+			cast java.lang.Double.DoubleClass;
+		} else if (c == cast Bool) {
+			cast java.lang.Boolean.BooleanClass;
+		} else {
+			c;
+		}
+	}
+
+	// access
+
+	static public function arrayRead(obj:Dynamic, index:Int) {
+		if (instanceof(obj, Array)) {
+			return (obj : Array<Dynamic>)[index];
+		}
+		throw 'Cannot array-read on $obj';
+	}
+
+	static public function getMethodHandle(on:java.lang.Class<Dynamic>, name:String, rtype:java.lang.Class<Dynamic>,
+			types:java.NativeArray<java.lang.Class<Dynamic>>) {
+		var lut = java.lang.invoke.MethodHandles.lookup();
+		var mt = java.lang.invoke.MethodType.methodType(rtype, types);
+		return lut.findStatic(on, name, mt);
 	}
 
 	static public function bindMethod<T:java.lang.Object>(obj:T, name:String, descriptor:String) {
@@ -138,6 +163,8 @@ class Jvm {
 		}
 	}
 
+	// string
+
 	static public function toString<T:java.lang.Object>(obj:T) {
 		if (obj == null) {
 			return "null";
@@ -148,21 +175,5 @@ class Jvm {
 
 	static public function stringConcat<A:java.lang.Object, B:java.lang.Object>(a:A, b:B):String {
 		return (cast toString(a) : java.lang.JavaString.String).concat(toString(b));
-	}
-
-	static public function getWrapperClass<S, T>(c:java.lang.Class<S>):java.lang.Class<S> {
-		if (!c.isPrimitive()) {
-			return c;
-		}
-		// TODO: other basic types
-		return if (c == cast Int) {
-			cast java.lang.Integer.IntegerClass;
-		} else if (c == cast Float) {
-			cast java.lang.Double.DoubleClass;
-		} else if (c == cast Bool) {
-			cast java.lang.Boolean.BooleanClass;
-		} else {
-			c;
-		}
 	}
 }
