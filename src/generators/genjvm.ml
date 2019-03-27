@@ -219,6 +219,11 @@ let is_const_int_pattern (el,_) =
 		| _ -> false
 	) el
 
+let is_interface_var_access c cf =
+	c.cl_interface && match cf.cf_kind with
+		| Var _ | Method MethDynamic -> true
+		| _ -> false
+
 let type_unifies a b =
 	try Type.unify a b; true with _ -> false
 
@@ -473,7 +478,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr RValue e1;
 			let vtobj = self#vtype e1.etype in
 			code#arraylength vtobj
-		| FInstance(c,tl,cf) ->
+		| FInstance(c,tl,cf) when not (is_interface_var_access c cf) ->
 			let vt = self#vtype cf.cf_type in
 			let offset = add_field pool c cf in
 			self#texpr RValue e1;
@@ -489,7 +494,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let jasig,jsig = self#new_native_array object_sig [] in
 			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
 			code#invokespecial offset_field (object_path_sig path) [TInt;jasig] []
-		| FDynamic s | FAnon {cf_name = s} ->
+		| FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}) ->
 			self#texpr RValue e1;
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
@@ -518,7 +523,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			if ak <> AKNone then code#getstatic offset vt;
 			apply (fun () -> code#dup);
 			code#putstatic offset vt
-		| TField(e1,FInstance(c,tl,cf)) ->
+		| TField(e1,FInstance(c,tl,cf)) when not (is_interface_var_access c cf) ->
 			let vt = self#vtype t in
 			let offset = add_field pool c cf in
 			let vtobj = self#vtype e1.etype in
@@ -529,7 +534,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end;
 			apply (fun () -> code#dup_x1);
 			code#putfield offset vtobj vt
-		| TField(e1,(FDynamic s | FAnon {cf_name = s})) ->
+		| TField(e1,(FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}))) ->
 			self#texpr RValue e1;
 			if ak <> AKNone then code#dup;
 			self#string s;
