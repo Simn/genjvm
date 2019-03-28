@@ -171,6 +171,9 @@ module NativeSignatures = struct
 	let retention_policy_path = (["java";"lang";"annotation"],"RetentionPolicy")
 	let retention_policy_sig = TObject(retention_policy_path,[])
 
+	let haxe_enum_path = (["haxe";"jvm"],"Enum")
+	let haxe_enum_sig = TObject(haxe_enum_path,[])
+
 	(* numeric *)
 
 	let byte_path = ["java";"lang"],"Byte"

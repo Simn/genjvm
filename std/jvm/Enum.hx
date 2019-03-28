@@ -5,20 +5,18 @@ import java.NativeArray;
 @:keep
 @:native('haxe.jvm.Enum')
 class Enum {
-	public var index:Int;
-	public var parameters:NativeArray<Dynamic>;
+	public var _hx_index:Int;
 
-	public function new(index:Int, parameters:NativeArray<Dynamic>) {
-		this.index = index;
-		this.parameters = parameters;
+	public function new(index:Int) {
+		this._hx_index = index;
 	}
 
 	public function toString() {
-		var baseName = Type.getEnumConstructs(cast(cast this : java.lang.Object).getClass())[index];
+		var baseName = Type.getEnumConstructs(Type.getEnum(cast this))[_hx_index];
+		var parameters = Type.enumParameters(cast this);
 		if (parameters.length == 0) {
 			return baseName;
 		}
-		// TODO: creating arrays here is stupid
-		return '$baseName(${@:privateAccess Array.ofNative(parameters).join(", ")})';
+		return '$baseName(${@:privateAccess parameters.join(", ")})';
 	}
 }

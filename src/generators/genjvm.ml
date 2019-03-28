@@ -300,7 +300,7 @@ class closure_context (jsig : jsignature) = object(self)
 end
 
 let create_context_class gctx jc jm name vl =
-	let jc = jc#spawn_inner_class jm object_path in
+	let jc = jc#spawn_inner_class (Some jm) object_path None in
 	let path = jc#get_this_path in
 	let jsig = object_path_sig path in
 	let api = make_resolve_api gctx.com jc in
@@ -474,15 +474,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let vtobj = self#vtype e1.etype in
 			code#getfield offset vtobj vt
 		| FEnum(en,ef) ->
-			let path = en.e_path in
-			let offset = pool#add_path path in
-			code#new_ offset;
-			code#dup;
-			code#iconst (Int32.of_int ef.ef_index);
-			code#iconst Int32.zero;
-			let jasig,jsig = self#new_native_array object_sig [] in
-			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
-			code#invokespecial offset_field (object_path_sig path) [TInt;jasig] []
+			let jsig = self#vtype ef.ef_type in
+			let offset = pool#add_field en.e_path ef.ef_name jsig FKField in
+			code#getstatic offset jsig
 		| FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}) ->
 			self#texpr RValue e1;
 			self#string s;
@@ -1080,17 +1074,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			(if is_super then code#invokespecial else if c.cl_interface then code#invokeinterface else code#invokevirtual) offset t1 tl (retype tr);
 			tr
 		| TField(_,FEnum(en,ef)) ->
-			let path = en.e_path in
-			let offset = pool#add_path path in
-			code#new_ offset;
-			code#dup;
-			code#iconst (Int32.of_int ef.ef_index);
-			code#iconst (Int32.of_int (List.length el));
-			let jasig,jsig = self#new_native_array object_sig el in
-			let offset_field = pool#add_field path "<init>" enum_ctor_sig FKMethod in
-			let jsig = object_path_sig path in
-			code#invokespecial offset_field jsig [TInt;jasig] [];
-			Some jsig
+			let tl,_ = self#call_arguments ef.ef_type el in
+			let tr = self#vtype tr in
+			jm#invokestatic en.e_path ef.ef_name (method_sig tl (Some tr));
+			Some tr
 		| TConst TSuper ->
 			let jsig = (TUninitialized None) in
 			code#aload jsig 0;
@@ -1507,20 +1494,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr ret (Texpr.for_remap com.basic v e1 e2 e.epos)
 		| TEnumIndex e1 ->
 			self#texpr RValue e1;
-			let vtobj = self#vtype e1.etype in
-			let path = match vtobj with TObject(path,_) -> path | _ -> assert false in
-			let offset = pool#add_field path "index" TInt FKField in
-			code#getfield offset vtobj TInt
-		| TEnumParameter(e1,_,i) ->
+			jm#getfield haxe_enum_path "_hx_index" TInt
+		| TEnumParameter(e1,ef,i) ->
 			self#texpr RValue e1;
-			let vtobj = self#vtype e1.etype in
-			let path = match vtobj with TObject(path,_) -> path | _ -> assert false in
-			let offset = pool#add_field path "parameters" (array_sig object_sig) FKField in
-			let tobj = object_sig in
-			let ta = TArray(tobj,None) in
-			code#getfield offset vtobj ta;
-			code#iconst (Int32.of_int i);
-			self#read_native_array ta tobj;
+			let path,name,jsig_arg = match follow ef.ef_type with
+				| TFun(tl,TEnum(en,_)) ->
+					let n,_,t = List.nth tl i in
+					en.e_path,n,self#vtype t
+				| _ -> assert false
+			in
+			let cpath = ((fst path),Printf.sprintf "%s$%s" (snd path) ef.ef_name) in
+			let jsig = (object_path_sig cpath) in
+			jm#cast jsig;
+			jm#getfield cpath name jsig_arg;
 			self#cast e.etype;
 		| TThrow e1 ->
 			self#texpr RValue e1;
@@ -1758,28 +1744,82 @@ let generate_class gctx c =
 	write_class gctx.jar (path_map c.cl_path) jc
 
 let generate_enum gctx en =
-	let super_path = (["haxe";"jvm"],"Enum") in
-	let jc = new JvmClass.builder en.e_path super_path in
-	jc#add_access_flag 1; (* public *)
-	let c = resolve_class gctx.com super_path in
-	let cf = Option.get c.cl_constructor in
-	let offset_field = add_field jc#get_pool c cf in
-	let api = make_resolve_api gctx.com jc in
-	let jm = new JvmMethod.builder jc api "<init>" enum_ctor_sig in
-	jm#add_access_flag 1; (* public *)
-	let _,load0,_ = jm#add_local "this" jc#get_jsig VarArgument in
-	let _,load1,_ = jm#add_local "index" TInt VarArgument in
-	let _,load2,_ = jm#add_local "parameters" enum_ctor_sig VarArgument in
-	load0();
-	load1();
-	load2();
-	jm#get_code#invokespecial offset_field jc#get_jsig [TInt;enum_ctor_sig] [];
-	jm#get_code#return_void;
-	jc#add_method jm#export_method;
-	let names = List.map (fun name -> AString name) en.e_names in
-	jc#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
-	let jc = jc#export_class in
-	write_class gctx.jar en.e_path jc
+	let jc_enum = new JvmClass.builder en.e_path haxe_enum_path in
+	jc_enum#add_access_flag 0x1; (* public *)
+	jc_enum#add_access_flag 0x400; (* abstract *)
+	let api = make_resolve_api gctx.com jc_enum in
+	let jsig_enum_ctor = method_sig [TInt] None in
+	(* Create base constructor *)
+	begin
+		let jm_ctor = jc_enum#spawn_method api "<init>" jsig_enum_ctor [] in
+		jm_ctor#load_this;
+		let _,load,_ = jm_ctor#add_local "index" TInt VarArgument in
+		load();
+		jm_ctor#call_super_ctor jsig_enum_ctor;
+		jm_ctor#get_code#return_void;
+		jc_enum#add_method jm_ctor#export_method
+	end;
+	let inits = DynArray.create () in
+	let names = List.map (fun name ->
+		let ef = PMap.find name en.e_constrs in
+		let args = match follow ef.ef_type with
+			| TFun(tl,_) -> List.map (fun (n,_,t) -> n,jsignature_of_type t) tl
+			| _ -> []
+		in
+		let jsigs = List.map snd args in
+		(* Create class for constructor *)
+		let jc_ctor = begin
+			let jc_ctor = jc_enum#spawn_inner_class None jc_enum#get_this_path (Some ef.ef_name) in
+			jc_ctor#add_access_flag 0x10; (* final *)
+			let jsig_method = method_sig jsigs None in
+			let jm_ctor = jc_ctor#spawn_method api "<init>" jsig_method [MPublic] in
+			jm_ctor#load_this;
+			jm_ctor#get_code#iconst (Int32.of_int ef.ef_index);
+			jm_ctor#call_super_ctor jsig_enum_ctor;
+			List.iter (fun (n,jsig) ->
+				jm_ctor#add_argument_and_field n jsig
+			) args;
+			jm_ctor#get_code#return_void;
+			jc_ctor#add_method jm_ctor#export_method;
+			jc_ctor#add_annotation (["haxe";"jvm";"annotation"],"EnumValueReflectionInformation") (["argumentNames",AArray (List.map (fun (name,_) -> AString name) args)]);
+			jc_ctor
+		end in
+		write_class gctx.jar jc_ctor#get_this_path jc_ctor#export_class;
+		begin match args with
+			| [] ->
+				(* Create static field for ctor without args *)
+				let jm_static = jc_enum#spawn_method api ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
+				jc_enum#add_field jm_static#export_field;
+				DynArray.add inits (jm_static,jc_ctor);
+			| _ ->
+				(* Create static function for ctor with args *)
+				let jsig_static = method_sig jsigs (Some jc_enum#get_jsig) in
+				let jm_static = jc_enum#spawn_method api ef.ef_name jsig_static [MPublic;MStatic] in
+				jm_static#construct jc_ctor#get_this_path (fun () ->
+					List.iter (fun (n,jsig) ->
+						let _,load,_ = jm_static#add_local n jsig VarArgument in
+						load();
+					) args;
+					jsigs;
+				);
+				jm_static#get_code#return_value jc_enum#get_jsig;
+				jc_enum#add_method jm_static#export_method;
+		end;
+		write_class gctx.jar jc_ctor#get_this_path jc_ctor#export_class;
+		AString name
+	) en.e_names in
+	(* Assign static fields for ctors without args *)
+	if DynArray.length inits > 0 then begin
+		let jm_clinit = jc_enum#spawn_method api "<clinit>" (method_sig [] None) [MStatic] in
+		DynArray.iter (fun (jm_static,jc_ctor) ->
+			jm_clinit#construct jc_ctor#get_this_path (fun () -> []);
+			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
+		) inits;
+		jm_clinit#get_code#return_void;
+		jc_enum#add_method jm_clinit#export_method;
+	end;
+	jc_enum#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
+	write_class gctx.jar en.e_path jc_enum#export_class
 
 let generate_abstract gctx a =
 	let super_path = object_path in
@@ -1799,7 +1839,7 @@ let is_extern_abstract a = match a.a_impl with
 
 let generate_module_type ctx mt = match mt with
 	| TClassDecl c when not c.cl_extern && debug_path c.cl_path -> generate_class ctx c
-	| TEnumDecl en -> generate_enum ctx en
+	| TEnumDecl en when not en.e_extern -> generate_enum ctx en
 	| TAbstractDecl a when not (is_extern_abstract a) && Meta.has Meta.CoreType a.a_meta -> generate_abstract ctx a
 	| _ -> ()
 

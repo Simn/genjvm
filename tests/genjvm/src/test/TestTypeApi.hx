@@ -154,19 +154,18 @@ class TestTypeApi extends BaseTest {
 	}
 
 	function testTypeof() {
-		// enum comparison is broken
-		// eq(TNull, Type.typeof(null));
-		// eq(TInt, Type.typeof(0));
-		// eq(TInt, Type.typeof(0.)); // is this right?
-		// eq(TFloat, Type.typeof(0.1));
-		// // eq(Type.typeof(false)); // TODO
-		// // eq(Type.typeof(true));
-		// eq(TFunction, Type.typeof(testTypeof));
-		// eq(TFunction, Type.typeof(function() {}));
-		// // eq(Type.typeof(haxe.ds.Option.None));
-		// // eq(Type.typeof(haxe.ds.Option.Some(1)));
-		// eq(TObject, Type.typeof({}));
-		// eq(Type.typeof("foo"));
+		eq(TNull, Type.typeof(null));
+		eq(TInt, Type.typeof(0));
+		eq(TInt, Type.typeof(0.)); // is this right?
+		eq(TFloat, Type.typeof(0.1));
+		// eq(TBool, Type.typeof(false)); // TODO
+		// eq(Type.typeof(true));
+		eq(TFunction, Type.typeof(testTypeof));
+		eq(TFunction, Type.typeof(function() {}));
+		// eq(Type.typeof(haxe.ds.Option.None));
+		// eq(Type.typeof(haxe.ds.Option.Some(1)));
+		eq(TObject, Type.typeof({}));
+		// eq(TObject, Type.typeof("foo"));
 	}
 
 	function testEnumIndex() {

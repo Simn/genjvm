@@ -7,6 +7,7 @@ import jvm.DynamicObject;
 import jvm.Exception;
 import jvm.annotation.ClassReflectionInformation;
 import jvm.annotation.EnumReflectionInformation;
+import jvm.annotation.EnumValueReflectionInformation;
 import java.lang.invoke.*;
 
 @:keep

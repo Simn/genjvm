@@ -1,7 +1,6 @@
 import java.lang.invoke.*;
 import java.lang.NoSuchMethodException;
-import jvm.annotation.ClassReflectionInformation;
-import jvm.annotation.EnumReflectionInformation;
+import jvm.annotation.*;
 
 enum ValueType {
 	TNull;
@@ -28,10 +27,16 @@ class Type {
 		return null;
 	}
 
-	static function isEnum<T>(c:java.lang.Class<T>):Bool {
+	static function isEnumClass<T>(c:java.lang.Class<T>):Bool {
 		// TODO: have to be careful if we ever decide to omit EnumReflectionInformation
 		// Maybe a separate HaxeEnum annotation would be better here
 		return c.isAnnotationPresent(cast EnumReflectionInformation);
+	}
+
+	static function isEnumValueClass<T>(c:java.lang.Class<T>):Bool {
+		// TODO: have to be careful if we ever decide to omit EnumValueReflectionInformation
+		// Maybe a separate HaxeEnum annotation would be better here
+		return c.isAnnotationPresent(cast EnumValueReflectionInformation);
 	}
 
 	public static function getClass<T>(o:T):Class<T> {
@@ -42,7 +47,7 @@ class Type {
 			return null;
 		}
 		var c = (cast o : java.lang.Object).getClass();
-		if (isEnum(c)) {
+		if (isEnumValueClass(c)) {
 			return null;
 		}
 		return c;
@@ -52,7 +57,7 @@ class Type {
 		if (o == null) {
 			return null;
 		}
-		var c = (cast o : java.lang.Object).getClass();
+		var c = (cast o : java.lang.Object).getClass().getSuperclass();
 		if (!c.isAnnotationPresent(cast EnumReflectionInformation)) {
 			return null;
 		}
@@ -92,7 +97,7 @@ class Type {
 	public static function resolveEnum(name:String):Enum<Dynamic> {
 		return try {
 			var c = java.lang.Class.forName(name);
-			if (!isEnum(c)) {
+			if (!isEnumClass(c)) {
 				null;
 			} else {
 				cast c;
@@ -152,7 +157,8 @@ class Type {
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
 		// TODO: review this if we ever do nadako-enums
-		return cast new jvm.Enum(index, params == null ? new java.NativeArray(0) : @:privateAccess params.__a);
+		// return cast new jvm.Enum(index, params == null ? new java.NativeArray(0) : @:privateAccess params.__a);
+		return null;
 	}
 
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
@@ -192,7 +198,7 @@ class Type {
 		}
 		var c = (cast v : java.lang.Object).getClass();
 		// TODO: native enums?
-		if (isEnum(c)) {
+		if (isEnumValueClass(c)) {
 			return TEnum(cast c);
 		}
 		return TClass(c);
@@ -207,11 +213,20 @@ class Type {
 	}
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
-		return @:privateAccess Array.ofNative((cast e : jvm.Enum).parameters);
+		var clInfo:java.lang.Class<EnumValueReflectionInformation> = cast EnumValueReflectionInformation;
+		var annotation = hackGetAnnotation((cast e : java.lang.Object).getClass(), clInfo);
+		var ret = [];
+		if (annotation == null) {
+			return ret;
+		}
+		for (name in annotation.argumentNames()) {
+			ret.push(jvm.Jvm.readField(e, name));
+		}
+		return ret;
 	}
 
 	public static function enumIndex(e:EnumValue):Int {
-		return (cast e : jvm.Enum).index;
+		return (cast e : jvm.Enum)._hx_index;
 	}
 
 	public static function allEnums<T>(e:Enum<T>):Array<T> {
