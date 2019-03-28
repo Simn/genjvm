@@ -139,6 +139,15 @@ module NativeSignatures = struct
 	let method_handle_path = (["java";"lang";"invoke"],"MethodHandle")
 	let method_handle_sig = TObject(method_handle_path,[])
 
+	let method_type_path = (["java";"lang";"invoke"],"MethodType")
+	let method_type_sig = TObject(method_type_path,[])
+
+	let method_lookup_path = (["java";"lang";"invoke"],"MethodHandles$Lookup")
+	let method_lookup_sig = TObject(method_lookup_path,[])
+
+	let call_site_path = (["java";"lang";"invoke"],"CallSite")
+	let call_site_sig = TObject(call_site_path,[])
+
 	let java_class_path = ["java";"lang"],"Class"
 	let java_class_sig = TObject(java_class_path,[TType(WNone,object_sig)])
 

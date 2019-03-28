@@ -1,10 +1,13 @@
 package jvm;
 
+import haxe.extern.Rest;
+import haxe.Constraints;
 import Enum;
 import jvm.DynamicObject;
 import jvm.Exception;
 import jvm.annotation.ClassReflectionInformation;
 import jvm.annotation.EnumReflectionInformation;
+import java.lang.invoke.*;
 
 @:keep
 @:native('haxe.jvm.Jvm')
@@ -12,6 +15,8 @@ class Jvm {
 	extern static public function instanceof<S, T>(obj:S, type:T):Bool;
 
 	extern static public function referenceEquals<T>(v1:T, v2:T):Bool;
+
+	extern static public function invokedynamic(s:String, rest:Array<Dynamic>):Dynamic;
 
 	static public function equals<T>(v1:T, v2:T):Bool {
 		if (referenceEquals(v1, v2))
@@ -93,6 +98,11 @@ class Jvm {
 			return (obj : Array<Dynamic>)[index];
 		}
 		throw 'Cannot array-read on $obj';
+	}
+
+	static public function bootstrap(caller:MethodHandles.MethodHandles_Lookup, name:String, type:MethodType):CallSite {
+		var handle = caller.findStatic(caller.lookupClass(), name, type);
+		return new ConstantCallSite(handle);
 	}
 
 	static public function readField(obj:Dynamic, name:String):Dynamic {

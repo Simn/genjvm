@@ -1026,6 +1026,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					Some TBool
 				| _ -> Error.error "Type expression expected" e1.epos
 			end;
+		| TField(_,FStatic({cl_path = ["haxe";"jvm"],"Jvm"},({cf_name = "invokedynamic"}))) ->
+			begin match el with
+				| [{eexpr = TConst (TString s)};{eexpr = TArrayDecl el}] ->
+					let t = tfun (List.map (fun e -> e.etype) el) tr in
+					let tl,tr = self#call_arguments t el in
+					let index = jc#get_bootstrap_method haxe_jvm_path "bootstrap" (method_sig [method_lookup_sig;string_sig;method_type_sig] (Some call_site_sig)) [] in
+					let jsig_method = method_sig tl tr in
+					let offset_info = pool#add_name_and_type s jsig_method FKMethod in
+					let offset = pool#add (ConstInvokeDynamic(index,offset_info)) in
+					code#invokedynamic offset [] [call_site_sig];
+					tr
+				| _ -> assert false
+			end
 		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let tl,tr = self#call_arguments cf.cf_type el in
 			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
