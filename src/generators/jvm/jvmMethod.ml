@@ -33,6 +33,9 @@ class builder jc api name jsig = object(self)
 	val mutable locals = []
 	val mutable local_offset = 0
 
+	method has_method_flag flag =
+		MethodAccessFlags.has_flag access_flags flag
+
 	(** Pushes a new scope onto the stack. Returns a function which when called reverts to the previous state. **)
 	method push_scope =
 		let old_locals = locals in
@@ -93,10 +96,18 @@ class builder jc api name jsig = object(self)
 	method add_thrown_exception (path : jpath) =
 		Hashtbl.replace thrown_exceptions (jc#get_pool#add_path path) true
 
+	(* Convenience *)
+
 	method invokevirtual (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
 			code#invokevirtual offset jsig tl (match tr with None -> [] | Some tr -> [tr])
+		| _ -> assert false
+
+	method invokespecial (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
+		| TMethod(tl,tr) ->
+			let offset = code#get_pool#add_field path name jsigm FKMethod in
+			code#invokespecial offset jsig tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
 	method invokestatic (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
@@ -108,6 +119,41 @@ class builder jc api name jsig = object(self)
 	method getfield (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#getfield offset (NativeSignatures.object_path_sig path) jsigf
+
+	method putfield (path : jpath) (name : string) (jsigf : jsignature) =
+		let offset = code#get_pool#add_field path name jsigf FKField in
+		code#putfield offset (NativeSignatures.object_path_sig path) jsigf
+
+	method putstatic (path : jpath) (name : string) (jsigf : jsignature) =
+		let offset = code#get_pool#add_field path name jsigf FKField in
+		code#putstatic offset jsigf
+
+	method load_this =
+		assert (not (self#has_method_flag MStatic));
+		code#aload jc#get_jsig 0
+
+	method call_super_ctor (jsig_method : jsignature) =
+		assert (not (self#has_method_flag MStatic));
+		self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method
+
+	method add_argument_and_field (name : string) (jsig_field : jsignature) =
+		assert (not (self#has_method_flag MStatic));
+		let jf = new builder jc api name jsig_field in
+		jf#add_access_flag 1;
+		jc#add_field jf#export_field;
+		let _,load,_ = self#add_local name jsig_field VarArgument in
+		self#load_this;
+		load();
+		self#putfield jc#get_this_path name jsig_field;
+
+	method construct (path : jpath) (f : unit -> jsignature list) =
+		let pool = code#get_pool in
+		let offset = pool#add_path path in
+		code#new_ offset;
+		code#dup;
+		let jsigs = f () in
+		self#invokespecial path "<init>" jc#get_jsig (NativeSignatures.method_sig jsigs None);
+		self#set_top_initialized (NativeSignatures.object_path_sig path)
 
 	(* casting *)
 

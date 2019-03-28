@@ -1,6 +1,7 @@
 open JvmGlobals
 open JvmData
 open JvmSignature
+open NativeSignatures
 open JvmAttribute
 open JvmBuilder
 
@@ -56,22 +57,36 @@ class builder path_this path_super = object(self)
 		closure_count <- closure_count + 1;
 		name
 
-	method spawn_inner_class (jm : JvmMethod.builder) path_super =
-		let path = ([],Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes)) in
+	method spawn_inner_class (jm : JvmMethod.builder option) (path_super : jpath) (name : string option) =
+		let path = match name with
+			| None -> (fst path_this,Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes))
+			| Some name -> (fst path_this,Printf.sprintf "%s$%s" (snd path_this) name)
+		in
 		let jc = new builder path path_super in
 		jc#add_access_flag 0x01;
-		let _ =
+		begin match jm with
+		| None ->
+			()
+		| Some jm ->
 			let pool = jc#get_pool in
 			let offset_class = pool#add_path path_this in
 			let offset_name = pool#add_string jm#get_name in
 			let offset_desc = pool#add_string (generate_signature false jm#get_jsig) in
 			let offset_info = pool#add (ConstNameAndType(offset_name,offset_desc)) in
 			jc#add_attribute (JvmAttribute.AttributeEnclosingMethod(offset_class,offset_info));
-		in
+		end;
 		let offset_name = pool#add_string (snd path) in
 		let offset_class = pool#add (ConstClass offset_name) in
 		DynArray.add inner_classes (jc,offset_name,offset_class);
 		jc
+
+	method spawn_method (api : JvmMethod.builder_api) (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
+		let jm = new JvmMethod.builder self api name jsig_method in
+		List.iter (fun flag ->
+			jm#add_access_flag (MethodAccessFlags.to_int flag)
+		) flags;
+		if not (jm#has_method_flag MStatic) then ignore(jm#add_local "this" jsig VarArgument);
+		jm
 
 	method private commit_inner_classes =
 		if DynArray.length inner_classes > 0 then begin

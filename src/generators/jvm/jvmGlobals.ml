@@ -49,6 +49,64 @@ let in_range unsigned range i = match (if unsigned then get_numeric_range_unsign
 let jerror s =
 	failwith s
 
+module ClassAccessFlags = struct
+	type t =
+		| CPublic
+		| CFinal
+		| CSuper
+		| CInterface
+		| CAbstract
+		| CSynthetic
+		| CAnnotation
+		| CEnum
+
+	let to_int = function
+		| CPublic -> 0x1
+		| CFinal -> 0x10
+		| CSuper -> 0x20
+		| CInterface -> 0x200
+		| CAbstract -> 0x400
+		| CSynthetic -> 0x1000
+		| CAnnotation -> 0x2000
+		| CEnum -> 0x4000
+
+	let has_flag b flag =
+		b land (to_int flag) <> 0
+end
+
+module MethodAccessFlags = struct
+	type t =
+		| MPublic
+		| MPrivate
+		| MProtected
+		| MStatic
+		| MFinal
+		| MSynchronized
+		| MBridge
+		| MVarargs
+		| MNative
+		| MAbstract
+		| MStrict
+		| MSynthetic
+
+	let to_int = function
+		| MPublic -> 0x1
+		| MPrivate -> 0x2
+		| MProtected -> 0x4
+		| MStatic -> 0x8
+		| MFinal -> 0x10
+		| MSynchronized -> 0x20
+		| MBridge -> 0x40
+		| MVarargs -> 0x80
+		| MNative -> 0x100
+		| MAbstract -> 0x400
+		| MStrict -> 0x800
+		| MSynthetic -> 0x1000
+
+	let has_flag b flag =
+		b land (to_int flag) <> 0
+end
+
 let write_byte ch i = IO.write_byte ch i
 let write_bytes ch b = IO.nwrite ch b
 let write_ui16 ch i = IO.BigEndian.write_ui16 ch i
