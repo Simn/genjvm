@@ -16,7 +16,7 @@ class Jvm {
 
 	extern static public function referenceEquals<T>(v1:T, v2:T):Bool;
 
-	extern static public function invokedynamic(s:String, rest:Array<Dynamic>):Dynamic;
+	extern static public function invokedynamic<T>(bootstrapMethod:Function, fieldName:String, staticArguments:Array<Dynamic>, rest:Rest<Dynamic>):T;
 
 	static public function equals<T>(v1:T, v2:T):Bool {
 		if (referenceEquals(v1, v2))

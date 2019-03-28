@@ -1028,16 +1028,38 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end;
 		| TField(_,FStatic({cl_path = ["haxe";"jvm"],"Jvm"},({cf_name = "invokedynamic"}))) ->
 			begin match el with
-				| [{eexpr = TConst (TString s)};{eexpr = TArrayDecl el}] ->
+				| e_bsm :: {eexpr = TConst (TString name)} :: {eexpr = TArrayDecl el_static_args} :: el ->
 					let t = tfun (List.map (fun e -> e.etype) el) tr in
 					let tl,tr = self#call_arguments t el in
-					let index = jc#get_bootstrap_method haxe_jvm_path "bootstrap" (method_sig [method_lookup_sig;string_sig;method_type_sig] (Some call_site_sig)) [] in
+					let path,mname = match e_bsm.eexpr with
+						| TField(_,FStatic(c,cf)) -> c.cl_path,cf.cf_name
+						| _ -> Error.error "Reference to bootstrap method expected" e_bsm.epos
+					in
+					let rec loop consts jsigs static_args = match static_args with
+						| e :: static_args ->
+							let const,jsig =  match e.eexpr with
+							| TConst (TString s) -> pool#add_const_string s,string_sig
+							| TConst (TInt i) -> pool#add (ConstInt i),TInt
+							| TConst (TFloat f) -> pool#add (ConstDouble (float_of_string f)),TDouble
+							| TField(_,FStatic(c,cf)) ->
+								let offset = pool#add_field c.cl_path cf.cf_name (self#vtype cf.cf_type) FKMethod in
+								pool#add (ConstMethodHandle(6, offset)),method_handle_sig
+							| _ -> Error.error "Invalid static argument" e.epos
+							in
+							loop (const :: consts) (jsig :: jsigs) static_args
+						| [] ->
+							List.rev consts,List.rev jsigs
+					in
+					let consts,jsigs = loop [] [] el_static_args in
+					let mtl = method_lookup_sig :: string_sig :: method_type_sig :: jsigs in
+					let index = jc#get_bootstrap_method path mname (method_sig mtl (Some call_site_sig)) consts in
 					let jsig_method = method_sig tl tr in
-					let offset_info = pool#add_name_and_type s jsig_method FKMethod in
+					let offset_info = pool#add_name_and_type name jsig_method FKMethod in
 					let offset = pool#add (ConstInvokeDynamic(index,offset_info)) in
-					code#invokedynamic offset [] [call_site_sig];
+					code#invokedynamic offset tl (retype tr);
 					tr
-				| _ -> assert false
+				| _ ->
+					Error.error "Bad invokedynamic call" e1.epos
 			end
 		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let tl,tr = self#call_arguments cf.cf_type el in

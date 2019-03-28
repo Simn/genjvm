@@ -29,17 +29,17 @@ class builder path_this path_super = object(self)
 	method add_method (m : jvm_field) =
 		DynArray.add methods m
 
-	method get_bootstrap_method path name jsig (consts : jvm_constant list) =
+	method get_bootstrap_method path name jsig (consts : jvm_constant_pool_index list) =
 		try
-			fst (List.assoc (path,name) bootstrap_methods)
+			fst (List.assoc (path,name,consts) bootstrap_methods)
 		with Not_found ->
 			let offset = pool#add_field path name jsig FKMethod in
 			let offset = pool#add (ConstMethodHandle(6, offset)) in
 			let bm = {
 				bm_method_ref = offset;
-				bm_arguments = Array.of_list (List.map pool#add consts);
+				bm_arguments = Array.of_list consts;
 			} in
-			bootstrap_methods <- ((path,name),(offset,bm)) :: bootstrap_methods;
+			bootstrap_methods <- ((path,name,consts),(offset,bm)) :: bootstrap_methods;
 			num_bootstrap_methods <- num_bootstrap_methods + 1;
 			num_bootstrap_methods - 1
 
