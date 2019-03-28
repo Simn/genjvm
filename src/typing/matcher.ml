@@ -1089,9 +1089,19 @@ module Compile = struct
 		let sigma,null = get_column_sigma cases in
 		if mctx.match_debug then print_endline (Printf.sprintf "compile_switch:\n\tsubject: %s\n\ttsubjects: %s\n\tcases: %s" (s_expr_pretty subject) (s_subjects subjects) (s_cases cases));
 		let switch_cases = List.map (fun (con,unguarded) ->
-			let subjects = get_sub_subjects mctx subject con @ subjects in
+			let sub_subjects = get_sub_subjects mctx subject con in
+			let rec loop bindings locals sub_subjects = match sub_subjects with
+				| e :: sub_subjects ->
+					let v = gen_local mctx.ctx e.etype e.epos in
+					loop ((v,v.v_pos,e) :: bindings) ((mk (TLocal v) v.v_type v.v_pos) :: locals) sub_subjects
+				| [] ->
+					List.rev bindings,List.rev locals
+			in
+			let bindings,sub_subjects = loop [] [] sub_subjects in
+			let subjects = sub_subjects @ subjects in
 			let spec = specialize subject con cases in
 			let dt = compile mctx subjects spec in
+			let dt = bind mctx bindings dt in
 			con,unguarded,dt
 		) sigma in
 		let default = default subject cases in
