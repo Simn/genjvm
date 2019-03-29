@@ -5,7 +5,7 @@ import haxe.ds.StringMap;
 @:keep
 @:native('haxe.jvm.DynamicObject')
 class DynamicObject {
-	public var _hx_fields:Null<StringMap<Dynamic>>;
+	var _hx_fields:Null<StringMap<Dynamic>>;
 	public var _hx_deletedAField:Null<Int>;
 
 	public function new() {}
@@ -17,6 +17,11 @@ class DynamicObject {
 			Reflect.setField(this, name, null);
 		} catch (_:Dynamic) {}
 		return _hx_fields.remove(name);
+	}
+
+	final public function _hx_getFields() {
+		_hx_initReflection();
+		return [for (key in _hx_fields.keys()) key];
 	}
 
 	final public function _hx_getField<T>(name:String) {

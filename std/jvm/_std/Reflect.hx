@@ -55,7 +55,7 @@ class Reflect {
 		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
 			return [];
 		}
-		return [for (key in (cast o : jvm.DynamicObject)._hx_fields.keys()) key];
+		return (cast o : jvm.DynamicObject)._hx_getFields();
 	}
 
 	public static function isFunction(f:Dynamic):Bool {

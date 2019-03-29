@@ -154,6 +154,14 @@ class builder jc name jsig = object(self)
 		self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
 		self#set_top_initialized (object_path_sig path)
 
+	method load_default_value = function
+		| TByte | TBool | TChar | TShort | TInt ->
+			code#iconst Int32.zero;
+		| TFloat -> code#fconst 0.
+		| TDouble -> code#dconst 0.
+		| TLong -> code#lconst Int64.zero
+		| jsig -> code#aconst_null jsig
+
 	(* casting *)
 
 	(** Checks if the stack top is a basic type and wraps accordingly. **)

@@ -20,6 +20,8 @@ type generation_context = {
 	jar : Zip.out_file;
 	t_exception : Type.t;
 	t_throwable : Type.t;
+	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
+	mutable anon_num : int;
 }
 
 type ret =
@@ -142,6 +144,21 @@ let rec jsignature_of_type t = match t with
 
 and jtype_argument_of_type t =
 	TType(WNone,jsignature_of_type t)
+
+module TAnonIdentifiaction = struct
+	let identify gctx fields =
+		let l = PMap.fold (fun cf acc -> cf :: acc) fields [] in
+		let l = List.sort (fun cf1 cf2 -> compare cf1.cf_name cf2.cf_name) l in
+		let l = List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type) l in
+		try
+			Hashtbl.find gctx.anon_lut l,l
+		with Not_found ->
+			let id = gctx.anon_num in
+			gctx.anon_num <- gctx.anon_num + 1;
+			let path = (["haxe";"generated"],Printf.sprintf "Anon%i" id) in
+			Hashtbl.add gctx.anon_lut l path;
+			path,l
+end
 
 let enum_ctor_sig =
 	let ta = TArray(object_sig,None) in
@@ -1502,18 +1519,59 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jm#set_terminated true
 			end
 		| TObjectDecl fl ->
-			let f () =
-				let offset = pool#add_field haxe_dynamic_object_path "<init>" (method_sig [] None) FKMethod in
-				[],offset
-			in
-			self#construct ret haxe_dynamic_object_path object_sig f;
-			List.iter (fun ((name,_,_),e) ->
-				code#dup;
-				self#string name;
-				self#texpr RValue e;
-				self#expect_reference_type;
-				jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
-			) fl;
+			begin match follow e.etype with
+			| TAnon an ->
+				let path,fl' = TAnonIdentifiaction.identify gctx an.a_fields in
+				jm#construct path (fun () ->
+					(* We have to respect declaration order, so let's temp var where necessary *)
+					let rec loop fl fl' ok acc = match fl,fl' with
+						| ((name,_,_),e) :: fl,(name',jsig) :: fl' ->
+							if ok && name = name' then begin
+								self#texpr RValue e;
+								jm#cast jsig;
+								loop fl fl' ok acc
+							end else begin
+								let load = match (Texpr.skip e).eexpr with
+								| TConst _ | TTypeExpr _ | TFunction _ ->
+									(fun () -> self#texpr RValue e)
+								| _ ->
+									let _,load,save = jm#add_local (Printf.sprintf "_hx_tmp_%s" name) (self#vtype e.etype) VarWillInit in
+									self#texpr RValue e;
+									save();
+									load
+								in
+								loop fl fl' false ((name,load) :: acc)
+							end
+						| [],[] ->
+							acc
+						| (_,e) :: fl,[] ->
+							self#texpr RVoid e;
+							loop fl fl' ok acc
+						| [],(_,jsig) :: fl' ->
+							jm#load_default_value jsig;
+							loop [] fl' ok acc
+					in
+					let vars = loop fl fl' true [] in
+					let vars = List.sort (fun (name1,_) (name2,_) -> compare name1 name2) vars in
+					List.iter (fun (_,load) ->
+						load();
+					) vars;
+					List.map snd fl';
+				)
+			| _ ->
+				let f () =
+					let offset = pool#add_field haxe_dynamic_object_path "<init>" (method_sig [] None) FKMethod in
+					[],offset
+				in
+				self#construct ret haxe_dynamic_object_path object_sig f;
+				List.iter (fun ((name,_,_),e) ->
+					code#dup;
+					self#string name;
+					self#texpr RValue e;
+					self#expect_reference_type;
+					jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
+				) fl;
+			end
 		| TIdent _ ->
 			Error.error (s_expr_ast false "" (s_type (print_context())) e) e.epos;
 
@@ -1813,6 +1871,8 @@ let generate com =
 		jar = Zip.open_out jar_path;
 		t_exception = TInst(resolve_class com (["java";"lang"],"Exception"),[]);
 		t_throwable = TInst(resolve_class com (["java";"lang"],"Throwable"),[]);
+		anon_lut = Hashtbl.create 0;
+		anon_num = 0;
 	} in
 	let manifest_content =
 		"Manifest-Version: 1.0\n" ^
@@ -1822,4 +1882,37 @@ let generate com =
 	in
 	Zip.add_entry manifest_content gctx.jar "META-INF/MANIFEST.MF";
 	List.iter (generate_module_type gctx) com.types;
+	Hashtbl.iter (fun fields path ->
+		let jc = new JvmClass.builder path haxe_dynamic_object_path in
+		jc#add_access_flag 0x1;
+		begin
+			let jm_ctor = jc#spawn_method "<init>" (method_sig (List.map snd fields) None) [MPublic] in
+			jm_ctor#load_this;
+			List.iter (fun (name,jsig) ->
+				jm_ctor#add_argument_and_field name jsig;
+			) fields;
+			jm_ctor#call_super_ctor (method_sig [] None);
+			jm_ctor#get_code#return_void;
+		end;
+		begin
+			let string_map_path = (["haxe";"ds"],"StringMap") in
+			let string_map_sig = object_path_sig string_map_path in
+			let jm_fields = jc#spawn_method "_hx_getKnownFields" (method_sig [] (Some string_map_sig)) [MProtected] in
+			let _,load,save = jm_fields#add_local "tmp" string_map_sig VarWillInit in
+			jm_fields#construct string_map_path (fun () -> []);
+			save();
+			List.iter (fun (name,jsig) ->
+				load();
+				let offset = jc#get_pool#add_const_string name in
+				jm_fields#get_code#sconst (string_sig) offset;
+				jm_fields#load_this;
+				jm_fields#getfield jc#get_this_path name jsig;
+				jm_fields#expect_reference_type;
+				jm_fields#invokevirtual string_map_path "set" string_map_sig (method_sig [string_sig;object_sig] None);
+			) fields;
+			load();
+			jm_fields#get_code#return_value string_map_sig
+		end;
+		write_class gctx.jar path jc#export_class
+	) gctx.anon_lut;
 	Zip.close_out gctx.jar
