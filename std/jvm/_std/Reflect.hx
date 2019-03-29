@@ -19,6 +19,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+import jvm.Jvm;
+
 @:coreApi
 class Reflect {
 	public static function hasField(o:Dynamic, field:String):Bool {
@@ -50,7 +53,20 @@ class Reflect {
 	}
 
 	public static function compare<T>(a:T, b:T):Int {
-		return 0;
+		// TODO: this is incomplete/bad
+		if (a == b) {
+			return 0;
+		}
+		if (a == null) {
+			return -1;
+		}
+		if (b == null) {
+			return 1;
+		}
+		if (Jvm.instanceof(a, java.lang.Number) && Jvm.instanceof(a, java.lang.Number)) {
+			return java.lang.Long.compare((cast a : java.lang.Number).longValue(), (cast b : java.lang.Number).longValue());
+		}
+		return (cast a : java.lang.JavaString.String).compareTo(cast b);
 	}
 
 	public static function compareMethods(f1:Dynamic, f2:Dynamic):Bool {
