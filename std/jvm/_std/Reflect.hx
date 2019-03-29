@@ -32,16 +32,20 @@ class Reflect {
 		return null;
 	}
 
-	public static function setField(o:Dynamic, field:String, value:Dynamic):Void {}
+	public static function setField(o:Dynamic, field:String, value:Dynamic):Void {
+
+	}
 
 	public static function getProperty(o:Dynamic, field:String):Dynamic {
 		return null;
 	}
 
-	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {}
+	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {
+
+	}
 
 	public static function callMethod(o:Dynamic, func:haxe.Constraints.Function, args:Array<Dynamic>):Dynamic {
-		return null;
+		return (cast func : java.lang.invoke.MethodHandle).invokeWithArguments(@:privateAccess args.__a);
 	}
 
 	public static function fields(o:Dynamic):Array<String> {
@@ -89,7 +93,8 @@ class Reflect {
 		return null;
 	}
 
-	@:overload(function(f:Array<Dynamic>->Void):Dynamic {})
+	// TODO: some problem with empty Code attribute
+	// @:overload(function(f:Array<Dynamic>->Void):Dynamic {})
 	public static function makeVarArgs(f:Array<Dynamic>->Dynamic):Dynamic {
 		return null;
 	}

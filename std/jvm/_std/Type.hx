@@ -1,6 +1,7 @@
 import java.lang.invoke.*;
 import java.lang.NoSuchMethodException;
 import jvm.annotation.*;
+import jvm.Jvm;
 
 enum ValueType {
 	TNull;
@@ -43,7 +44,7 @@ class Type {
 		if (o == null) {
 			return null;
 		}
-		if (jvm.Jvm.instanceof(o, Class)) {
+		if (Jvm.instanceof(o, Class)) {
 			return null;
 		}
 		var c = (cast o : java.lang.Object).getClass();
@@ -130,7 +131,7 @@ class Type {
 				}
 				var valid = true;
 				for (i in 0...params.length) {
-					if (!jvm.Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
+					if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
 						valid = false;
 						break;
 					}
@@ -152,13 +153,20 @@ class Type {
 	}
 
 	public static function createEnum<T>(e:Enum<T>, constr:String, ?params:Array<Dynamic>):T {
-		return null;
-	}
+		if (params == null || params.length == 0) {
+			return Jvm.readField(e, constr);
+		} else {
+			return Reflect.callMethod(null, Jvm.readField(e, constr), params);
+		}	}
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
-		// TODO: review this if we ever do nadako-enums
-		// return cast new jvm.Enum(index, params == null ? new java.NativeArray(0) : @:privateAccess params.__a);
-		return null;
+		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
+		var annotation = hackGetAnnotation(e.native(), clInfo);
+		if (params == null || params.length == 0) {
+			return Jvm.readField(e, annotation.constructorNames()[index]);
+		} else {
+			return Reflect.callMethod(null, Jvm.readField(e, annotation.constructorNames()[index]), params);
+		}
 	}
 
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
@@ -180,26 +188,26 @@ class Type {
 		if (v == null) {
 			return TNull;
 		}
-		if (jvm.Jvm.instanceof(v, java.lang.Number)) {
+		if (Jvm.instanceof(v, java.lang.Number)) {
 			var v:java.lang.Number = cast v;
 			if (v.intValue() == v.doubleValue()) {
 				return TInt;
 			}
 			return TFloat;
 		}
-		if (jvm.Jvm.instanceof(v, java.lang.Boolean)) {
+		if (Jvm.instanceof(v, java.lang.Boolean.BooleanClass)) {
 			return TBool;
 		}
-		if (jvm.Jvm.instanceof(v, jvm.DynamicObject)) {
+		if (Jvm.instanceof(v, jvm.DynamicObject)) {
 			return TObject;
 		}
-		if (jvm.Jvm.instanceof(v, java.lang.invoke.MethodHandle)) {
+		if (Jvm.instanceof(v, java.lang.invoke.MethodHandle)) {
 			return TFunction;
 		}
 		var c = (cast v : java.lang.Object).getClass();
 		// TODO: native enums?
 		if (isEnumValueClass(c)) {
-			return TEnum(cast c);
+			return TEnum(cast c.getSuperclass());
 		}
 		return TClass(c);
 	}
@@ -209,7 +217,12 @@ class Type {
 	}
 
 	public static function enumConstructor(e:EnumValue):String {
-		return null;
+		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
+		var annotation = hackGetAnnotation(getEnum(e).native(), clInfo);
+		if (annotation == null) {
+			return null;
+		}
+		return annotation.constructorNames()[(cast e : jvm.Enum)._hx_index];
 	}
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
@@ -220,7 +233,7 @@ class Type {
 			return ret;
 		}
 		for (name in annotation.argumentNames()) {
-			ret.push(jvm.Jvm.readField(e, name));
+			ret.push(Jvm.readField(e, name));
 		}
 		return ret;
 	}

@@ -65,9 +65,12 @@ class TestTypeApi extends BaseTest {
 		testResolveEnum();
 		testCreateInstance();
 		testCreateEmptyInstance();
+		testCreateEnum();
+		testCreateEnumIndex();
 		testEnumConstructs();
 		testTypeof();
 		testEnumIndex();
+		testEnumConstructor();
 		testEnumParameters();
 	}
 
@@ -147,6 +150,20 @@ class TestTypeApi extends BaseTest {
 		// eq(cast SomeClassWithArgs, Type.getClass(Type.createEmptyInstance(SomeClassWithArgs)));
 	}
 
+	function testCreateEnum() {
+		eq(None, Type.createEnum(Option, "None"));
+		eq(None, Type.createEnum(Option, "None", []));
+		t(Type.createEnum(Option, "Some", [12]).match(Some(12)));
+		t(Type.createEnum(Option, "Some", ["foo"]).match(Some("foo")));
+	}
+
+	function testCreateEnumIndex() {
+		eq(None, Type.createEnumIndex(Option, 1));
+		eq(None, Type.createEnumIndex(Option, 1, []));
+		t(Type.createEnumIndex(Option, 0, [12]).match(Some(12)));
+		t(Type.createEnumIndex(Option, 0, ["foo"]).match(Some("foo")));
+	}
+
 	function testEnumConstructs() {
 		var a = Type.getEnumConstructs(Option);
 		eq("Some", a[0]);
@@ -158,19 +175,24 @@ class TestTypeApi extends BaseTest {
 		eq(TInt, Type.typeof(0));
 		eq(TInt, Type.typeof(0.)); // is this right?
 		eq(TFloat, Type.typeof(0.1));
-		// eq(TBool, Type.typeof(false)); // TODO
-		// eq(Type.typeof(true));
+		eq(TBool, Type.typeof(false));
+		eq(TBool, Type.typeof(true));
 		eq(TFunction, Type.typeof(testTypeof));
 		eq(TFunction, Type.typeof(function() {}));
-		// eq(Type.typeof(haxe.ds.Option.None));
-		// eq(Type.typeof(haxe.ds.Option.Some(1)));
+		t(Type.typeof(haxe.ds.Option.None).match(TEnum(haxe.ds.Option)));
+		t(Type.typeof(haxe.ds.Option.Some(12)).match(TEnum(haxe.ds.Option)));
 		eq(TObject, Type.typeof({}));
-		// eq(TObject, Type.typeof("foo"));
+		t(Type.typeof("foo").match(TClass(String)));
 	}
 
 	function testEnumIndex() {
 		eq(1, Type.enumIndex(None));
 		eq(0, Type.enumIndex(Some(12)));
+	}
+
+	function testEnumConstructor() {
+		eq("None", Type.enumConstructor(None));
+		eq("Some", Type.enumConstructor(Some(12)));
 	}
 
 	function testEnumParameters() {
