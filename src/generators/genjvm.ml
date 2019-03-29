@@ -1714,7 +1714,7 @@ let generate_enum gctx en =
 	let jsig_enum_ctor = method_sig [TInt] None in
 	(* Create base constructor *)
 	begin
-		let jm_ctor = jc_enum#spawn_method "<init>" jsig_enum_ctor [] in
+		let jm_ctor = jc_enum#spawn_method "<init>" jsig_enum_ctor [MProtected] in
 		jm_ctor#load_this;
 		let _,load,_ = jm_ctor#add_local "index" TInt VarArgument in
 		load();
