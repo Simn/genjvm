@@ -668,14 +668,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TObject((["java";"lang"],"String"),_),_
 		| _,TObject((["java";"lang"],"String"),_) ->
 			Some string_sig
-		| TLong,_ | _,TLong ->
-			Some TLong
-		| TDouble,_ | _,TDouble ->
-			Some TDouble
-		| TInt,_ | _,TInt ->
-			Some TInt
-		| _ ->
-			None
+		| TLong,_ | _,TLong -> Some TLong
+		| TDouble,_ | _,TDouble -> Some TDouble
+		| TFloat,_ | _,TFloat -> Some TFloat
+		| TInt,_ | _,TInt -> Some TInt
+		| TShort,_ | _,TShort -> Some TShort
+		| TChar,_ | _,TChar -> Some TChar
+		| TByte,_ | _,TByte -> Some TByte
+		| TBool,_ | _,TBool -> Some TBool
+		| _ -> None
 
 	method do_compare op =
 		match code#get_stack#get_stack_items 2 with
