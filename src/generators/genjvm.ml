@@ -470,7 +470,29 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let jsig = self#vtype ef.ef_type in
 			let offset = pool#add_field en.e_path ef.ef_name jsig FKField in
 			code#getstatic offset jsig
-		| FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}) ->
+		| FAnon {cf_name = s} ->
+			self#texpr RValue e1;
+			let default () =
+				self#string s;
+				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
+				self#cast t;
+			in
+			begin match follow e1.etype with
+			| TAnon an ->
+				let path,_ = TAnonIdentifiaction.identify gctx an.a_fields in
+				code#dup;
+				code#instanceof path;
+				jm#if_then_else
+					(fun () -> code#if_ref CmpEq)
+					(fun () ->
+						jm#cast (object_path_sig path);
+						jm#getfield path s (self#vtype t);
+					)
+					(fun () -> default());
+			| _ ->
+				default();
+			end
+		| FDynamic s | FInstance(_,_,{cf_name = s}) ->
 			self#texpr RValue e1;
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
