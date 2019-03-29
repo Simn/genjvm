@@ -6,6 +6,7 @@ class Main {
 		new test.TestExceptions();
 		new test.TestClosure();
 		new test.TestTypeApi();
+		new test.TestReflectApi();
 		trace('Done! ${test.BaseTest.numTests} tests with ${test.BaseTest.numFailures} failures');
 	}
 }

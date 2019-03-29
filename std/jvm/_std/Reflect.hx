@@ -25,15 +25,18 @@ import jvm.Jvm;
 @:coreApi
 class Reflect {
 	public static function hasField(o:Dynamic, field:String):Bool {
-		return false;
+		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
+			return false;
+		}
+		return (cast o : jvm.DynamicObject)._hx_hasField(field);
 	}
 
 	public static function field(o:Dynamic, field:String):Dynamic {
-		return null;
+		return Jvm.readField(o, field);
 	}
 
 	public static function setField(o:Dynamic, field:String, value:Dynamic):Void {
-
+		Jvm.writeField(o, field, value);
 	}
 
 	public static function getProperty(o:Dynamic, field:String):Dynamic {
@@ -49,7 +52,10 @@ class Reflect {
 	}
 
 	public static function fields(o:Dynamic):Array<String> {
-		return null;
+		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
+			return [];
+		}
+		return [for (key in (cast o : jvm.DynamicObject)._hx_fields.keys()) key];
 	}
 
 	public static function isFunction(f:Dynamic):Bool {
