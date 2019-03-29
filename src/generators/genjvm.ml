@@ -294,44 +294,16 @@ end
 let create_context_class gctx jc jm name vl =
 	let jc = jc#spawn_inner_class (Some jm) object_path None in
 	let path = jc#get_this_path in
-	let jsig = object_path_sig path in
-	let rec loop sigs offsets vl = match vl with
-		| v :: vl ->
-			let jsig = jsignature_of_type v.v_type in
-			let jf = new JvmMethod.builder jc v.v_name jsig in
-			jf#add_access_flag 1; (* public *)
-			let jf = jf#export_field in
-			jc#add_field jf;
-			let offset = jc#get_pool#add_field path v.v_name jsig FKField in
-			loop (jsig :: sigs) (offset :: offsets) vl
-		| [] ->
-			List.rev sigs,List.rev offsets
-	in
-	let sigs,offsets = loop [] [] vl in
-	jc#add_access_flag 1; (* public *)
-	let jm = new JvmMethod.builder jc "<init>" (method_sig sigs None) in
-	let pop_scope = jm#push_scope in
-	jm#add_access_flag 1; (* public *)
-	let _,load0,_ = jm#add_local "this" jsig VarArgument in
-	load0();
-	let offset_field = jc#get_pool#add_field object_path "<init>" (method_sig [] None) FKMethod in
-	jm#get_code#invokespecial offset_field object_sig [] [];
-	let ctx_class = new closure_context jsig in
-	let rec loop vl sigs offsets = match vl,sigs,offsets with
-		| v :: vl,jsig_var :: sigs,offset :: offsets ->
-			let _,load,_ = jm#add_local v.v_name jsig_var VarArgument in
-			load0();
-			load();
-			jm#get_code#putfield offset jsig jsig_var;
-			ctx_class#add v.v_id v.v_name jsig_var;
-			loop vl sigs offsets
-		| _ ->
-			()
-	in
-	loop vl sigs offsets;
-	jm#get_code#return_void;
-	pop_scope();
-	jc#add_method jm#export_method;
+	let ctx_class = new closure_context (object_path_sig path) in
+	let jsigs = List.map (fun v -> jsignature_of_type v.v_type) vl in
+	let jm_ctor = jc#spawn_method "<init>" (method_sig jsigs None) [MPublic] in
+	jm_ctor#load_this;
+	jm_ctor#call_super_ctor (method_sig [] None);
+	List.iter2 (fun v jsig ->
+		jm_ctor#add_argument_and_field v.v_name jsig;
+		ctx_class#add v.v_id v.v_name jsig;
+	) vl jsigs;
+	jm_ctor#get_code#return_void;
 	write_class gctx.jar path jc#export_class;
 	ctx_class
 
