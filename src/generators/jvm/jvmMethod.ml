@@ -2,20 +2,17 @@ open JvmGlobals
 open JvmData
 open JvmAttribute
 open JvmSignature
+open JvmSignature.NativeSignatures
 open JvmBuilder
 
 (* High-level method builder. *)
-
-type builder_api = {
-	resolve_field : bool -> Globals.path -> string -> jvm_constant_pool_index;
-}
 
 type var_init_state =
 	| VarArgument
 	| VarWillInit
 	| VarNeedDefault
 
-class builder jc api name jsig = object(self)
+class builder jc name jsig = object(self)
 	inherit base_builder
 	val code = new JvmCode.builder jc#get_pool
 
@@ -118,11 +115,11 @@ class builder jc api name jsig = object(self)
 
 	method getfield (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
-		code#getfield offset (NativeSignatures.object_path_sig path) jsigf
+		code#getfield offset (object_path_sig path) jsigf
 
 	method putfield (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
-		code#putfield offset (NativeSignatures.object_path_sig path) jsigf
+		code#putfield offset (object_path_sig path) jsigf
 
 	method putstatic (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
@@ -138,7 +135,7 @@ class builder jc api name jsig = object(self)
 
 	method add_argument_and_field (name : string) (jsig_field : jsignature) =
 		assert (not (self#has_method_flag MStatic));
-		let jf = new builder jc api name jsig_field in
+		let jf = new builder jc name jsig_field in
 		jf#add_access_flag 1;
 		jc#add_field jf#export_field;
 		let _,load,_ = self#add_local name jsig_field VarArgument in
@@ -152,8 +149,8 @@ class builder jc api name jsig = object(self)
 		code#new_ offset;
 		code#dup;
 		let jsigs = f () in
-		self#invokespecial path "<init>" jc#get_jsig (NativeSignatures.method_sig jsigs None);
-		self#set_top_initialized (NativeSignatures.object_path_sig path)
+		self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
+		self#set_top_initialized (object_path_sig path)
 
 	(* casting *)
 
@@ -161,8 +158,7 @@ class builder jc api name jsig = object(self)
 	method expect_reference_type =
 		let wrap_null jsig name =
 			let path = (["java";"lang"],name) in
-			let offset = api.resolve_field true path "valueOf" in
-			code#invokestatic offset [jsig] [TObject(path,[])]
+			self#invokestatic path "valueOf" (method_sig [jsig] (Some (object_path_sig path)))
 		in
 		match code#get_stack#top with
 		| TByte as t -> wrap_null t "Byte"
@@ -175,14 +171,11 @@ class builder jc api name jsig = object(self)
 		| TBool as t -> wrap_null t "Boolean"
 		| _ -> ()
 
-	method private expect_basic_type t =
+	method private expect_basic_type jsig =
 		let unwrap_null tname name =
-			let path = (["java";"lang"],tname) in
-			let tp = TObject(path,[]) in
-			let offset = api.resolve_field true (["haxe";"jvm"],"Jvm") name in
-			code#invokestatic offset [tp] [t]
+			self#invokestatic (["haxe";"jvm"],"Jvm") name (method_sig [object_sig] (Some jsig))
 		in
-		match t with
+		match jsig with
 		| TByte -> unwrap_null "Byte" "toByte"
 		| TChar -> unwrap_null "Character" "toChar"
 		| TDouble -> unwrap_null "Double" "toDouble"
@@ -240,8 +233,7 @@ class builder jc api name jsig = object(self)
 			()
 		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
 			self#expect_reference_type;
-			let offset = api.resolve_field true (["haxe";"jvm"],"Jvm") "toString" in
-			code#invokestatic offset [code#get_stack#top] [jsig]
+			self#invokestatic (["haxe";"jvm"],"Jvm") "toString" (method_sig [object_sig] (Some string_sig))
 		| TObject(path1,_),TObject(path2,_) ->
 			code#checkcast path1;
 		| TObject(path,_),TTypeParameter _ ->
@@ -255,7 +247,7 @@ class builder jc api name jsig = object(self)
 		| TArray _,_ ->
 			code#checkcast_sig jsig
 		| t1,t2 ->
-			match NativeSignatures.is_unboxed t1,NativeSignatures.is_unboxed t2 with
+			match is_unboxed t1,is_unboxed t2 with
 			| true,false -> self#expect_basic_type t1
 			| false,true -> self#expect_reference_type
 			| _ -> ()

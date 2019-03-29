@@ -192,15 +192,6 @@ let add_field pool c cf =
 	let t = jsignature_of_type cf.cf_type in
 	pool#add_field (path_map c.cl_path) (if cf.cf_name = "new" then "<init>" else cf.cf_name) t field_kind
 
-let make_resolve_api com jc =
-	let api = {
-		resolve_field = (fun static path name ->
-			let c,cf = resolve_field com static path name in
-			add_field jc#get_pool c cf
-		)
-	} in
-	api
-
 let write_class jar path jc =
 	let dir = match path with
 		| ([],s) -> s
@@ -303,11 +294,10 @@ let create_context_class gctx jc jm name vl =
 	let jc = jc#spawn_inner_class (Some jm) object_path None in
 	let path = jc#get_this_path in
 	let jsig = object_path_sig path in
-	let api = make_resolve_api gctx.com jc in
 	let rec loop sigs offsets vl = match vl with
 		| v :: vl ->
 			let jsig = jsignature_of_type v.v_type in
-			let jf = new JvmMethod.builder jc api v.v_name jsig in
+			let jf = new JvmMethod.builder jc v.v_name jsig in
 			jf#add_access_flag 1; (* public *)
 			let jf = jf#export_field in
 			jc#add_field jf;
@@ -318,7 +308,7 @@ let create_context_class gctx jc jm name vl =
 	in
 	let sigs,offsets = loop [] [] vl in
 	jc#add_access_flag 1; (* public *)
-	let jm = new JvmMethod.builder jc api "<init>" (method_sig sigs None) in
+	let jm = new JvmMethod.builder jc "<init>" (method_sig sigs None) in
 	let pop_scope = jm#push_scope in
 	jm#add_access_flag 1; (* public *)
 	let _,load0,_ = jm#add_local "this" jsig VarArgument in
@@ -418,7 +408,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			method_sig args (if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
 		in
-		let jm = new JvmMethod.builder jc (make_resolve_api com jc) name jsig in
+		let jm = new JvmMethod.builder jc name jsig in
 		jm#add_access_flag 0x1;
 		jm#add_access_flag 0x8;
 		let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
@@ -1576,13 +1566,12 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 
 let generate_method gctx jc c mtype cf =
 	try
-		let api = make_resolve_api gctx.com jc in
 		let jsig = if cf.cf_name = "main" then
 			method_sig [array_sig string_sig] None
 		else
 			jsignature_of_type cf.cf_type
 		in
-		let jm = new JvmMethod.builder jc api cf.cf_name jsig in
+		let jm = new JvmMethod.builder jc cf.cf_name jsig in
 		let close_scope = jm#push_scope in
 		jm#add_access_flag 1; (* public *)
 		if c.cl_interface then jm#add_access_flag 0x0400; (* abstact *)
@@ -1611,9 +1600,8 @@ let generate_method gctx jc c mtype cf =
 		failwith (Printf.sprintf "%s\nMethod %s.%s" s (s_type_path c.cl_path) cf.cf_name)
 
 let generate_field gctx jc c mtype cf =
-	let api = make_resolve_api gctx.com jc in
 	let jsig = jsignature_of_type cf.cf_type in
-	let jm = new JvmMethod.builder jc api cf.cf_name jsig in
+	let jm = new JvmMethod.builder jc cf.cf_name jsig in
 	jm#add_access_flag 1; (* public *)
 	if mtype = MStatic then jm#add_access_flag 0x8;
 	if has_class_field_flag cf CfFinal then jm#add_access_flag 0x10;
@@ -1681,8 +1669,7 @@ let generate_class gctx c =
 		| Some cf,SuperGood _ -> field MConstructor cf
 		| Some cf,_ -> field MConstructorTop cf
 		| None,_ ->
-			let api = make_resolve_api gctx.com jc in
-			let jm = new JvmMethod.builder jc api "<init>" (method_sig [] None) in
+			let jm = new JvmMethod.builder jc "<init>" (method_sig [] None) in
 			jm#add_access_flag 1; (* public *)
 			ignore(jm#add_local "this" jc#get_jsig VarArgument);
 			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
@@ -1747,11 +1734,10 @@ let generate_enum gctx en =
 	let jc_enum = new JvmClass.builder en.e_path haxe_enum_path in
 	jc_enum#add_access_flag 0x1; (* public *)
 	jc_enum#add_access_flag 0x400; (* abstract *)
-	let api = make_resolve_api gctx.com jc_enum in
 	let jsig_enum_ctor = method_sig [TInt] None in
 	(* Create base constructor *)
 	begin
-		let jm_ctor = jc_enum#spawn_method api "<init>" jsig_enum_ctor [] in
+		let jm_ctor = jc_enum#spawn_method "<init>" jsig_enum_ctor [] in
 		jm_ctor#load_this;
 		let _,load,_ = jm_ctor#add_local "index" TInt VarArgument in
 		load();
@@ -1772,7 +1758,7 @@ let generate_enum gctx en =
 			let jc_ctor = jc_enum#spawn_inner_class None jc_enum#get_this_path (Some ef.ef_name) in
 			jc_ctor#add_access_flag 0x10; (* final *)
 			let jsig_method = method_sig jsigs None in
-			let jm_ctor = jc_ctor#spawn_method api "<init>" jsig_method [MPublic] in
+			let jm_ctor = jc_ctor#spawn_method "<init>" jsig_method [MPublic] in
 			jm_ctor#load_this;
 			jm_ctor#get_code#iconst (Int32.of_int ef.ef_index);
 			jm_ctor#call_super_ctor jsig_enum_ctor;
@@ -1788,13 +1774,13 @@ let generate_enum gctx en =
 		begin match args with
 			| [] ->
 				(* Create static field for ctor without args *)
-				let jm_static = jc_enum#spawn_method api ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
+				let jm_static = jc_enum#spawn_method ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
 				jc_enum#add_field jm_static#export_field;
 				DynArray.add inits (jm_static,jc_ctor);
 			| _ ->
 				(* Create static function for ctor with args *)
 				let jsig_static = method_sig jsigs (Some jc_enum#get_jsig) in
-				let jm_static = jc_enum#spawn_method api ef.ef_name jsig_static [MPublic;MStatic] in
+				let jm_static = jc_enum#spawn_method ef.ef_name jsig_static [MPublic;MStatic] in
 				jm_static#construct jc_ctor#get_this_path (fun () ->
 					List.iter (fun (n,jsig) ->
 						let _,load,_ = jm_static#add_local n jsig VarArgument in
@@ -1810,7 +1796,7 @@ let generate_enum gctx en =
 	) en.e_names in
 	(* Assign static fields for ctors without args *)
 	if DynArray.length inits > 0 then begin
-		let jm_clinit = jc_enum#spawn_method api "<clinit>" (method_sig [] None) [MStatic] in
+		let jm_clinit = jc_enum#spawn_method "<clinit>" (method_sig [] None) [MStatic] in
 		DynArray.iter (fun (jm_static,jc_ctor) ->
 			jm_clinit#construct jc_ctor#get_this_path (fun () -> []);
 			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;

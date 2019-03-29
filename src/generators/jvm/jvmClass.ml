@@ -80,8 +80,8 @@ class builder path_this path_super = object(self)
 		DynArray.add inner_classes (jc,offset_name,offset_class);
 		jc
 
-	method spawn_method (api : JvmMethod.builder_api) (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
-		let jm = new JvmMethod.builder self api name jsig_method in
+	method spawn_method (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
+		let jm = new JvmMethod.builder self name jsig_method in
 		List.iter (fun flag ->
 			jm#add_access_flag (MethodAccessFlags.to_int flag)
 		) flags;
