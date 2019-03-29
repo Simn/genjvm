@@ -4,6 +4,7 @@ open Common
 open Type
 open Path
 open JvmGlobals
+open MethodAccessFlags
 open JvmData
 open JvmAttribute
 open JvmSignature
@@ -408,9 +409,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			method_sig args (if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
 		in
-		let jm = new JvmMethod.builder jc name jsig in
-		jm#add_access_flag 0x1;
-		jm#add_access_flag 0x8;
+		let jm = jc#spawn_method name jsig [MPublic;MStatic] in
 		let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
 		begin match outside with
 		| None -> ()
@@ -423,7 +422,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		) tf.tf_args;
 		jm#finalize_arguments;
 		handler#texpr RReturn tf.tf_expr;
-		jc#add_method jm#export_method;
 		self#read_closure true jc#get_this_path name jsig;
 		outside
 
@@ -1543,14 +1541,6 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 			e,[],t_dynamic
 	in
 	let handler = new texpr_to_jvm gctx jc jm tr in
-	begin match mtype with
-	| MStatic ->
-		()
-	| MInstance ->
-		ignore(jm#add_local "this" jc#get_jsig VarArgument)
-	| MConstructor | MConstructorTop ->
-		ignore(jm#add_local "this" (TUninitialized None) VarArgument)
-	end;
 	if is_main then ignore(jm#add_local "args" (TArray(string_sig,None)) VarArgument);
 	List.iter (fun (v,_) ->
 		ignore(handler#add_local v VarArgument);
@@ -1571,12 +1561,11 @@ let generate_method gctx jc c mtype cf =
 		else
 			jsignature_of_type cf.cf_type
 		in
-		let jm = new JvmMethod.builder jc cf.cf_name jsig in
-		let close_scope = jm#push_scope in
-		jm#add_access_flag 1; (* public *)
-		if c.cl_interface then jm#add_access_flag 0x0400; (* abstact *)
-		if mtype = MStatic then jm#add_access_flag 0x8;
-		if (has_class_field_flag cf CfFinal) then jm#add_access_flag 0x10;
+		let flags = [MPublic] in
+		let flags = if c.cl_interface then MAbstract :: flags else flags in
+		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+		let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
+		let jm = jc#spawn_method cf.cf_name jsig flags in
 		begin match cf.cf_expr with
 		| None -> ()
 		| Some e ->
@@ -1594,17 +1583,15 @@ let generate_method gctx jc c mtype cf =
 				let offset = jc#get_pool#add_string s in
 				jm#add_attribute (AttributeSignature offset);
 		end;
-		close_scope();
-		jm#export_method
 	with Failure s | HarderFailure s ->
 		failwith (Printf.sprintf "%s\nMethod %s.%s" s (s_type_path c.cl_path) cf.cf_name)
 
 let generate_field gctx jc c mtype cf =
 	let jsig = jsignature_of_type cf.cf_type in
-	let jm = new JvmMethod.builder jc cf.cf_name jsig in
-	jm#add_access_flag 1; (* public *)
-	if mtype = MStatic then jm#add_access_flag 0x8;
-	if has_class_field_flag cf CfFinal then jm#add_access_flag 0x10;
+	let flags = [MPublic] in
+	let flags = if c.cl_interface then MAbstract :: flags else flags in
+	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+	let jm = jc#spawn_field cf.cf_name jsig flags in
 	begin match cf.cf_expr with
 		| None ->
 			()
@@ -1635,8 +1622,7 @@ let generate_field gctx jc c mtype cf =
 	end;
 	let ssig = generate_signature true (jsignature_of_type cf.cf_type) in
 	let offset = jc#get_pool#add_string ssig in
-	jm#add_attribute (AttributeSignature offset);
-	jm#export_field
+	jm#add_attribute (AttributeSignature offset)
 
 type super_situation =
 	| SuperNo
@@ -1658,10 +1644,10 @@ let generate_class gctx c =
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
 			List.iter (fun cf ->
-				jc#add_method (generate_method gctx jc c mtype cf)
+				generate_method gctx jc c mtype cf
 			) (cf :: cf.cf_overloads)
 		| _ ->
-			if not c.cl_interface then jc#add_field (generate_field gctx jc c mtype cf)
+			if not c.cl_interface then generate_field gctx jc c mtype cf
 	in
 	List.iter (field MStatic) c.cl_ordered_statics;
 	List.iter (field MInstance) c.cl_ordered_fields;
@@ -1669,13 +1655,10 @@ let generate_class gctx c =
 		| Some cf,SuperGood _ -> field MConstructor cf
 		| Some cf,_ -> field MConstructorTop cf
 		| None,_ ->
-			let jm = new JvmMethod.builder jc "<init>" (method_sig [] None) in
-			jm#add_access_flag 1; (* public *)
-			ignore(jm#add_local "this" jc#get_jsig VarArgument);
+			let jm = jc#spawn_method "<init>" (method_sig [] None) [MPublic] in
 			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
 			handler#object_constructor;
 			jm#get_code#return_void;
-			jc#add_method jm#export_method;
 	end;
 	begin match c.cl_init with
 		| None ->

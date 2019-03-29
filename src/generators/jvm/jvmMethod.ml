@@ -14,6 +14,7 @@ type var_init_state =
 
 class builder jc name jsig = object(self)
 	inherit base_builder
+	val name = if name = "new" then "<init>" else name
 	val code = new JvmCode.builder jc#get_pool
 
 	val mutable max_num_locals = 0
@@ -131,7 +132,8 @@ class builder jc name jsig = object(self)
 
 	method call_super_ctor (jsig_method : jsignature) =
 		assert (not (self#has_method_flag MStatic));
-		self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method
+		self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method;
+		self#set_this_initialized
 
 	method add_argument_and_field (name : string) (jsig_field : jsignature) =
 		assert (not (self#has_method_flag MStatic));
@@ -486,7 +488,7 @@ class builder jc name jsig = object(self)
 			self#add_attribute (AttributeLocalVariableTable a);
 		end;
 		let attributes = self#export_attributes jc#get_pool in
-		let offset_name = jc#get_pool#add_string (if name = "new" then "<init>" else name) in
+		let offset_name = jc#get_pool#add_string name in
 		let jsig = generate_method_signature false jsig in
 		let offset_desc = jc#get_pool#add_string jsig in
 		{

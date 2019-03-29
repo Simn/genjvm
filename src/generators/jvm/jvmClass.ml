@@ -87,7 +87,7 @@ class builder path_this path_super = object(self)
 			jm#add_access_flag (MethodAccessFlags.to_int flag)
 		) flags;
 		let pop_scope = jm#push_scope in
-		if not (jm#has_method_flag MStatic) then ignore(jm#add_local "this" jsig VarArgument);
+		if not (jm#has_method_flag MStatic) then ignore(jm#add_local "this" (if jm#get_name = "<init>" then (TUninitialized None) else jsig) VarArgument);
 		spawned_methods <- (jm,Some pop_scope) :: spawned_methods;
 		jm
 
