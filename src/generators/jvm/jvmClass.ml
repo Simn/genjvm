@@ -77,7 +77,7 @@ class builder path_this path_super = object(self)
 			jc#add_attribute (JvmAttribute.AttributeEnclosingMethod(offset_class,offset_info));
 		end;
 		let offset_name = pool#add_string (snd path) in
-		let offset_class = pool#add (ConstClass offset_name) in
+		let offset_class = pool#add_path path in
 		DynArray.add inner_classes (jc,offset_name,offset_class);
 		jc
 
