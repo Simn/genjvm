@@ -20,6 +20,7 @@ class builder path_this path_super = object(self)
 	val mutable closure_count = 0
 	val mutable bootstrap_methods = []
 	val mutable num_bootstrap_methods = 0
+	val mutable spawned_methods = []
 
 	method add_interface path =
 		interface_offsets <- (pool#add_path path) :: interface_offsets
@@ -85,7 +86,17 @@ class builder path_this path_super = object(self)
 		List.iter (fun flag ->
 			jm#add_access_flag (MethodAccessFlags.to_int flag)
 		) flags;
+		let pop_scope = jm#push_scope in
 		if not (jm#has_method_flag MStatic) then ignore(jm#add_local "this" jsig VarArgument);
+		spawned_methods <- (jm,Some pop_scope) :: spawned_methods;
+		jm
+
+	method spawn_field (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
+		let jm = new JvmMethod.builder self name jsig_method in
+		List.iter (fun flag ->
+			jm#add_access_flag (MethodAccessFlags.to_int flag)
+		) flags;
+		spawned_methods <- (jm,None) :: spawned_methods;
 		jm
 
 	method private commit_inner_classes =
@@ -110,6 +121,17 @@ class builder path_this path_super = object(self)
 			self#add_attribute (AttributeBootstrapMethods (Array.of_list l))
 
 	method export_class =
+		assert (not was_exported);
+		was_exported <- true;
+		List.iter (fun (jm,pop_scope) ->
+			begin match pop_scope with
+			| Some pop_scope ->
+				pop_scope();
+				self#add_method jm#export_method;
+			| None ->
+				self#add_field jm#export_field
+			end;
+		) spawned_methods;
 		self#commit_bootstrap_methods;
 		self#commit_inner_classes;
 		self#commit_annotations pool;

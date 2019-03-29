@@ -15,6 +15,7 @@ class base_builder = object(self)
 	val mutable access_flags = 0
 	val attributes = DynArray.create ()
 	val annotations = DynArray.create ()
+	val mutable was_exported = false
 
 	method add_access_flag i =
 		access_flags <- i lor access_flags

@@ -469,6 +469,8 @@ class builder jc name jsig = object(self)
 
 	(** Exports the method as a [jvm_field]. No other functions should be called on this object afterwards. *)
 	method export_method =
+		assert (not was_exported);
+		was_exported <- true;
 		self#commit_annotations jc#get_pool;
 		if code#get_fp > 0 then begin
 			let code = self#get_jcode in
@@ -497,6 +499,8 @@ class builder jc name jsig = object(self)
 	(** Exports the method as a [jvm_field]. No other functions should be called on this object afterwards. *)
 	method export_field =
 		assert (code#get_fp = 0);
+		assert (not was_exported);
+		was_exported <- true;
 		let attributes = self#export_attributes jc#get_pool in
 		let offset_name = jc#get_pool#add_string name in
 		let jsig = generate_signature false jsig in

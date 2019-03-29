@@ -1743,7 +1743,6 @@ let generate_enum gctx en =
 		load();
 		jm_ctor#call_super_ctor jsig_enum_ctor;
 		jm_ctor#get_code#return_void;
-		jc_enum#add_method jm_ctor#export_method
 	end;
 	let inits = DynArray.create () in
 	let names = List.map (fun name ->
@@ -1766,7 +1765,6 @@ let generate_enum gctx en =
 				jm_ctor#add_argument_and_field n jsig
 			) args;
 			jm_ctor#get_code#return_void;
-			jc_ctor#add_method jm_ctor#export_method;
 			jc_ctor#add_annotation (["haxe";"jvm";"annotation"],"EnumValueReflectionInformation") (["argumentNames",AArray (List.map (fun (name,_) -> AString name) args)]);
 			jc_ctor
 		end in
@@ -1774,8 +1772,7 @@ let generate_enum gctx en =
 		begin match args with
 			| [] ->
 				(* Create static field for ctor without args *)
-				let jm_static = jc_enum#spawn_method ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
-				jc_enum#add_field jm_static#export_field;
+				let jm_static = jc_enum#spawn_field ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
 				DynArray.add inits (jm_static,jc_ctor);
 			| _ ->
 				(* Create static function for ctor with args *)
@@ -1789,9 +1786,7 @@ let generate_enum gctx en =
 					jsigs;
 				);
 				jm_static#get_code#return_value jc_enum#get_jsig;
-				jc_enum#add_method jm_static#export_method;
 		end;
-		write_class gctx.jar jc_ctor#get_this_path jc_ctor#export_class;
 		AString name
 	) en.e_names in
 	(* Assign static fields for ctors without args *)
@@ -1802,7 +1797,6 @@ let generate_enum gctx en =
 			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
 		) inits;
 		jm_clinit#get_code#return_void;
-		jc_enum#add_method jm_clinit#export_method;
 	end;
 	jc_enum#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
 	write_class gctx.jar en.e_path jc_enum#export_class
