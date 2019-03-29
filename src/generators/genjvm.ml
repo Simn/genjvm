@@ -263,7 +263,6 @@ end
 
 class closure_context (jsig : jsignature) = object(self)
 	val lut = Hashtbl.create 0
-	val path = match jsig with TObject(path,_) -> path | _ -> assert false
 	val sigs = DynArray.create()
 
 	method add (var_id : int) (var_name : string) (var_sig : jsignature) =
@@ -272,40 +271,56 @@ class closure_context (jsig : jsignature) = object(self)
 
 	method get (code : JvmCode.builder) (var_id : int) =
 		let var_sig,var_name = Hashtbl.find lut var_id in
-		(-1),
-		(fun () ->
-			code#aload jsig 0;
-			let offset = code#get_pool#add_field path var_name var_sig FKField in
-			code#getfield offset jsig var_sig
-		),
-		(fun () ->
-			code#aload jsig 0;
-			let offset = code#get_pool#add_field path var_name var_sig FKField in
-			code#putfield offset jsig var_sig
-		)
+		if DynArray.length sigs > 1 then begin
+			(-1),
+			(fun () ->
+				code#aload jsig 0;
+				let offset = code#get_pool#add_field self#get_path var_name var_sig FKField in
+				code#getfield offset jsig var_sig
+			),
+			(fun () ->
+				code#aload jsig 0;
+				let offset = code#get_pool#add_field self#get_path var_name var_sig FKField in
+				code#putfield offset jsig var_sig
+			)
+		end else begin
+			(-1),
+			(fun () ->
+				code#aload jsig 0;
+			),
+			(fun () ->
+				code#aload jsig 0;
+			)
+		end
 
 	method get_constructor_sig =
 		method_sig (DynArray.to_list sigs) None
 
 	method get_jsig = jsig
-	method get_path = path
+	method get_path = match jsig with TObject(path,_) -> path | _ -> assert false
 end
 
-let create_context_class gctx jc jm name vl =
-	let jc = jc#spawn_inner_class (Some jm) object_path None in
-	let path = jc#get_this_path in
-	let ctx_class = new closure_context (object_path_sig path) in
-	let jsigs = List.map (fun v -> jsignature_of_type v.v_type) vl in
-	let jm_ctor = jc#spawn_method "<init>" (method_sig jsigs None) [MPublic] in
-	jm_ctor#load_this;
-	jm_ctor#call_super_ctor (method_sig [] None);
-	List.iter2 (fun v jsig ->
-		jm_ctor#add_argument_and_field v.v_name jsig;
+let create_context_class gctx jc jm name vl = match vl with
+	| [v] ->
+		let jsig = get_boxed_type (jsignature_of_type v.v_type) in
+		let ctx_class = new closure_context jsig in
 		ctx_class#add v.v_id v.v_name jsig;
-	) vl jsigs;
-	jm_ctor#get_code#return_void;
-	write_class gctx.jar path jc#export_class;
-	ctx_class
+		ctx_class
+	| _ ->
+		let jc = jc#spawn_inner_class (Some jm) object_path None in
+		let path = jc#get_this_path in
+		let ctx_class = new closure_context (object_path_sig path) in
+		let jsigs = List.map (fun v -> jsignature_of_type v.v_type) vl in
+		let jm_ctor = jc#spawn_method "<init>" (method_sig jsigs None) [MPublic] in
+		jm_ctor#load_this;
+		jm_ctor#call_super_ctor (method_sig [] None);
+		List.iter2 (fun v jsig ->
+			jm_ctor#add_argument_and_field v.v_name jsig;
+			ctx_class#add v.v_id v.v_name jsig;
+		) vl jsigs;
+		jm_ctor#get_code#return_void;
+		write_class gctx.jar path jc#export_class;
+		ctx_class
 
 class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return_type : Type.t) = object(self)
 	val com = gctx.com
@@ -385,9 +400,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
 		begin match outside with
 		| None -> ()
-		| Some(ctx_class,_) ->
+		| Some(ctx_class,vl) ->
 			handler#set_context ctx_class;
-			ignore(handler#add_named_local "_hx_ctx" ctx_class#get_jsig)
+			let name = match vl with [v] -> v.v_name | _ -> "_hx_ctx" in
+			ignore(handler#add_named_local name ctx_class#get_jsig)
 		end;
 		List.iter (fun (v,_) ->
 			ignore(handler#add_local v VarArgument);
@@ -1374,6 +1390,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match self#tfunction e tf with
 			| None ->
 				()
+			| Some(_,[v]) ->
+				let _,load,_ = self#get_local v in
+				load();
+				self#expect_reference_type;
+				jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 			| Some(ctx_class,vl) ->
 				let f () =
 					let tl = List.map (fun v ->
