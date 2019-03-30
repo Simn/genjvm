@@ -245,10 +245,18 @@ class builder jc name jsig = object(self)
 			self#expect_reference_type;
 			self#invokestatic (["haxe";"jvm"],"Jvm") "toString" (method_sig [object_sig] (Some string_sig))
 		| TObject(path1,_),TObject(path2,_) ->
-			code#checkcast path1;
+			if path1 = object_path then begin
+				(* We should never need a checkcast to Object, but we should adjust the stack so stack maps are wide enough *)
+				ignore(code#get_stack#pop);
+				code#get_stack#push object_sig
+			end else
+				code#checkcast path1;
 		| TObject(path,_),TTypeParameter _ ->
 			code#checkcast path
 		| TMethod _,TMethod _ ->
+			()
+		| TMethod _,TObject((["java";"lang";"invoke"],"MethodHandle"),_)
+		| TObject((["java";"lang";"invoke"],"MethodHandle"),_),TMethod _ ->
 			()
 		| TMethod _,_ ->
 			code#checkcast (["java";"lang";"invoke"],"MethodHandle")
