@@ -152,7 +152,13 @@ class Jvm {
 			var cl = (obj : java.lang.Object).getClass();
 			var field = cl.getField(name);
 			field.setAccessible(true);
-			field.set(obj, value);
+			try {
+				field.set(obj, value);
+			} catch (_:java.lang.IllegalArgumentException) {
+				if (value == null) {
+					field.setByte(obj, 0); // rely on widening
+				}
+			}
 		} catch (_:java.lang.NoSuchFieldException) {
 			if (instanceof(obj, DynamicObject)) {
 				return (obj : DynamicObject)._hx_setField(name, value);

@@ -19,6 +19,7 @@ class TestReflectApi extends BaseTest {
 		testFields();
 		testIsFunction();
 		testIsEnumValue();
+		testDeleteField();
 	}
 
 	function testHasField() {
@@ -110,5 +111,34 @@ class TestReflectApi extends BaseTest {
 		// f(Reflect.isEnumValue(Some)); // TODO
 		f(Reflect.isEnumValue(null));
 		f(Reflect.isEnumValue(Option));
+	}
+
+	function testDeleteField() {
+		var obj = {
+			x: 12,
+			y: function() {
+				return "foo";
+			},
+			z: "foo"
+		};
+		t(Reflect.deleteField(obj, "x"));
+		f(Reflect.deleteField(obj, "x"));
+		f(Reflect.hasField(obj, "x"));
+		eq(0, obj.x);
+		obj.x = 12;
+		// TODO
+		// t(Reflect.hasField(obj, "x"));
+		// t(Reflect.deleteField(obj, "x"));
+		// f(Reflect.deleteField(obj, "x"));
+
+		t(Reflect.deleteField(obj, "z"));
+		f(Reflect.deleteField(obj, "z"));
+		f(Reflect.hasField(obj, "z"));
+		eq(null, obj.z);
+		obj.z = "bar";
+		// TODO
+		// t(Reflect.hasField(obj, "z"));
+		// t(Reflect.deleteField(obj, "z"));
+		// f(Reflect.deleteField(obj, "z"));
 	}
 }

@@ -93,7 +93,10 @@ class Reflect {
 	}
 
 	public static function deleteField(o:Dynamic, field:String):Bool {
-		return false;
+		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
+			return false;
+		}
+		return (cast o : jvm.DynamicObject)._hx_deleteField(field);
 	}
 
 	public static function copy<T>(o:T):T {
