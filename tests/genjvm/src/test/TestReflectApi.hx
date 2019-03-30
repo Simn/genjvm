@@ -1,7 +1,10 @@
 package test;
 
+import haxe.ds.Option;
+
 private class TestClass {
 	public var value:String;
+
 	public function new(value:String) {
 		this.value = value;
 	}
@@ -14,12 +17,14 @@ class TestReflectApi extends BaseTest {
 		testField();
 		testSetField();
 		testFields();
+		testIsFunction();
+		testIsEnumValue();
 	}
 
 	function testHasField() {
 		var obj = {
 			x: 12,
-			y: function() { },
+			y: function() {},
 			z: "foo"
 		};
 		t(Reflect.hasField(obj, "x"));
@@ -31,7 +36,9 @@ class TestReflectApi extends BaseTest {
 	function testField() {
 		var obj = {
 			x: 12,
-			y: function() { return "foo"; },
+			y: function() {
+				return "foo";
+			},
 			z: "foo"
 		};
 		eq(12, Reflect.field(obj, "x"));
@@ -47,7 +54,9 @@ class TestReflectApi extends BaseTest {
 	function testSetField() {
 		var obj = {
 			x: 12,
-			y: function() { return "foo"; },
+			y: function() {
+				return "foo";
+			},
 			z: "foo"
 		};
 		Reflect.setField(obj, "x", 13);
@@ -73,7 +82,9 @@ class TestReflectApi extends BaseTest {
 	function testFields() {
 		var obj = {
 			x: 12,
-			y: function() { return "foo"; },
+			y: function() {
+				return "foo";
+			},
 			z: "foo"
 		};
 		var fields = Reflect.fields(obj);
@@ -81,5 +92,23 @@ class TestReflectApi extends BaseTest {
 		t(fields.indexOf("y") > -1);
 		t(fields.indexOf("z") > -1);
 		t(fields.indexOf("a") == -1);
+	}
+
+	function testIsFunction() {
+		t(Reflect.isFunction(testIsFunction));
+		t(Reflect.isFunction(Reflect.isFunction));
+		t(Reflect.isFunction(function() {}));
+		f(Reflect.isFunction("foo"));
+		f(Reflect.isFunction(null));
+		f(Reflect.isFunction((null : java.lang.invoke.MethodHandle)));
+	}
+
+	function testIsEnumValue() {
+		t(Reflect.isEnumValue(None));
+		t(Reflect.isEnumValue(Some(12)));
+		f(Reflect.isEnumValue("foo"));
+		// f(Reflect.isEnumValue(Some)); // TODO
+		f(Reflect.isEnumValue(null));
+		f(Reflect.isEnumValue(Option));
 	}
 }

@@ -43,9 +43,7 @@ class Reflect {
 		return null;
 	}
 
-	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {
-
-	}
+	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {}
 
 	public static function callMethod(o:Dynamic, func:haxe.Constraints.Function, args:Array<Dynamic>):Dynamic {
 		return (cast func : java.lang.invoke.MethodHandle).invokeWithArguments(@:privateAccess args.__a);
@@ -59,7 +57,7 @@ class Reflect {
 	}
 
 	public static function isFunction(f:Dynamic):Bool {
-		return false;
+		return Jvm.instanceof(f, java.lang.invoke.MethodHandle);
 	}
 
 	public static function compare<T>(a:T, b:T):Int {
@@ -88,7 +86,10 @@ class Reflect {
 	}
 
 	public static function isEnumValue(v:Dynamic):Bool {
-		return false;
+		if (v == null) {
+			return false;
+		}
+		return @:privateAccess Type.isEnumValueClass((cast v : java.lang.Object).getClass());
 	}
 
 	public static function deleteField(o:Dynamic, field:String):Bool {

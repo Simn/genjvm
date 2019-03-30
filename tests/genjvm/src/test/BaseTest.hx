@@ -6,7 +6,7 @@ class BaseTest {
 	static public var numTests:Int;
 	static public var numFailures:Int;
 
-	public function new() { }
+	public function new() {}
 
 	function eq<T>(expected:T, actual:T, ?p:PosInfos) {
 		++numTests;
@@ -18,5 +18,9 @@ class BaseTest {
 
 	function t(v:Bool, ?p:PosInfos) {
 		eq(true, v, p);
+	}
+
+	function f(v:Bool, ?p:PosInfos) {
+		eq(false, v, p);
 	}
 }
