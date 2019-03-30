@@ -20,6 +20,7 @@ class TestReflectApi extends BaseTest {
 		testIsFunction();
 		testIsEnumValue();
 		testDeleteField();
+		testCopy();
 	}
 
 	function testHasField() {
@@ -145,5 +146,25 @@ class TestReflectApi extends BaseTest {
 		t(Reflect.hasField(obj, "z"));
 		t(Reflect.deleteField(obj, "z"));
 		f(Reflect.deleteField(obj, "z"));
+
+		obj.z = null;
+		t(Reflect.hasField(obj, "z"));
+		t(Reflect.deleteField(obj, "z"));
+		f(Reflect.deleteField(obj, "z"));
+	}
+
+	function testCopy() {
+		var x = {a: 1, b: null};
+		var y = Reflect.copy(x);
+		eq(1, Reflect.field(y, "a"));
+		eq(null, Reflect.field(y, "b"));
+		eq(null, Reflect.field(y, "c"));
+
+		var x = {a: 1, b: null};
+		Reflect.setField(x, "c", "foo");
+		var y = Reflect.copy(x);
+		eq(1, Reflect.field(y, "a"));
+		eq(null, Reflect.field(y, "b"));
+		eq("foo", Reflect.field(y, "c"));
 	}
 }

@@ -4,7 +4,7 @@ import haxe.ds.StringMap;
 
 @:keep
 @:native('haxe.jvm.DynamicObject')
-class DynamicObject {
+class DynamicObject implements java.lang.Cloneable {
 	var _hx_fields:Null<StringMap<Dynamic>>;
 
 	public var _hx_deletedAField:Null<Int>;
@@ -41,6 +41,14 @@ class DynamicObject {
 		try {
 			Jvm.writeFieldNoDyn(this, name, value);
 		} catch (_:Dynamic) {}
+	}
+
+	final public function _hx_clone() {
+		var clone:DynamicObject = (cast this : java.lang.Object).clone();
+		if (_hx_fields != null) {
+			clone._hx_fields = this._hx_fields.copy();
+		}
+		return clone;
 	}
 
 	final function _hx_initReflection() {

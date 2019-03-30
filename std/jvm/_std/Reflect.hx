@@ -100,7 +100,10 @@ class Reflect {
 	}
 
 	public static function copy<T>(o:T):T {
-		return null;
+		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
+			return null;
+		}
+		return cast(cast o : jvm.DynamicObject)._hx_clone();
 	}
 
 	// TODO: some problem with empty Code attribute
