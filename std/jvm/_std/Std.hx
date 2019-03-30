@@ -80,10 +80,13 @@ class Std {
 	}
 
 	inline public static function instance<T:{}, S:T>(value:T, c:Class<S>):S {
-		return null;
+		return Std.is(value, c) ? cast value : null;
 	}
 
 	public static function random(x:Int):Int {
-		return 4;
+		if (x <= 0) {
+			return 0;
+		}
+		return Std.int(Math.random() * x);
 	}
 }
