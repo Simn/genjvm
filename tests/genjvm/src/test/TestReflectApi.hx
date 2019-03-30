@@ -16,6 +16,8 @@ class TestReflectApi extends BaseTest {
 		testHasField();
 		testField();
 		testSetField();
+		testGetProperty();
+		testSetProperty();
 		testFields();
 		testIsFunction();
 		testIsEnumValue();
@@ -78,6 +80,52 @@ class TestReflectApi extends BaseTest {
 		eq("bar", obj.value);
 
 		Reflect.setField(obj, "dontExist", 12);
+		eq(null, Reflect.field(obj, "dontExist"));
+	}
+
+	function testGetProperty() {
+		var obj = {
+			x: 12,
+			y: function() {
+				return "foo";
+			},
+			z: "foo"
+		};
+		eq(12, Reflect.getProperty(obj, "x"));
+		eq("foo", Reflect.getProperty(obj, "y")());
+		eq("foo", Reflect.getProperty(obj, "z"));
+		eq(null, Reflect.getProperty(obj, "a"));
+
+		var obj = new TestClass("foo");
+		eq("foo", Reflect.getProperty(obj, "value"));
+		eq(null, Reflect.getProperty(obj, "a"));
+	}
+
+	function testSetProperty() {
+		var obj = {
+			x: 12,
+			y: function() {
+				return "foo";
+			},
+			z: "foo"
+		};
+		Reflect.setProperty(obj, "x", 13);
+		eq(13, obj.x);
+
+		Reflect.setProperty(obj, "y", function() return "bar");
+		eq("bar", obj.y());
+
+		Reflect.setProperty(obj, "z", "bar");
+		eq("bar", obj.z);
+
+		Reflect.setProperty(obj, "a", "blub");
+		eq("blub", Reflect.field(obj, "a"));
+
+		var obj = new TestClass("foo");
+		Reflect.setProperty(obj, "value", "bar");
+		eq("bar", obj.value);
+
+		Reflect.setProperty(obj, "dontExist", 12);
 		eq(null, Reflect.field(obj, "dontExist"));
 	}
 

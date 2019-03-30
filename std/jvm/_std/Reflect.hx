@@ -40,10 +40,18 @@ class Reflect {
 	}
 
 	public static function getProperty(o:Dynamic, field:String):Dynamic {
-		return null;
+		if (hasField(o, "get_" + field)) {
+			field = "get_" + field;
+		}
+		return Reflect.field(o, field);
 	}
 
-	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {}
+	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {
+		if (hasField(o, "set_" + field)) {
+			field = "set_" + field;
+		}
+		Reflect.setField(o, field, value);
+	}
 
 	public static function callMethod(o:Dynamic, func:haxe.Constraints.Function, args:Array<Dynamic>):Dynamic {
 		return (cast func : java.lang.invoke.MethodHandle).invokeWithArguments(@:privateAccess args.__a);
