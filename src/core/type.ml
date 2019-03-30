@@ -2593,7 +2593,6 @@ let map_expr_type f ft fv e =
 	| TField (e1',v) ->
 		let e1 = f e1' in
 		let v = try
-			if type_iseq e1.etype e1'.etype then raise Not_found;
 			let n = match v with
 				| FClosure _ -> raise Not_found
 				| FAnon f | FInstance (_,_,f) | FStatic (_,f) -> f.cf_name

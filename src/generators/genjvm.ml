@@ -1078,7 +1078,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
 			tr
 		| TField(e1,FInstance(c,tl,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
-			let offset = add_field pool c cf in
 			let is_super = match e1.eexpr with
 			| TConst TSuper ->
 				code#aload jc#get_jsig 0;
@@ -1087,8 +1086,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr RValue e1;
 				false
 			in
-			let tl,tr = self#call_arguments cf.cf_type el in
+			let hack_cf = ref cf in
+			let tl,tr = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
 			let t1 = self#vtype e1.etype in
+			let offset = add_field pool c !hack_cf in
 			(if is_super then code#invokespecial else if c.cl_interface then code#invokeinterface else code#invokevirtual) offset t1 tl (retype tr);
 			tr
 		| TField(_,FEnum(en,ef)) ->
