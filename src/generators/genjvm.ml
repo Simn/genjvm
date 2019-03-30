@@ -1202,14 +1202,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		in
 		let commit_instanceof_checks excl =
 			start_exception_block throwable_path throwable_sig;
+			let pop_scope = jm#push_scope in
+			let _,load,save = jm#add_local "exc" throwable_sig VarWillInit in
+			code#dup;
+			save();
 			unwrap();
 			let restore = jm#start_branch in
 			let rl = ref [] in
 			let rec loop excl = match excl with
 				| [] ->
-					(* TODO: this re-wraps which we should avoid. Either have to store the original expression in a local
-					   or keep it in the stack (but in that case we have to pop it in the individual cases). *)
-					self#throw throwable_sig;
+					code#pop;
+					load();
+					code#athrow;
+					jm#set_terminated true
 				| (_,v,e) :: excl ->
 					code#dup;
 					let path = match self#vtype (self#mknull v.v_type) with TObject(path,_) -> path | _ -> assert false in
@@ -1225,6 +1230,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						(fun () -> loop excl)
 			in
 			loop excl;
+			pop_scope();
 			!rl
 		in
 		let rec loop acc excl = match excl with
