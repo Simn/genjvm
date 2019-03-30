@@ -229,7 +229,22 @@ class Type {
 	}
 
 	public static function enumEq<T>(a:T, b:T):Bool {
-		return false;
+		var a:jvm.Enum = cast a;
+		var b:jvm.Enum = cast b;
+		if (a._hx_index != b._hx_index) {
+			return false;
+		}
+		var params1 = enumParameters(cast a);
+		var params2 = enumParameters(cast b);
+		if (params1.length != params2.length) {
+			return false;
+		}
+		for (i in 0...params1.length) {
+			if (params1[i] != params2[i]) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public static function enumConstructor(e:EnumValue):String {
@@ -259,6 +274,14 @@ class Type {
 	}
 
 	public static function allEnums<T>(e:Enum<T>):Array<T> {
-		return null;
+		var all = getEnumConstructs(e);
+		var ret = [];
+		for (name in all) {
+			var v = Jvm.readField(e, name);
+			if (Jvm.instanceof(v, jvm.Enum)) {
+				ret.push(v);
+			}
+		}
+		return ret;
 	}
 }

@@ -82,8 +82,10 @@ class TestTypeApi extends BaseTest {
 		testEnumConstructs();
 		testTypeof();
 		testEnumIndex();
+		testEnumEq();
 		testEnumConstructor();
 		testEnumParameters();
+		testAllEnums();
 	}
 
 	function testGetClass() {
@@ -216,6 +218,13 @@ class TestTypeApi extends BaseTest {
 		eq(0, Type.enumIndex(Some(12)));
 	}
 
+	function testEnumEq() {
+		t(Type.enumEq(Some(12), Some(12)));
+		t(Type.enumEq(None, None));
+		t(!Type.enumEq(Some(13), Some(12)));
+		t(!Type.enumEq(Some(13), None));
+	}
+
 	function testEnumConstructor() {
 		eq("None", Type.enumConstructor(None));
 		eq("Some", Type.enumConstructor(Some(12)));
@@ -224,5 +233,12 @@ class TestTypeApi extends BaseTest {
 	function testEnumParameters() {
 		eq(0, Type.enumParameters(None).length);
 		eq(12, Type.enumParameters(Some(12))[0]);
+	}
+
+	function testAllEnums() {
+		var a = Type.allEnums(haxe.macro.Expr.ExprDef);
+		eq(2, a.length);
+		t(a[0] == EBreak || a[0] == EContinue);
+		t(a[1] == EBreak || a[1] == EContinue);
 	}
 }
