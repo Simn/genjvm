@@ -27,6 +27,7 @@ class TestStdApi extends BaseTest {
 	public function new() {
 		super();
 		testIs();
+		testParse();
 	}
 
 	function is(v:Dynamic, t1:Dynamic, ?t2:Dynamic, ?pos:haxe.PosInfos) {
@@ -50,6 +51,7 @@ class TestStdApi extends BaseTest {
 		is(1.2, Float);
 		is(1e10, Float);
 		is(-1e10, Float);
+		// TODO: needs rerouting
 		// is(Math.NaN, Float);
 		// is(Math.POSITIVE_INFINITY, Float);
 		// is(Math.NEGATIVE_INFINITY, Float);
@@ -75,5 +77,19 @@ class TestStdApi extends BaseTest {
 		is(function() {}, null);
 		is(MyClass, Class);
 		is(MyEnum, Enum);
+	}
+
+	function testParse() {
+		eq(Std.parseInt("65"), 65);
+		eq(Std.parseInt("65.3"), 65);
+		eq(Std.parseInt("65.7"), 65);
+		eq(Std.parseInt("65.7a"), 65);
+		eq(Std.parseFloat("65"), 65.0);
+		eq(Std.parseFloat("65a"), 65.0);
+		eq(Std.parseFloat("65.3"), 65.3);
+		eq(Std.parseFloat("-1e10"), -1e10);
+		eq(Std.parseFloat("-1E10"), -1e10);
+		eq(Std.parseInt("0xFF"), 255);
+		eq(Std.parseInt("0xFF"), 255);
 	}
 }

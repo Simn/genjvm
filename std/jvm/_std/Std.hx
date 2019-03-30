@@ -58,12 +58,25 @@ class Std {
 		return cast x;
 	}
 
+	static var integerFormatter = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US);
+	static var doubleFormatter = {
+		var fmt = new java.text.DecimalFormat();
+		fmt.setParseBigDecimal(true);
+		fmt.setDecimalFormatSymbols(new java.text.DecimalFormatSymbols(java.util.Locale.US));
+		fmt;
+	};
+
 	public static function parseInt(x:String):Null<Int> {
-		return null;
+		switch ((cast x : java.lang.JavaString.String).codePointAt(1)) {
+			case 'x'.code | 'X'.code:
+				return java.lang.Integer.decode(x).intValue();
+			case _:
+				return integerFormatter.parse(x).intValue();
+		}
 	}
 
 	public static function parseFloat(x:String):Float {
-		return 0.0;
+		return doubleFormatter.parse(x.toUpperCase()).doubleValue();
 	}
 
 	inline public static function instance<T:{}, S:T>(value:T, c:Class<S>):S {
