@@ -157,7 +157,8 @@ class Type {
 			return Jvm.readField(e, constr);
 		} else {
 			return Reflect.callMethod(null, Jvm.readField(e, constr), params);
-		}	}
+		}
+	}
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
 		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
@@ -169,12 +170,27 @@ class Type {
 		}
 	}
 
+	static function getFields<T>(c:java.lang.Class<T>, statics:Bool):Array<String> {
+		var ret = [];
+		for (f in c.getDeclaredFields()) {
+			if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) == statics) {
+				ret.push(f.getName());
+			}
+		}
+		for (m in c.getDeclaredMethods()) {
+			if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) == statics) {
+				ret.push(m.getName());
+			}
+		}
+		return ret;
+	}
+
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
-		return null;
+		return getFields(c.native(), false);
 	}
 
 	public static function getClassFields(c:Class<Dynamic>):Array<String> {
-		return null;
+		return getFields(c.native(), true);
 	}
 
 	public static function getEnumConstructs(e:Enum<Dynamic>):Array<String> {

@@ -53,6 +53,16 @@ private class SomeClassWithMixedArgs {
 
 private class ActuallyExtendsObject extends java.lang.Object {}
 
+private class SomeClassWithStuff {
+	static var staticVar = "foo";
+
+	var memberVar = "bar";
+
+	static function staticFunction() {}
+
+	function memberFunction() {}
+}
+
 class TestTypeApi extends BaseTest {
 	public function new() {
 		super();
@@ -67,6 +77,8 @@ class TestTypeApi extends BaseTest {
 		testCreateEmptyInstance();
 		testCreateEnum();
 		testCreateEnumIndex();
+		testGetInstanceFields();
+		testGetClassFields();
 		testEnumConstructs();
 		testTypeof();
 		testEnumIndex();
@@ -162,6 +174,20 @@ class TestTypeApi extends BaseTest {
 		eq(None, Type.createEnumIndex(Option, 1, []));
 		t(Type.createEnumIndex(Option, 0, [12]).match(Some(12)));
 		t(Type.createEnumIndex(Option, 0, ["foo"]).match(Some("foo")));
+	}
+
+	function testGetInstanceFields() {
+		var a = Type.getInstanceFields(SomeClassWithStuff);
+		eq(2, a.length);
+		eq("memberVar", a[0]);
+		eq("memberFunction", a[1]);
+	}
+
+	function testGetClassFields() {
+		var a = Type.getClassFields(SomeClassWithStuff);
+		eq(2, a.length);
+		eq("staticVar", a[0]);
+		eq("staticFunction", a[1]);
 	}
 
 	function testEnumConstructs() {
