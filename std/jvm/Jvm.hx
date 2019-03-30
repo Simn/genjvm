@@ -144,10 +144,7 @@ class Jvm {
 		}
 	}
 
-	static public function writeField<T>(obj:Dynamic, name:String, value:T) {
-		if (obj == null) {
-			return;
-		}
+	static public function writeFieldNoDyn<T>(obj:Dynamic, name:String, value:T) {
 		try {
 			var cl = (obj : java.lang.Object).getClass();
 			var field = cl.getField(name);
@@ -160,11 +157,18 @@ class Jvm {
 				}
 			}
 		} catch (_:java.lang.NoSuchFieldException) {
-			if (instanceof(obj, DynamicObject)) {
-				return (obj : DynamicObject)._hx_setField(name, value);
-			}
 			return;
 		}
+	}
+
+	static public function writeField<T>(obj:Dynamic, name:String, value:T) {
+		if (obj == null) {
+			return;
+		}
+		if (instanceof(obj, DynamicObject)) {
+			return (obj : DynamicObject)._hx_setField(name, value);
+		}
+		writeFieldNoDyn(obj, name, value);
 	}
 
 	// string

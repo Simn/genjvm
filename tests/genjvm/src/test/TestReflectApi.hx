@@ -126,19 +126,24 @@ class TestReflectApi extends BaseTest {
 		f(Reflect.hasField(obj, "x"));
 		eq(0, obj.x);
 		obj.x = 12;
-		// TODO
-		// t(Reflect.hasField(obj, "x"));
-		// t(Reflect.deleteField(obj, "x"));
-		// f(Reflect.deleteField(obj, "x"));
+		t(Reflect.hasField(obj, "x"));
+		t(Reflect.deleteField(obj, "x"));
+		f(Reflect.deleteField(obj, "x"));
 
 		t(Reflect.deleteField(obj, "z"));
 		f(Reflect.deleteField(obj, "z"));
 		f(Reflect.hasField(obj, "z"));
 		eq(null, obj.z);
-		obj.z = "bar";
-		// TODO
-		// t(Reflect.hasField(obj, "z"));
-		// t(Reflect.deleteField(obj, "z"));
-		// f(Reflect.deleteField(obj, "z"));
+		(obj : Dynamic).z = "bar";
+		t(Reflect.hasField(obj, "z"));
+		t(Reflect.deleteField(obj, "z"));
+		f(Reflect.deleteField(obj, "z"));
+
+		Reflect.setField(obj, "z", "bar");
+		eq("bar", obj.z);
+		eq("bar", Reflect.field(obj, "z"));
+		t(Reflect.hasField(obj, "z"));
+		t(Reflect.deleteField(obj, "z"));
+		f(Reflect.deleteField(obj, "z"));
 	}
 }
