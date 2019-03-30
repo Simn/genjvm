@@ -19,10 +19,35 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+import jvm.Jvm;
+
 @:coreApi
 class Std {
 	public static function is(v:Dynamic, t:Dynamic):Bool {
-		return false;
+		if (v == null || t == null) {
+			return false;
+		}
+		var clt:java.lang.Class<Dynamic> = cast t;
+		if (clt == null) {
+			return false;
+		}
+		if (clt == cast java.lang.Object) {
+			return true;
+		}
+		clt = Jvm.getWrapperClass(clt);
+		if (clt == cast java.lang.Double.DoubleClass) {
+			// Haxe semantics: any number is assignable to Float
+			clt = cast java.lang.Number;
+		} else if (clt == cast java.lang.Integer.IntegerClass) {
+			if (!Jvm.instanceof(v, java.lang.Number)) {
+				return false;
+			}
+			var n = (cast v : java.lang.Number);
+			// Haxe semantics: 2.0 is an integer...
+			return n.doubleValue() == n.intValue();
+		}
+		return clt.isAssignableFrom((v : java.lang.Object).getClass());
 	}
 
 	public static function string(s:Dynamic):String {

@@ -115,6 +115,8 @@ let rec jsignature_of_type t = match t with
 				| [t] -> TArray(jsignature_of_type t,None)
 				| _ -> assert false
 				end
+			| [],"Dynamic" ->
+				object_sig
 			| _ ->
 				if Meta.has Meta.CoreType a.a_meta then
 					TObject(a.a_path,List.map jtype_argument_of_type tl)
@@ -749,10 +751,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
 				code#if_ref (flip_cmp_op op)
 			)
-		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2;t1]
-		| [t1;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _ as t2] ->
+		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _;_]
+		| [_;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _] ->
 			(fun () ->
-				jm#invokestatic haxe_jvm_path "equals" (method_sig [t1;t2] (Some TBool));
+				jm#invokestatic haxe_jvm_path "equals" (method_sig [object_sig;object_sig] (Some TBool));
 				code#if_ref (flip_cmp_op op)
 			)
 		| [TObject _ as t1;TObject _ as t2] ->
