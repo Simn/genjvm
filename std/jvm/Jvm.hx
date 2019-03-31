@@ -5,6 +5,7 @@ import haxe.Constraints;
 import Enum;
 import jvm.DynamicObject;
 import jvm.Exception;
+import jvm.EmptyConstructor;
 import jvm.annotation.ClassReflectionInformation;
 import jvm.annotation.EnumReflectionInformation;
 import jvm.annotation.EnumValueReflectionInformation;

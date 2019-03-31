@@ -1833,6 +1833,22 @@ let generate_class gctx c =
 				SuperNoConstructor
 	in
 	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
+	begin
+		let jsig_empty = method_sig [haxe_empty_constructor_sig] None in
+		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
+		ignore(jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument);
+		jm_empty_ctor#load_this;
+		begin match sig_super_ctor with
+		| SuperNo ->
+			(* Haxe type with no parent class, call Object.<init>() *)
+			jm_empty_ctor#call_super_ctor (method_sig [] None)
+		| _ ->
+			(* Parent class exists, call SuperClass.<init>(EmptyConstructor) *)
+			jm_empty_ctor#get_code#aconst_null haxe_empty_constructor_sig;
+			jm_empty_ctor#call_super_ctor jsig_empty
+		end;
+		jm_empty_ctor#get_code#return_void;
+	end;
 	let pool = jc#get_pool in
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->

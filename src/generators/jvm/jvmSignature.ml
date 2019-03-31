@@ -174,6 +174,9 @@ module NativeSignatures = struct
 	let haxe_enum_path = (["haxe";"jvm"],"Enum")
 	let haxe_enum_sig = TObject(haxe_enum_path,[])
 
+	let haxe_empty_constructor_path = (["haxe";"jvm"],"EmptyConstructor")
+	let haxe_empty_constructor_sig = TObject(haxe_empty_constructor_path,[])
+
 	(* numeric *)
 
 	let byte_path = ["java";"lang"],"Byte"
