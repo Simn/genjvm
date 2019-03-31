@@ -1439,6 +1439,23 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| Not | Neg | NegBits when ret = RVoid -> self#texpr ret e1
 			| _ -> self#unop ret op flag e1
 			end
+		| TBinop(OpAdd,e1,e2) when ExtType.is_string (follow e.etype) ->
+			let string_builder_path = (["java";"lang"],"StringBuilder") in
+			let string_builder_sig = object_path_sig string_builder_path in
+			jm#construct string_builder_path (fun () -> []);
+			let rec loop e = match e.eexpr with
+				| TBinop(OpAdd,e1,e2) ->
+					loop e1;
+					loop e2;
+				| _ ->
+					self#texpr rvalue_any e;
+					let jsig = jm#get_code#get_stack#top in
+					let jsig = if is_unboxed jsig then jsig else object_sig in
+					jm#invokevirtual string_builder_path "append" string_builder_sig (method_sig [jsig] (Some string_builder_sig));
+			in
+			loop e1;
+			loop e2;
+			jm#invokevirtual string_builder_path "toString" string_builder_sig (method_sig [] (Some string_sig));
 		| TBinop(op,e1,e2) ->
 			begin match op with
 			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2 e.etype
