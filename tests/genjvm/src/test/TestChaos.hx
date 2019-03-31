@@ -20,6 +20,7 @@ private class ChaosConstructorChild extends ChaosConstructor {
 class TestChaos extends BaseTest {
 	var intField:Int;
 
+	static var NaN = java.lang.Double.DoubleClass.NaN;
 	static var staticIntField:Int;
 	static var trueValue = true;
 	static var falseValue = false;
@@ -33,6 +34,7 @@ class TestChaos extends BaseTest {
 		testObjectDecl();
 		testStringConcat();
 		testBranchingCtorArgs();
+		testNaN();
 	}
 
 	function testAssignment() {
@@ -281,5 +283,14 @@ class TestChaos extends BaseTest {
 
 		eq(1, new ChaosConstructorChild(1).value);
 		eq(0, new ChaosConstructorChild(-1).value);
+	}
+
+	function testNaN() {
+		f(NaN == NaN);
+		f(NaN >= NaN);
+		f(NaN > NaN);
+		f(NaN <= NaN);
+		f(NaN < NaN);
+		t(NaN != NaN);
 	}
 }

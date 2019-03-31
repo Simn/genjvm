@@ -783,7 +783,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TObject _ as t1;TObject _ as t2] ->
 			(fun () -> (if op = CmpNe then code#if_acmp_ne_ref else code#if_acmp_eq_ref) t1 t2)
 		| [TDouble;TDouble] ->
-			code#dcmpl;
+			begin match op with
+			| CmpLt | CmpLe ->
+				code#dcmpl;
+			| _ ->
+				code#dcmpg;
+			end;
 			(fun () -> code#if_ref op)
 		| [TLong;TLong] ->
 			code#lcmpl;
