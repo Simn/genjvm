@@ -623,7 +623,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method condition e = match (Texpr.skip e).eexpr with
 		| TBinop((OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte) as op,e1,e2) ->
 			let op = convert_cmp_op op in
-			let op = flip_cmp_op op in
 			self#binop_compare op e1 e2
 		| _ ->
 			self#texpr rvalue_any e;
@@ -761,36 +760,37 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method do_compare op =
 		match code#get_stack#get_stack_items 2 with
 		| [TInt | TByte | TChar | TBool;TInt | TByte | TChar | TBool] ->
+			let op = flip_cmp_op op in
 			(fun () -> code#if_icmp_ref op)
 		| [t2;TObject((["java";"lang"],"String"),[]) as t1] ->
 			(* TODO: We need a slow compare if java.lang.Object is involved because it could refer to String *)
 			(fun () ->
 				jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
-				code#if_ref (flip_cmp_op op)
+				code#if_ref op
 			)
 		| [TObject((["java";"lang"],"String"),[]) as t1;t2] ->
 			(fun () ->
 				code#swap;
 				jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
-				code#if_ref (flip_cmp_op op)
+				code#if_ref op
 			)
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _;_]
 		| [_;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _] ->
 			(fun () ->
 				jm#invokestatic haxe_jvm_path "equals" (method_sig [object_sig;object_sig] (Some TBool));
-				code#if_ref (flip_cmp_op op)
+				code#if_ref op
 			)
 		| [TObject _ as t1;TObject _ as t2] ->
-			(fun () -> (if op = CmpNe then code#if_acmp_ne_ref else code#if_acmp_eq_ref) t1 t2)
+			(fun () -> (if op = CmpEq then code#if_acmp_ne_ref else code#if_acmp_eq_ref) t1 t2)
 		| [TDouble;TDouble] ->
+			let op = flip_cmp_op op in
 			begin match op with
-			| CmpLt | CmpLe ->
-				code#dcmpl;
-			| _ ->
-				code#dcmpg;
+			| CmpGe | CmpGt -> code#dcmpg;
+			| _ -> code#dcmpl;
 			end;
 			(fun () -> code#if_ref op)
 		| [TLong;TLong] ->
+			let op = flip_cmp_op op in
 			code#lcmpl;
 			(fun () -> code#if_ref op)
 		| [t1;t2] ->
@@ -803,12 +803,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| {eexpr = TConst TNull},e1
 		| e1,{eexpr = TConst TNull} ->
 			self#texpr rvalue_any e1;
-			(if op = CmpNe then self#if_not_null else self#if_null) (self#vtype e1.etype);
+			(if op = CmpEq then self#if_not_null else self#if_null) (self#vtype e1.etype);
 		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 ->
+			let op = flip_cmp_op op in
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			(fun () -> code#if_ref op)
 		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 ->
+			let op = flip_cmp_op op in
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			(fun () -> code#if_ref op)
@@ -908,7 +910,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method binop ret op e1 e2 t = match op with
 		| OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte ->
 			let op = convert_cmp_op op in
-			let op = flip_cmp_op op in
 			self#boolop (self#binop_compare op e1 e2)
 		| OpAssign ->
 			let f () =
