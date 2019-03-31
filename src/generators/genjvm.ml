@@ -21,7 +21,10 @@ type generation_context = {
 	t_exception : Type.t;
 	t_throwable : Type.t;
 	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
+	anon_path_lut : (path,jpath) Hashtbl.t;
 	mutable anon_num : int;
+	mutable curclass : tclass option;
+	mutable curfield : tclass_field option;
 }
 
 type ret =
@@ -148,10 +151,13 @@ and jtype_argument_of_type t =
 	TType(WNone,jsignature_of_type t)
 
 module TAnonIdentifiaction = struct
-	let identify gctx fields =
+	let convert_fields fields =
 		let l = PMap.fold (fun cf acc -> cf :: acc) fields [] in
 		let l = List.sort (fun cf1 cf2 -> compare cf1.cf_name cf2.cf_name) l in
-		let l = List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type) l in
+		List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type) l
+
+	let identify gctx fields =
+		let l = convert_fields fields in
 		try
 			Hashtbl.find gctx.anon_lut l,l
 		with Not_found ->
@@ -160,6 +166,14 @@ module TAnonIdentifiaction = struct
 			let path = (["haxe";"generated"],Printf.sprintf "Anon%i" id) in
 			Hashtbl.add gctx.anon_lut l path;
 			path,l
+
+	let identify_as gctx path fields =
+		if not (Hashtbl.mem gctx.anon_path_lut path) then begin
+			let fields = convert_fields fields in
+			Hashtbl.add gctx.anon_lut fields path;
+			Hashtbl.add gctx.anon_path_lut path path;
+		end
+
 end
 
 let enum_ctor_sig =
@@ -1898,6 +1912,47 @@ let generate_module_type ctx mt = match mt with
 	| TAbstractDecl a when not (is_extern_abstract a) && Meta.has Meta.CoreType a.a_meta -> generate_abstract ctx a
 	| _ -> ()
 
+module Preprocessor = struct
+
+	let is_normal_anon an = match !(an.a_status) with
+		| Closed | Const | Opened -> true
+		| _ -> false
+
+	let preprocess_expr gctx e =
+		let rec loop e =
+			begin match e.etype,follow e.etype with
+			| TType(td,_),TAnon an when is_normal_anon an ->
+				ignore(TAnonIdentifiaction.identify_as gctx td.t_path an.a_fields)
+			| _ -> ()
+			end;
+			Type.iter loop e
+		in
+		loop e
+
+	let preprocess_field gctx cf mtype =
+		match cf.cf_expr with
+		| None ->
+			()
+		| Some e ->
+			preprocess_expr gctx e
+
+	let preprocess_class gctx c =
+		gctx.curclass <- Some c;
+		let field mtype cf =
+			gctx.curfield <- Some cf;
+			preprocess_field gctx cf mtype
+		in
+		List.iter (field MStatic) c.cl_ordered_statics;
+		List.iter (field MStatic) c.cl_ordered_fields;
+		Option.may (field MConstructor) c.cl_constructor
+
+	let preprocess gctx =
+		List.iter (function
+			| TClassDecl c -> preprocess_class gctx c
+			| _ -> ()
+		) gctx.com.types
+end
+
 let generate com =
 	mkdir_from_path com.file;
 	let jar_name,manifest_suffix = match com.main_class with
@@ -1912,8 +1967,12 @@ let generate com =
 		t_exception = TInst(resolve_class com (["java";"lang"],"Exception"),[]);
 		t_throwable = TInst(resolve_class com (["java";"lang"],"Throwable"),[]);
 		anon_lut = Hashtbl.create 0;
+		anon_path_lut = Hashtbl.create 0;
 		anon_num = 0;
+		curclass = None;
+		curfield = None;
 	} in
+	Preprocessor.preprocess gctx;
 	let manifest_content =
 		"Manifest-Version: 1.0\n" ^
 		"Created-By: Haxe (Haxe Foundation)" ^
