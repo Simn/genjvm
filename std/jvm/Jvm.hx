@@ -184,4 +184,170 @@ class Jvm {
 	static public function stringConcat<A:java.lang.Object, B:java.lang.Object>(a:A, b:B):String {
 		return (cast toString(a) : java.lang.JavaString.String).concat(toString(b));
 	}
+
+	// ops
+
+	@:native("+")
+	static public function opAdd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.JavaString.String) || instanceof(b, java.lang.JavaString.String)) {
+			return stringConcat(a, b);
+		}
+		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() + (cast b : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() + (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() + (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("-")
+	static public function opSub<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() - (cast b : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() - (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() - (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("*")
+	static public function opMul<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() * (cast b : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() * (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() * (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("/")
+	static public function opDiv<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() / (cast b : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() / (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() / (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("%")
+	static public function opMod<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() % (cast b : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() % (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() % (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("&")
+	static public function opAnd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() & (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() & (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("|")
+	static public function opOr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() | (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() | (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("^")
+	static public function opXor<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() ^ (cast b : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() ^ (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("shl")
+	static public function opShl<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() << (cast b : java.lang.Number).intValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() << (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native(">>")
+	static public function opShr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() >> (cast b : java.lang.Number).intValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() >> (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native(">>>")
+	static public function opUshr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() >>> (cast b : java.lang.Number).intValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() >>> (cast b : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("neg")
+	static public function opNeg<T1:java.lang.Object>(a:T1):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass)) {
+			return -(cast a : java.lang.Number).doubleValue();
+		}
+		if (instanceof(a, java.lang.Long.LongClass)) {
+			return -(cast a : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass)) {
+			return -(cast a : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("~")
+	static public function opNegBits<T1:java.lang.Object>(a:T1):Dynamic {
+		if (instanceof(a, java.lang.Long.LongClass)) {
+			return ~(cast a : java.lang.Number).longValue();
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass)) {
+			return ~(cast a : java.lang.Number).intValue();
+		}
+		throw "Invalid operation";
+	}
 }

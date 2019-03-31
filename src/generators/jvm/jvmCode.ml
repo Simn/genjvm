@@ -389,14 +389,14 @@ class builder pool = object(self)
 	method fsub = self#op OpFsub 1 [TFloat;TFloat] [TFloat]
 	method fmul = self#op OpFmul 1 [TFloat;TFloat] [TFloat]
 	method fdiv = self#op OpFdiv 1 [TFloat;TFloat] [TFloat]
-	method frem = self#op OpFrem 1 [TFloat;TFloat] [TInt]
+	method frem = self#op OpFrem 1 [TFloat;TFloat] [TFloat]
 	method fneg = self#op OpFneg 1 [TFloat] [TFloat]
 
 	method dadd = self#op OpDadd 1 [TDouble;TDouble] [TDouble]
 	method dsub = self#op OpDsub 1 [TDouble;TDouble] [TDouble]
 	method dmul = self#op OpDmul 1 [TDouble;TDouble] [TDouble]
 	method ddiv = self#op OpDdiv 1 [TDouble;TDouble] [TDouble]
-	method drem = self#op OpDrem 1 [TDouble;TDouble] [TInt]
+	method drem = self#op OpDrem 1 [TDouble;TDouble] [TDouble]
 	method dneg = self#op OpDneg 1 [TDouble] [TDouble]
 
 	(* stack *)

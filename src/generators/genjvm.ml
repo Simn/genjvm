@@ -739,23 +739,27 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method binop_exprs cast_type f1 f2 =
 		f1();
-		Option.may (jm#cast ~allow_to_string:true) cast_type;
+		jm#cast ~allow_to_string:true cast_type;
 		f2();
-		Option.may (jm#cast ~allow_to_string:true) cast_type;
+		jm#cast ~allow_to_string:true cast_type;
 
 	method get_binop_type t1 t2 = match jsignature_of_type (follow t1),jsignature_of_type (follow t2) with
 		| TObject((["java";"lang"],"String"),_),_
 		| _,TObject((["java";"lang"],"String"),_) ->
-			Some string_sig
-		| TLong,_ | _,TLong -> Some TLong
-		| TDouble,_ | _,TDouble -> Some TDouble
-		| TFloat,_ | _,TFloat -> Some TFloat
-		| TInt,_ | _,TInt -> Some TInt
-		| TShort,_ | _,TShort -> Some TShort
-		| TChar,_ | _,TChar -> Some TChar
-		| TByte,_ | _,TByte -> Some TByte
-		| TBool,_ | _,TBool -> Some TBool
-		| _ -> None
+			string_sig
+		| TLong,_ | _,TLong -> TLong
+		| TDouble,_ | _,TDouble -> TDouble
+		| TFloat,_ | _,TFloat -> TFloat
+		| TInt,_ | _,TInt -> TInt
+		| TShort,_ | _,TShort -> TShort
+		| TChar,_ | _,TChar -> TChar
+		| TByte,_ | _,TByte -> TByte
+		| TBool,_ | _,TBool -> TBool
+		| jsig1,jsig2 ->
+			if jsig1 = string_sig || jsig2 = string_sig then
+				string_sig
+			else
+				object_sig
 
 	method do_compare op =
 		match code#get_stack#get_stack_items 2 with
@@ -819,83 +823,143 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#binop_exprs (self#get_binop_type e1.etype e2.etype) (f e1) (f e2);
 			self#do_compare op
 
-	method binop_numeric (opi,opd,opl) cast_type f1 f2 =
-		self#binop_exprs cast_type f1 f2;
-		begin match code#get_stack#get_stack_items 2 with
-		| [TInt | TByte | TShort;TInt | TByte | TShort] -> opi ()
-		| [TDouble;TDouble] -> opd ()
-		| [TLong;TLong] -> opl ()
-		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[]);] ->
-			jm#invokestatic haxe_jvm_path "stringConcat" (method_sig [object_sig;object_sig] (Some string_sig))
-		| [t1;t2] -> jerror (Printf.sprintf "Can't numop %s and %s" (generate_signature false t1) (generate_signature false t2))
-		| tl -> jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
-		end
-
 	method binop_basic ret op cast_type f1 f2 =
-		let long_op_int () =
-			let is_long = match cast_type with
-				| Some TLong -> true
-				| _ -> false
-			in
-			f1();
-			jm#cast (if is_long then TLong else TInt);
-			f2();
-			jm#cast TInt; (* ! *)
-			is_long
-		in
-		match op with
-		| OpAdd -> self#binop_numeric ((fun () -> code#iadd),(fun () -> code#dadd),(fun () -> code#ladd)) cast_type f1 f2
-		| OpSub -> self#binop_numeric ((fun () -> code#isub),(fun () -> code#dsub),(fun () -> code#lsub)) cast_type f1 f2
-		| OpMult -> self#binop_numeric ((fun () -> code#imul),(fun () -> code#dmul),(fun () -> code#lmul)) cast_type f1 f2
-		| OpDiv ->
-			let operand f =
-				f ();
-				begin match cast_type with
-				| Some TLong -> jm#cast TLong
-				| _ -> jm#cast TDouble
+		let emit_exprs () = self#binop_exprs cast_type f1 f2 in
+		begin match cast_type with
+			| TByte | TShort | TInt ->
+				begin match op with
+				| OpAdd ->
+					emit_exprs();
+					code#iadd
+				| OpSub ->
+					emit_exprs();
+					code#isub
+				| OpMult ->
+					emit_exprs();
+					code#imul
+				| OpDiv ->
+					f1();
+					jm#cast TDouble;
+					f2();
+					jm#cast TDouble;
+					code#ddiv;
+				| OpAnd ->
+					emit_exprs();
+					code#iand
+				| OpOr ->
+					emit_exprs();
+					code#ior
+				| OpXor ->
+					emit_exprs();
+					code#ixor
+				| OpShl ->
+					emit_exprs();
+					code#ishl
+				| OpShr ->
+					emit_exprs();
+					code#ishr
+				| OpUShr ->
+					emit_exprs();
+					code#iushr
+				| OpMod ->
+					emit_exprs();
+					code#irem
+				| _ -> jerror (Printf.sprintf "Unsupported binop on TInt: %s" (s_binop op))
 				end
-			in
-			operand f1;
-			operand f2;
-			begin match cast_type with
-			| Some TLong -> code#ldiv
-			| _ -> code#ddiv
-			end
-		| OpAnd -> self#binop_numeric ((fun () -> code#iand),(fun () -> assert false),(fun () -> code#land_)) cast_type f1 f2
-		| OpOr -> self#binop_numeric ((fun () -> code#ior),(fun () -> assert false),(fun () -> code#lor_)) cast_type f1 f2
-		| OpXor -> self#binop_numeric ((fun () -> code#ixor),(fun () -> assert false),(fun () -> code#lxor_)) cast_type f1 f2
-		| OpShl ->
-			let is_long = long_op_int () in
-			if is_long then code#lshl else code#ishl
-		| OpShr ->
-			let is_long = long_op_int () in
-			if is_long then code#lshr else code#ishr
-		| OpUShr ->
-			let is_long = long_op_int () in
-			if is_long then code#lushr else code#iushr
-		| OpMod -> self#binop_numeric ((fun () -> code#irem),(fun () -> code#drem),(fun () -> code#lrem)) cast_type f1 f2
-		| OpBoolAnd ->
-			let operand f =
-				f();
-				jm#cast TBool;
-			in
-			operand f1;
-			jm#if_then_else
-				(fun () -> code#if_ref CmpEq)
-				(fun () -> operand f2)
-				(fun () -> code#bconst false)
-		| OpBoolOr ->
-			let operand f =
-				f();
-				jm#cast TBool;
-			in
-			operand f1;
-			jm#if_then_else
-				(fun () -> code#if_ref CmpEq)
-				(fun () -> code#bconst true)
-				(fun () -> operand f2)
-		| _ ->
-			assert false
+			| TDouble ->
+				emit_exprs();
+				begin match op with
+				| OpAdd -> code#dadd
+				| OpSub -> code#dsub
+				| OpMult -> code#dmul
+				| OpDiv -> code#ddiv
+				| OpMod -> code#drem
+				| _ -> jerror (Printf.sprintf "Unsupported binop on TDouble: %s" (s_binop op))
+				end
+			| TLong ->
+				begin match op with
+				| OpAdd ->
+					emit_exprs();
+					code#ladd
+				| OpSub ->
+					emit_exprs();
+					code#lsub
+				| OpMult ->
+					emit_exprs();
+					code#lmul
+				| OpDiv ->
+					emit_exprs();
+					code#ldiv
+				| OpAnd ->
+					emit_exprs();
+					code#land_
+				| OpOr ->
+					emit_exprs();
+					code#lor_
+				| OpXor ->
+					emit_exprs();
+					code#lxor_
+				| OpShl ->
+					f1();
+					jm#cast TLong;
+					f2();
+					jm#cast TInt;
+					code#lshl;
+				| OpShr ->
+					f1();
+					jm#cast TLong;
+					f2();
+					jm#cast TInt;
+					code#lshr;
+				| OpUShr ->
+					f1();
+					jm#cast TLong;
+					f2();
+					jm#cast TInt;
+					code#lushr;
+				| OpMod ->
+					emit_exprs();
+					code#lrem
+				| _ -> jerror (Printf.sprintf "Unsupported binop on TInt: %s" (s_binop op))
+				end
+			| TBool | TObject((["java";"lang"],"Object"),_) | TTypeParameter _ ->
+				begin match op with
+				| OpBoolAnd ->
+					let operand f =
+						f();
+						jm#cast TBool;
+					in
+					operand f1;
+					jm#if_then_else
+						(fun () -> code#if_ref CmpEq)
+						(fun () -> operand f2)
+						(fun () -> code#bconst false)
+				| OpBoolOr ->
+					let operand f =
+						f();
+						jm#cast TBool;
+					in
+					operand f1;
+					jm#if_then_else
+						(fun () -> code#if_ref CmpEq)
+						(fun () -> code#bconst true)
+						(fun () -> operand f2)
+				| _ ->
+					emit_exprs();
+					let name = if op = OpShl then "shl" else s_binop op in
+					jm#invokestatic haxe_jvm_path name (method_sig [object_sig;object_sig] (Some object_sig))
+				end
+			| TObject(path,_) ->
+				emit_exprs();
+				if path = string_path then
+					jm#invokestatic haxe_jvm_path "stringConcat" (method_sig [object_sig;object_sig] (Some string_sig))
+				else begin
+					let name = if op = OpShl then "shl" else s_binop op in
+					jm#invokestatic haxe_jvm_path name (method_sig [object_sig;object_sig] (Some object_sig))
+				end
+			| _ ->
+				jerror (Printf.sprintf "Unsupported operation %s on %s" (s_binop op) (generate_signature false cast_type))
+		end;
 
 	method boolop f =
 		jm#if_then_else
@@ -975,8 +1039,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match jsignature_of_type (follow e.etype) with
 			| TLong -> code#lneg;
 			| TDouble -> code#dneg;
-			| TInt -> code#ineg;
-			| _ -> assert false
+			| TByte | TShort | TInt -> code#ineg;
+			| _ -> jm#invokestatic haxe_jvm_path "neg" (method_sig [object_sig] (Some object_sig))
 			end;
 		| Not,_ ->
 			jm#if_then_else
@@ -986,14 +1050,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| NegBits,_ ->
 			self#texpr rvalue_any e;
 			begin match jsignature_of_type (follow e.etype) with
-			| TInt ->
+			| TByte | TShort | TInt ->
 				code#iconst Int32.minus_one;
 				code#ixor;
 			| TLong ->
 				code#lconst Int64.minus_one;
 				code#lxor_;
 			| _ ->
-				assert false
+				jm#invokestatic haxe_jvm_path "~" (method_sig [object_sig] (Some object_sig))
 			end
 
 	(* calls *)

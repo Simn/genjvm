@@ -29,6 +29,7 @@ class TestChaos extends BaseTest {
 		super();
 		testAssignment();
 		testOps();
+		testDynamicOps();
 		testIntArray();
 		testStringMap();
 		testObjectDecl();
@@ -94,6 +95,49 @@ class TestChaos extends BaseTest {
 
 		// boolean
 		var b = true;
+		eq(false, !b);
+		eq(false, b && falseValue);
+		eq(true, b && trueValue);
+		eq(true, b || falseValue);
+		eq(true, b || trueValue);
+
+		b = false;
+		eq(true, !b);
+		eq(false, b && falseValue);
+		eq(false, b && trueValue);
+		eq(false, b || falseValue);
+		eq(true, b || trueValue);
+
+		eq(true, a > 5);
+		eq(true, a >= 5);
+		eq(false, a < 5);
+		eq(false, a <= 5);
+		eq(true, a != 5);
+		eq(false, a != 10);
+	}
+
+	function testDynamicOps() {
+		var a:Dynamic = 10;
+		// arithmetic
+		eq(9., a - 1);
+		eq(20., a * 2);
+		eq(5., a / 2); // careful with Float comparison...
+		eq(1., a % 3);
+
+		// bit
+		eq(20, a << 1);
+		eq(5, a >> 1);
+		eq(5, a >>> 1);
+		eq(10, a & 15);
+		eq(15, a | 15);
+		eq(2, a ^ 8);
+
+		// unary
+		eq(-10., -a);
+		eq(-11, ~a);
+
+		// boolean
+		var b:Dynamic = true;
 		eq(false, !b);
 		eq(false, b && falseValue);
 		eq(true, b && trueValue);
