@@ -1993,10 +1993,10 @@ let generate com =
 		begin
 			let jm_ctor = jc#spawn_method "<init>" (method_sig (List.map snd fields) None) [MPublic] in
 			jm_ctor#load_this;
+			jm_ctor#call_super_ctor (method_sig [] None);
 			List.iter (fun (name,jsig) ->
 				jm_ctor#add_argument_and_field name jsig;
 			) fields;
-			jm_ctor#call_super_ctor (method_sig [] None);
 			jm_ctor#get_code#return_void;
 		end;
 		begin
