@@ -25,7 +25,7 @@ type generation_context = {
 }
 
 type ret =
-	| RValue
+	| RValue of jsignature option
 	| RVoid
 	| RReturn
 
@@ -341,6 +341,8 @@ let create_context_class gctx jc jm name vl = match vl with
 		write_class gctx.jar path jc#export_class;
 		ctx_class
 
+let rvalue_any = RValue None
+
 class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return_type : Type.t) = object(self)
 	val com = gctx.com
 	val code = jm#get_code
@@ -455,17 +457,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let t = self#vtype cf.cf_type in
 			code#getstatic offset t
 		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
 			jm#invokevirtual string_path "length" vtobj (method_sig [] (Some TInt))
 		| FInstance({cl_path = (["java"],"NativeArray")},_,{cf_name = "length"}) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
 			code#arraylength vtobj
 		| FInstance(c,tl,cf) when not (is_interface_var_access c cf) ->
 			let vt = self#vtype cf.cf_type in
 			let offset = add_field pool c cf in
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
 			code#getfield offset vtobj vt
 		| FEnum(en,ef) ->
@@ -473,7 +475,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let offset = pool#add_field en.e_path ef.ef_name jsig FKField in
 			code#getstatic offset jsig
 		| FAnon {cf_name = s} ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let default () =
 				self#string s;
 				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
@@ -495,14 +497,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				default();
 			end
 		| FDynamic s | FInstance(_,_,{cf_name = s}) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 			self#cast t;
 		| FClosure((Some(c,_)),cf) ->
 			let jsig = self#vtype cf.cf_type in
 			self#read_closure false c.cl_path cf.cf_name jsig;
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 		| _ ->
 			assert false
@@ -529,7 +531,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let vt = self#vtype t in
 			let offset = add_field pool c cf in
 			let vtobj = self#vtype e1.etype in
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			if ak <> AKNone then begin
 				code#dup;
 				code#getfield offset vtobj vt;
@@ -537,7 +539,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			apply (fun () -> code#dup_x1);
 			code#putfield offset vtobj vt
 		| TField(e1,(FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}))) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			if ak <> AKNone then code#dup;
 			self#string s;
 			if ak <> AKNone then begin
@@ -558,9 +560,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let vta = self#vtype e1.etype in
 					let t = self#mknull t in
 					let vte = self#vtype t in
-					self#texpr RValue e1;
+					self#texpr rvalue_any e1;
 					if ak <> AKNone then code#dup;
-					self#texpr RValue e2;
+					self#texpr rvalue_any e2;
 					if ak <> AKNone then begin
 						code#dup_x1;
 						code#invokevirtual offset_get vta [TInt] [vte];
@@ -572,9 +574,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| TInst({cl_path = (["java"],"NativeArray")},_) ->
 					let vte = self#vtype t in
 					let vta = self#vtype e1.etype in
-					self#texpr RValue e1;
+					self#texpr rvalue_any e1;
 					if ak <> AKNone then code#dup;
-					self#texpr RValue e2;
+					self#texpr rvalue_any e2;
 					if ak <> AKNone then begin
 						code#dup_x1;
 						self#read_native_array vta vte
@@ -603,7 +605,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let op = flip_cmp_op op in
 			self#binop_compare op e1 e2
 		| _ ->
-			self#texpr RValue e;
+			self#texpr rvalue_any e;
 			jm#cast TBool;
 			(fun () -> code#if_ref CmpEq)
 
@@ -629,7 +631,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				def,cases
 		in
-		self#texpr RValue e1;
+		self#texpr rvalue_any e1;
 		jm#cast TInt;
 		let flat_cases = DynArray.create () in
 		let case_lut = ref IntMap.empty in
@@ -774,18 +776,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		match (Texpr.skip e1),(Texpr.skip e2) with
 		| {eexpr = TConst TNull},e1
 		| e1,{eexpr = TConst TNull} ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			(if op = CmpNe then self#if_not_null else self#if_null) (self#vtype e1.etype);
 		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			self#cast t2;
 			(fun () -> code#if_ref op)
 		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			self#cast t2;
 			(fun () -> code#if_ref op)
 		| _ ->
-			let f e () = self#texpr RValue e in
+			let f e () = self#texpr rvalue_any e in
 			self#binop_exprs (self#get_binop_type e1.etype e2.etype) (f e1) (f e2);
 			self#do_compare op
 
@@ -884,7 +886,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#boolop (self#binop_compare op e1 e2)
 		| OpAssign ->
 			let f () =
-				self#texpr RValue e2;
+				self#texpr rvalue_any e2;
 				self#cast e1.etype;
 			in
 			self#read_write ret AKNone e1 f t
@@ -902,13 +904,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				if ret <> RVoid then load();
 			| _ ->
 				let f () =
-					self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (fun () -> ()) (fun () -> self#texpr RValue e2);
+					self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (fun () -> ()) (fun () -> self#texpr rvalue_any e2);
 					if is_null e1.etype then self#expect_reference_type;
 				in
 				self#read_write ret AKPre e1 f t
 			end
 		| _ ->
-			let f e () = self#texpr RValue e in
+			let f e () = self#texpr rvalue_any e in
 			self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (f e1) (f e2)
 
 	method unop ret op flag e =
@@ -942,7 +944,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f e.etype;
 			if is_null then self#expect_reference_type;
 		| Neg,_ ->
-			self#texpr RValue e;
+			self#texpr rvalue_any e;
 			begin match jsignature_of_type (follow e.etype) with
 			| TLong -> code#lneg;
 			| TDouble -> code#dneg;
@@ -955,7 +957,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				(fun () -> code#bconst false)
 				(fun () -> code#bconst true)
 		| NegBits,_ ->
-			self#texpr RValue e;
+			self#texpr rvalue_any e;
 			begin match jsignature_of_type (follow e.etype) with
 			| TInt ->
 				code#iconst Int32.minus_one;
@@ -1006,13 +1008,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let tl = self#check_hack hack tl el in
 		let rec loop acc tl el = match tl,el with
 			| (_,_,t) :: tl,e :: el ->
-				self#texpr RValue e;
+				self#texpr rvalue_any e;
 				self#cast t;
 				loop (self#vtype t :: acc) tl el
 			| _,[] -> List.rev acc
 			| [],e :: el ->
 				(* TODO: this sucks *)
-				self#texpr RValue e;
+				self#texpr rvalue_any e;
 				loop (self#vtype e.etype :: acc) [] el
 		in
 		let tl = loop [] tl el in
@@ -1032,7 +1034,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TField(_,FStatic({cl_path = ["haxe";"jvm"],"Jvm"},({cf_name = "instanceof"}))) ->
 			begin match el with
 				| [e1;{eexpr = TTypeExpr mt}] ->
-					self#texpr RValue e1;
+					self#texpr rvalue_any e1;
 					self#expect_reference_type;
 					code#instanceof (path_map (t_infos mt).mt_path);
 					Some TBool
@@ -1083,7 +1085,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				code#aload jc#get_jsig 0;
 				true
 			| _ ->
-				self#texpr RValue e1;
+				self#texpr rvalue_any e1;
 				false
 			in
 			let hack_cf = ref cf in
@@ -1124,7 +1126,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				assert false
 			end
 		| _ ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			jm#cast method_handle_sig;
 			let tl,tr = self#call_arguments e1.etype el in
 			jm#invokevirtual method_handle_path "invoke" (self#vtype e1.etype) (method_sig tl tr);
@@ -1276,7 +1278,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jasig,jsig
 
 	method new_native_array jsig el =
-		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr RValue e) el)
+		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr rvalue_any e) el)
 
 	method construct ret path t f =
 		let offset_class = pool#add_path (path_map path) in
@@ -1328,7 +1330,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		code#set_line (Lexer.get_error_line e.epos);
 		match e.eexpr with
 		| TVar(v,Some e1) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			self#cast v.v_type;
 			let _,_,store = self#add_local v VarWillInit in
 			store()
@@ -1411,7 +1413,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TCall(e1,el) ->
 			self#call ret e.etype e1 el
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			(* Technically this could throw... but whatever *)
 			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
 		| TNew(c,tl,el) ->
@@ -1429,7 +1431,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#return_void;
 			jm#set_terminated true;
 		| TReturn (Some e1) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			self#cast return_type;
 			let vt = self#vtype return_type in
 			code#return_value vt;
@@ -1453,7 +1455,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let offset = pool#add_field ctx_class#get_path "<init>" (ctx_class#get_constructor_sig) FKMethod in
 					tl,offset
 				in
-				self#construct RValue ctx_class#get_path ctx_class#get_jsig f;
+				self#construct rvalue_any ctx_class#get_path ctx_class#get_jsig f;
 				jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 			end
 		| TArrayDecl el when ret = RVoid ->
@@ -1479,17 +1481,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				let cf_get = PMap.find "__get" c.cl_fields in
 				let t = self#mknull t in
 				let ef = mk (TField(e1,FInstance(c,[t],cf_get))) (apply_params c.cl_params [t] cf_get.cf_type) e.epos in
-				self#call RValue t ef [e2];
+				self#call rvalue_any t ef [e2];
 				self#cast e.etype;
 			| TInst({cl_path = (["java"],"NativeArray")},_) ->
-				self#texpr RValue e1;
+				self#texpr rvalue_any e1;
 				let vt = self#vtype e1.etype in
 				let vte = self#vtype e.etype in
-				self#texpr RValue e2;
+				self#texpr rvalue_any e2;
 				self#read_native_array vt vte
 			| t ->
-				self#texpr RValue e1;
-				self#texpr RValue e2;
+				self#texpr rvalue_any e1;
+				self#texpr rvalue_any e2;
 				jm#invokestatic (["haxe";"jvm"],"Jvm") "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
 				self#cast e.etype;
 			end
@@ -1512,7 +1514,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr ret e1;
 			self#cast e.etype
 		| TCast(e1,Some mt) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let jsig = jsignature_of_type (type_of_module_type mt) in
 			(* TODO: I think this needs some instanceof checking for basic types *)
 			if NativeSignatures.is_unboxed jsig then jm#cast jsig
@@ -1523,10 +1525,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TFor(v,e1,e2) ->
 			self#texpr ret (Texpr.for_remap com.basic v e1 e2 e.epos)
 		| TEnumIndex e1 ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			jm#getfield haxe_enum_path "_hx_index" TInt
 		| TEnumParameter(e1,ef,i) ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let path,name,jsig_arg = match follow ef.ef_type with
 				| TFun(tl,TEnum(en,_)) ->
 					let n,_,t = List.nth tl i in
@@ -1539,7 +1541,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#getfield cpath name jsig_arg;
 			self#cast e.etype;
 		| TThrow e1 ->
-			self#texpr RValue e1;
+			self#texpr rvalue_any e1;
 			let exc = new haxe_exception gctx e1.etype in
 			if not (List.exists (fun exc' -> exc#is_assignable_to exc') caught_exceptions) then jm#add_thrown_exception exc#get_native_exception_path;
 			if not exc#is_native_exception then begin
@@ -1558,16 +1560,16 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let rec loop fl fl' ok acc = match fl,fl' with
 						| ((name,_,_),e) :: fl,(name',jsig) :: fl' ->
 							if ok && name = name' then begin
-								self#texpr RValue e;
+								self#texpr rvalue_any e;
 								jm#cast jsig;
 								loop fl fl' ok acc
 							end else begin
 								let load = match (Texpr.skip e).eexpr with
 								| TConst _ | TTypeExpr _ | TFunction _ ->
-									(fun () -> self#texpr RValue e)
+									(fun () -> self#texpr rvalue_any e)
 								| _ ->
 									let _,load,save = jm#add_local (Printf.sprintf "_hx_tmp_%s" name) (self#vtype e.etype) VarWillInit in
-									self#texpr RValue e;
+									self#texpr rvalue_any e;
 									save();
 									load
 								in
@@ -1598,7 +1600,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				List.iter (fun ((name,_,_),e) ->
 					code#dup;
 					self#string name;
-					self#texpr RValue e;
+					self#texpr rvalue_any e;
 					self#expect_reference_type;
 					jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
 				) fl;
