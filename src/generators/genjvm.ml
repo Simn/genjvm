@@ -11,9 +11,41 @@ open JvmSignature
 open JvmMethod
 open JvmBuilder
 
+(* hacks *)
+
+let find_overload map_type cf el =
+	let tl = List.map (fun e -> e.etype) el in
+	let rec loop cfl = match cfl with
+		| cf :: cfl ->
+			begin match follow cf.cf_type with
+				| TFun(tl'',_) ->
+					let rec loop2 tl' tl = match tl',tl with
+						| t' :: tl',(_,_,t) :: tl ->
+							let t = (map_type (monomorphs cf.cf_params t)) in
+							(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
+						| [],[] ->
+							Some (cf,tl'')
+						| _ ->
+							loop cfl
+					in
+					loop2 tl tl''
+				| _ ->
+					assert false
+			end;
+
+		| [] ->
+			None
+	in
+	loop (cf :: cf.cf_overloads)
+
 (* Haxe *)
 
 exception HarderFailure of string
+
+type field_generation_info = {
+	has_this_before_super : bool;
+	mutable super_call_fields : tclass_field list;
+}
 
 type generation_context = {
 	com : Common.context;
@@ -22,6 +54,7 @@ type generation_context = {
 	t_throwable : Type.t;
 	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
 	anon_path_lut : (path,jpath) Hashtbl.t;
+	field_infos : field_generation_info DynArray.t;
 	mutable anon_num : int;
 	mutable curclass : tclass option;
 	mutable curfield : tclass_field option;
@@ -1074,29 +1107,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| None ->
 			tl
 		| Some rcf ->
-			let tl' = List.map (fun e -> e.etype) el in
-			let rec loop cfl = match cfl with
-				| cf :: cfl ->
-					begin match follow cf.cf_type with
-						| TFun(tl'',_) ->
-							let rec loop2 tl' tl = match tl',tl with
-								| t' :: tl',(_,_,t) :: tl ->
-									(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
-								| [],[] ->
-									rcf := cf;
-									tl''
-								| _ ->
-									loop cfl
-							in
-							loop2 tl' tl''
-						| _ ->
-							assert false
-					end;
-
-				| [] ->
-					tl
-			in
-			loop (!rcf :: !rcf.cf_overloads)
+			match find_overload (fun t -> t) !rcf el with
+			| None ->
+				tl
+			| Some(cf,tl) ->
+				rcf := cf;
+				tl
 
 	method call_arguments ?(hack=None) t el =
 		let tl,tr = match follow t with
@@ -2032,20 +2048,43 @@ module Preprocessor = struct
 		| Closed | Const | Opened -> true
 		| _ -> false
 
-	let preprocess_expr gctx e =
+	let check_anon gctx e = match e.etype,follow e.etype with
+		| TType(td,_),TAnon an when is_normal_anon an ->
+			ignore(TAnonIdentifiaction.identify_as gctx td.t_path an.a_fields)
+		| _ ->
+			()
+
+	let preprocess_constructor_expr gctx e =
 		let used_this = ref false in
-		let super_before_this = ref false in
+		let this_before_super = ref false in
+		let super_call_fields = DynArray.create () in
 		let is_on_current_class cf = match gctx.curclass with
 			| None -> false
 			| Some c -> PMap.mem cf.cf_name c.cl_fields
 		in
+		let find_super_ctor el =
+			let csup,map_type = match gctx.curclass with
+				| Some {cl_super = Some(c,tl)} -> c,apply_params c.cl_params tl
+				| _ -> assert false
+			in
+			let rec loop map_type c = match c.cl_constructor with
+				| Some cf ->
+					begin match find_overload map_type cf el with
+					| Some(cf,_) -> cf
+					| None -> loop_super map_type c
+					end
+				| None ->
+					loop_super map_type c
+			and loop_super map_type c = match c.cl_super with
+				| None ->
+					Error.error "Could not find overload constructor" e.epos
+				| Some(c,tl) ->
+					loop (fun t -> apply_params c.cl_params tl (map_type t)) c
+			in
+			loop map_type csup
+		in
 		let rec loop e =
-			begin match e.etype,follow e.etype with
-			| TType(td,_),TAnon an when is_normal_anon an ->
-				ignore(TAnonIdentifiaction.identify_as gctx td.t_path an.a_fields)
-			| _ ->
-				()
-			end;
+			check_anon gctx e;
 			begin match e.eexpr with
 			| TBinop(OpAssign,{eexpr = TField({eexpr = TConst TThis},FInstance(_,_,cf))},e2) when is_on_current_class cf->
 				(* Assigning this.field = value is fine if field is declared on our current class *)
@@ -2053,11 +2092,24 @@ module Preprocessor = struct
 			| TConst TThis ->
 				used_this := true
 			| TCall({eexpr = TConst TSuper},el) ->
-				if !used_this then super_before_this := true;
+				if !used_this then this_before_super := true;
+				let cf = find_super_ctor el in
+				DynArray.add super_call_fields cf;
 				List.iter loop el;
 			| _ ->
 				Type.iter loop e
 			end;
+		in
+		loop e;
+		{
+			has_this_before_super = !this_before_super;
+			super_call_fields = DynArray.to_list super_call_fields;
+		}
+
+	let preprocess_expr gctx e =
+		let rec loop e =
+			check_anon gctx e;
+			Type.iter loop e
 		in
 		loop e
 
@@ -2066,7 +2118,13 @@ module Preprocessor = struct
 		| None ->
 			()
 		| Some e ->
-			preprocess_expr gctx e
+			if mtype = MConstructor then begin
+				let info = preprocess_constructor_expr gctx e in
+				let index = DynArray.length gctx.field_infos in
+				DynArray.add gctx.field_infos info;
+				cf.cf_meta <- (Meta.Custom ":jvm.fieldInfo",[(EConst (Int (string_of_int index)),null_pos)],null_pos) :: cf.cf_meta;
+			end else
+				preprocess_expr gctx e
 
 	let preprocess_class gctx c =
 		gctx.curclass <- Some c;
@@ -2104,6 +2162,7 @@ let generate com =
 		anon_num = 0;
 		curclass = None;
 		curfield = None;
+		field_infos = DynArray.create();
 	} in
 	Preprocessor.preprocess gctx;
 	let manifest_content =
