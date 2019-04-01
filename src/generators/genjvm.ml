@@ -878,7 +878,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jm#invokestatic haxe_jvm_path "equals" (method_sig [object_sig;object_sig] (Some TBool));
 				code#if_ref op
 			)
-		| [TObject _ as t1;TObject _ as t2] ->
+		| [(TObject _ | TArray _) as t1;(TObject _ | TArray _) as t2] ->
 			(fun () -> (if op = CmpEq then code#if_acmp_ne_ref else code#if_acmp_eq_ref) t1 t2)
 		| [TDouble;TDouble] ->
 			let op = flip_cmp_op op in
