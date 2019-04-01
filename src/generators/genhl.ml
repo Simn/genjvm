@@ -3231,7 +3231,7 @@ and make_fun ?gen_content ctx name fidx f cthis cparent =
 		op ctx (ORet r)
 	end;
 	let fargs = (match tthis with None -> [] | Some t -> [t]) @ (match rcapt with None -> [] | Some r -> [rtype ctx r]) @ args in
-	let f = {
+	let hlf = {
 		fpath = name;
 		findex = fidx;
 		ftype = HFun (fargs, tret);
@@ -3242,13 +3242,13 @@ and make_fun ?gen_content ctx name fidx f cthis cparent =
 	} in
 	ctx.m <- old;
 	Hashtbl.add ctx.defined_funs fidx ();
-	let f = if ctx.optimize then begin
+	let f = if ctx.optimize && (gen_content = None || name <> ("","")) then begin
 		let t = Timer.timer ["generate";"hl";"opt"] in
-		let f = Hlopt.optimize ctx.dump_out (DynArray.get ctx.cstrings.arr) f in
+		let f = Hlopt.optimize ctx.dump_out (DynArray.get ctx.cstrings.arr) hlf f in
 		t();
 		f
 	end else
-		f
+		hlf
 	in
 	DynArray.add ctx.cfunctions f;
 	capt
@@ -4050,6 +4050,7 @@ let generate com =
 		output_string ch str;
 		close_out ch;
 	end;
+	Hlopt.clean_cache();
 	t();
 	if Common.raw_defined com "run" then begin
 		if com.run_command ("haxelib run hashlink run " ^ escape_command com.file) <> 0 then failwith "Failed to run HL";
