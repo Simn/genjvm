@@ -2159,7 +2159,10 @@ module Preprocessor = struct
 			gctx.curfield <- Some cf;
 			preprocess_field gctx cf mtype
 		in
-		let field mtype cf = List.iter (field mtype) (cf :: cf.cf_overloads) in
+		let field mtype cf =
+			cf.cf_overloads <- List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads;
+			List.iter (field mtype) (cf :: cf.cf_overloads)
+		in
 		List.iter (field MStatic) c.cl_ordered_statics;
 		List.iter (field MStatic) c.cl_ordered_fields;
 		Option.may (field MConstructor) c.cl_constructor

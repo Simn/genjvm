@@ -114,8 +114,7 @@ class Reflect {
 		return cast(cast o : jvm.DynamicObject)._hx_clone();
 	}
 
-	// TODO: some problem with empty Code attribute
-	// @:overload(function(f:Array<Dynamic>->Void):Dynamic {})
+	@:overload(function(f:Array<Dynamic>->Void):Dynamic {})
 	public static function makeVarArgs(f:Array<Dynamic>->Dynamic):Dynamic {
 		return null;
 	}
