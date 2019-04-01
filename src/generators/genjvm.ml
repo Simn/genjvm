@@ -2033,13 +2033,31 @@ module Preprocessor = struct
 		| _ -> false
 
 	let preprocess_expr gctx e =
+		let used_this = ref false in
+		let super_before_this = ref false in
+		let is_on_current_class cf = match gctx.curclass with
+			| None -> false
+			| Some c -> PMap.mem cf.cf_name c.cl_fields
+		in
 		let rec loop e =
 			begin match e.etype,follow e.etype with
 			| TType(td,_),TAnon an when is_normal_anon an ->
 				ignore(TAnonIdentifiaction.identify_as gctx td.t_path an.a_fields)
-			| _ -> ()
+			| _ ->
+				()
 			end;
-			Type.iter loop e
+			begin match e.eexpr with
+			| TBinop(OpAssign,{eexpr = TField({eexpr = TConst TThis},FInstance(_,_,cf))},e2) when is_on_current_class cf->
+				(* Assigning this.field = value is fine if field is declared on our current class *)
+				loop e2;
+			| TConst TThis ->
+				used_this := true
+			| TCall({eexpr = TConst TSuper},el) ->
+				if !used_this then super_before_this := true;
+				List.iter loop el;
+			| _ ->
+				Type.iter loop e
+			end;
 		in
 		loop e
 
@@ -2056,6 +2074,7 @@ module Preprocessor = struct
 			gctx.curfield <- Some cf;
 			preprocess_field gctx cf mtype
 		in
+		let field mtype cf = List.iter (field mtype) (cf :: cf.cf_overloads) in
 		List.iter (field MStatic) c.cl_ordered_statics;
 		List.iter (field MStatic) c.cl_ordered_fields;
 		Option.may (field MConstructor) c.cl_constructor
