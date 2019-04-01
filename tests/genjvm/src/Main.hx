@@ -8,6 +8,7 @@ class Main {
 		new test.TestTypeApi();
 		new test.TestReflectApi();
 		new test.TestStdApi();
+		test.TestControlFlow;
 		trace('Done! ${test.BaseTest.numTests} tests with ${test.BaseTest.numFailures} failures');
 	}
 }

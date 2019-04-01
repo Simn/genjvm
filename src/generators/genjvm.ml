@@ -1489,6 +1489,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#switch ret e1 cases def
 		| TWhile(e1,e2,flag) -> (* TODO: do-while *)
 			(* TODO: could optimize a bit *)
+			let is_true_loop = match (Texpr.skip e1).eexpr with TConst (TBool true) -> true | _ -> false in
 			jm#add_stack_frame;
 			let fp = code#get_fp in
 			let old_continue = continue in
@@ -1496,16 +1497,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let old_breaks = breaks in
 			breaks <- [];
 			let restore = jm#start_branch in
-			let jump_then = (self#condition e1 ()) in
+			let jump_then = if not is_true_loop  then self#condition e1 () else ref 0 in
 			let pop_scope = jm#push_scope in
 			self#texpr RVoid e2;
 			if not jm#is_terminated then code#goto (ref (fp - code#get_fp));
 			pop_scope();
 			restore();
-			jump_then := code#get_fp - !jump_then;
-			jm#add_stack_frame;
-			let fp' = code#get_fp in
-			List.iter (fun r -> r := fp' - !r) breaks;
+			if not is_true_loop || breaks <> [] then begin
+				jump_then := code#get_fp - !jump_then;
+				let fp' = code#get_fp in
+				List.iter (fun r -> r := fp' - !r) breaks;
+				jm#add_stack_frame
+			end else
+				jm#set_terminated true;
 			continue <- old_continue;
 			breaks <- old_breaks;
 		| TBreak ->
