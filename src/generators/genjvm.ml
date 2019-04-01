@@ -157,18 +157,22 @@ module TAnonIdentifiaction = struct
 		List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type) l
 
 	let identify gctx fields =
-		let l = convert_fields fields in
-		try
-			Hashtbl.find gctx.anon_lut l,l
-		with Not_found ->
-			let id = gctx.anon_num in
-			gctx.anon_num <- gctx.anon_num + 1;
-			let path = (["haxe";"generated"],Printf.sprintf "Anon%i" id) in
-			Hashtbl.add gctx.anon_lut l path;
-			path,l
+		if PMap.is_empty fields then
+			haxe_dynamic_object_path,[]
+		else begin
+			let l = convert_fields fields in
+			try
+				Hashtbl.find gctx.anon_lut l,l
+			with Not_found ->
+				let id = gctx.anon_num in
+				gctx.anon_num <- gctx.anon_num + 1;
+				let path = (["haxe";"generated"],Printf.sprintf "Anon%i" id) in
+				Hashtbl.add gctx.anon_lut l path;
+				path,l
+		end
 
 	let identify_as gctx path fields =
-		if not (Hashtbl.mem gctx.anon_path_lut path) then begin
+		if not (PMap.is_empty fields) && not (Hashtbl.mem gctx.anon_path_lut path) then begin
 			let fields = convert_fields fields in
 			Hashtbl.add gctx.anon_lut fields path;
 			Hashtbl.add gctx.anon_path_lut path path;
