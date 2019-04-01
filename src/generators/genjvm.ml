@@ -963,6 +963,16 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					code#irem
 				| _ -> jerror (Printf.sprintf "Unsupported binop on TInt: %s" (s_binop op))
 				end
+			| TFloat ->
+				emit_exprs();
+				begin match op with
+				| OpAdd -> code#fadd
+				| OpSub -> code#fsub
+				| OpMult -> code#fmul
+				| OpDiv -> code#fdiv
+				| OpMod -> code#frem
+				| _ -> jerror (Printf.sprintf "Unsupported binop on TFloat: %s" (s_binop op))
+				end
 			| TDouble ->
 				emit_exprs();
 				begin match op with
