@@ -43,7 +43,7 @@ let find_overload map_type cf el =
 exception HarderFailure of string
 
 type field_generation_info = {
-	has_this_before_super : bool;
+	mutable has_this_before_super : bool;
 	(* This is an ordered list of fields that are targets of super() calls which is determined during
 	   pre-processing. The generator can pop from this list assuming that it processes the expression
 	   in the same order (which is should). *)
@@ -292,6 +292,17 @@ let is_interface_var_access c cf =
 
 let type_unifies a b =
 	try Type.unify a b; true with _ -> false
+
+let get_field_info gctx ml =
+	let rec loop ml = match ml with
+	| (Meta.Custom ":jvm.fieldInfo",[(EConst (Int s),_)],_) :: _ ->
+		Some (DynArray.get gctx.field_infos (int_of_string s))
+	| _ :: ml ->
+		loop ml
+	| [] ->
+		None
+	in
+	loop ml
 
 class haxe_exception gctx (t : Type.t) = object(self)
 	val native_exception =
@@ -1778,15 +1789,7 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 
 let generate_method gctx jc c mtype cf =
 	try
-		let rec loop ml = match ml with
-			| (Meta.Custom ":jvm.fieldInfo",[(EConst (Int s),_)],_) :: _ ->
-				Some (DynArray.get gctx.field_infos (int_of_string s))
-			| _ :: ml ->
-				loop ml
-			| [] ->
-				None
-		in
-		gctx.current_field_info <- loop cf.cf_meta;
+		gctx.current_field_info <- get_field_info gctx cf.cf_meta;
 		let jsig = if cf.cf_name = "main" then
 			method_sig [array_sig string_sig] None
 		else
@@ -2094,6 +2097,15 @@ module Preprocessor = struct
 			in
 			loop map_type csup
 		in
+		let rec promote_this_before_super c cf = match get_field_info gctx cf.cf_meta with
+			| None -> jerror "Something went wrong"
+			| Some info ->
+				if not info.has_this_before_super then begin
+					(* print_endline (Printf.sprintf "promoted this_before_super to %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type)); *)
+					info.has_this_before_super <- true;
+					List.iter (fun (c,cf) -> promote_this_before_super c cf) info.super_call_fields
+				end
+		in
 		let rec loop e =
 			check_anon gctx e;
 			begin match e.eexpr with
@@ -2104,8 +2116,12 @@ module Preprocessor = struct
 				used_this := true
 			| TCall({eexpr = TConst TSuper},el) ->
 				List.iter loop el;
-				if !used_this then this_before_super := true;
+				if !used_this then begin
+					this_before_super := true;
+					(* print_endline (Printf.sprintf "inferred this_before_super on %s.new : %s" (s_type_path (Option.get gctx.curclass).cl_path) (s_type (print_context()) (Option.get gctx.curfield).cf_type)); *)
+				end;
 				let c,cf = find_super_ctor el in
+				if !this_before_super then promote_this_before_super c cf;
 				DynArray.add super_call_fields (c,cf);
 			| _ ->
 				Type.iter loop e
