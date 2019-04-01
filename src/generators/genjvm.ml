@@ -1131,12 +1131,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					jm#cast TDouble;
 					code#dconst 1.;
 					if op = Increment then code#dadd else code#dsub
-				| TInt ->
+				| TByte | TShort | TInt ->
 					jm#cast TInt;
 					code#iconst Int32.one;
 					if op = Increment then code#iadd else code#isub
 				| _ ->
-					assert false
+					Error.error (Printf.sprintf "Unuspported unop on %s" (generate_signature false t)) e.epos;
 				end
 			in
 			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f e.etype;
