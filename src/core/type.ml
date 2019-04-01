@@ -2836,20 +2836,20 @@ module ExtType = struct
 		| TAbstract({a_path=[],"Void"},_) -> true
 		| _ -> false
 
-	let is_int t = match follow t with
+	let is_int t = match t with
 		| TAbstract({a_path=[],"Int"},_) -> true
 		| _ -> false
 
-	let is_float t = match follow t with
+	let is_float t = match t with
 		| TAbstract({a_path=[],"Float"},_) -> true
 		| _ -> false
 
-	let is_numeric t = match follow t with
+	let is_numeric t = match t with
 		| TAbstract({a_path=[],"Float"},_) -> true
 		| TAbstract({a_path=[],"Int"},_) -> true
 		| _ -> true
 
-	let is_string t = match follow t with
+	let is_string t = match t with
 		| TInst({cl_path=[],"String"},_) -> true
 		| _ -> false
 
