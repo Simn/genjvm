@@ -1134,29 +1134,34 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| TByte | TShort | TInt ->
 					jm#cast TInt;
 					code#iconst Int32.one;
-					if op = Increment then code#iadd else code#isub
+					if op = Increment then code#iadd else code#isub;
+					if is_null then self#expect_reference_type;
 				| _ ->
 					Error.error (Printf.sprintf "Unuspported unop on %s" (generate_signature false t)) e.epos;
 				end
 			in
 			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f e.etype;
-			if is_null then self#expect_reference_type;
 		| Neg,_ ->
 			self#texpr rvalue_any e;
-			begin match jsignature_of_type (follow e.etype) with
+			let jsig = jsignature_of_type (follow e.etype) in
+			jm#cast jsig;
+			begin match jsig with
 			| TLong -> code#lneg;
 			| TDouble -> code#dneg;
 			| TByte | TShort | TInt -> code#ineg;
 			| _ -> jm#invokestatic haxe_jvm_path "neg" (method_sig [object_sig] (Some object_sig))
 			end;
+			self#cast e.etype;
 		| Not,_ ->
 			jm#if_then_else
 				(self#condition e)
 				(fun () -> code#bconst false)
 				(fun () -> code#bconst true)
 		| NegBits,_ ->
+			let jsig = jsignature_of_type (follow e.etype) in
 			self#texpr rvalue_any e;
-			begin match jsignature_of_type (follow e.etype) with
+			jm#cast jsig;
+			begin match jsig with
 			| TByte | TShort | TInt ->
 				code#iconst Int32.minus_one;
 				code#ixor;
@@ -1165,7 +1170,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				code#lxor_;
 			| _ ->
 				jm#invokestatic haxe_jvm_path "~" (method_sig [object_sig] (Some object_sig))
-			end
+			end;
+			self#cast e.etype;
 
 	(* calls *)
 

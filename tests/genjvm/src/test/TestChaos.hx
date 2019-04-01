@@ -29,6 +29,7 @@ class TestChaos extends BaseTest {
 		super();
 		testAssignment();
 		testOps();
+		testNullOps();
 		testDynamicOps();
 		testIntArray();
 		testDynamicArray();
@@ -131,6 +132,65 @@ class TestChaos extends BaseTest {
 		eq(true, 0 != minusA);
 		eq(false, 0 == minusA);
 	}
+
+	function testNullOps() {
+		var a:Null<Int> = 10;
+		// arithmetic
+		eq(9, a - 1);
+		eq(20, a * 2);
+		eq(5., a / 2); // careful with Float comparison...
+		eq(1, a % 3);
+
+		// bit
+		eq(20, a << 1);
+		eq(5, a >> 1);
+		eq(5, a >>> 1);
+		eq(10, a & 15);
+		eq(15, a | 15);
+		eq(2, a ^ 8);
+
+		// unary
+		eq(-10, -a);
+		eq(-11, ~a);
+
+		// boolean
+		var b:Null<Bool> = true;
+		eq(false, !b);
+		eq(false, b && falseValue);
+		eq(true, b && trueValue);
+		eq(true, b || falseValue);
+		eq(true, b || trueValue);
+
+		b = false;
+		eq(true, !b);
+		eq(false, b && falseValue);
+		eq(false, b && trueValue);
+		eq(false, b || falseValue);
+		eq(true, b || trueValue);
+
+		eq(true, a > 5);
+		eq(true, a >= 5);
+		eq(false, a < 5);
+		eq(false, a <= 5);
+		eq(true, a != 5);
+		eq(false, a != 10);
+
+		eq(false, 0 > a);
+		eq(false, 0 >= a);
+		eq(true, 0 < a);
+		eq(true, 0 <= a);
+		eq(true, 0 != a);
+		eq(false, 0 == a);
+
+		var minusA:Null<Int> = -10;
+		eq(true, 0 > minusA);
+		eq(true, 0 >= minusA);
+		eq(false, 0 < minusA);
+		eq(false, 0 <= minusA);
+		eq(true, 0 != minusA);
+		eq(false, 0 == minusA);
+	}
+
 
 	function testDynamicOps() {
 		var a:Dynamic = 10;
