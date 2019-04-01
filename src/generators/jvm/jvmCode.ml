@@ -416,15 +416,13 @@ class builder pool = object(self)
 
 	method dup_x2 =
 		let tl = stack#get_stack_items 3 in
-		match tl with
-		| [vt1;vt2;vt3] ->
-			self#op OpDup_x2 1 tl [vt1;vt2;vt3;vt1]
-		| _ ->
-			assert false
-		(* let tl2 = (List.hd tl :: (List.rev tl)) in *)
-		(* match tl with
-		| (TLong | TDouble) :: _ -> self#op OpDup2_x2 1 tl tl2
-		| _ -> self#op OpDup_x2 1 tl tl2 *)
+		let sizes = List.map signature_size tl in
+		match sizes,tl with
+		| 2 :: 2 :: _,vt1 :: vt2 :: _ -> self#op OpDup2_x2 1 [vt1;vt2] [vt1;vt2;vt1]
+		| 1 :: 2 :: _,vt1 :: vt2 :: _ -> self#op OpDup_x2 1 [vt1;vt2] [vt1;vt2;vt1]
+		| 1 :: 1 :: 1 :: _,vt1 :: vt2 :: vt3 :: _ -> self#op OpDup_x2 1 tl [vt1;vt2;vt3;vt1]
+		| 2 :: 1 :: 1 :: _,vt1 :: vt2 :: vt3 :: _ -> self#op OpDup2_x2 1 tl [vt1;vt2;vt3;vt1]
+		| _ -> jerror "???"
 
 	method swap =
 		let tl = stack#get_stack_items 2 in
