@@ -2092,10 +2092,10 @@ module Preprocessor = struct
 			| TConst TThis ->
 				used_this := true
 			| TCall({eexpr = TConst TSuper},el) ->
+				List.iter loop el;
 				if !used_this then this_before_super := true;
 				let cf = find_super_ctor el in
 				DynArray.add super_call_fields cf;
-				List.iter loop el;
 			| _ ->
 				Type.iter loop e
 			end;
