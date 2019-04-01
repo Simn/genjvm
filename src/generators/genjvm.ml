@@ -44,7 +44,10 @@ exception HarderFailure of string
 
 type field_generation_info = {
 	has_this_before_super : bool;
-	mutable super_call_fields : tclass_field list;
+	(* This is an ordered list of fields that are targets of super() calls which is determined during
+	   pre-processing. The generator can pop from this list assuming that it processes the expression
+	   in the same order (which is should). *)
+	mutable super_call_fields : (tclass * tclass_field) list;
 }
 
 type generation_context = {
@@ -55,6 +58,7 @@ type generation_context = {
 	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
 	anon_path_lut : (path,jpath) Hashtbl.t;
 	field_infos : field_generation_info DynArray.t;
+	mutable current_field_info : field_generation_info option;
 	mutable anon_num : int;
 	mutable curclass : tclass option;
 	mutable curfield : tclass_field option;
@@ -1216,20 +1220,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TConst TSuper ->
 			let jsig = (TUninitialized None) in
 			code#aload jsig 0;
-			begin match follow e1.etype with
-			| TInst(c,_) ->
-				begin match get_constructor (fun cf -> cf.cf_type) c with
-				| _,cf ->
-					let hack_cf = ref cf in
-					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
-					let offset = add_field pool c !hack_cf in
-					code#invokespecial offset jsig tl [];
-					jm#set_this_initialized;
-					None
-				end;
-			| _ ->
-				assert false
-			end
+			let c,cf = match gctx.current_field_info with
+				| Some ({super_call_fields = hd :: tl} as info) ->
+					info.super_call_fields <- tl;
+					hd
+				| _ ->
+					Error.error "Something went wrong" e1.epos
+			in
+			let tl,_ = self#call_arguments cf.cf_type el in
+			let offset = add_field pool c cf in
+			code#invokespecial offset jsig tl [];
+			jm#set_this_initialized;
+			None
 		| TIdent "__array__" ->
 			begin match follow tr with
 			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
@@ -1776,6 +1778,15 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 
 let generate_method gctx jc c mtype cf =
 	try
+		let rec loop ml = match ml with
+			| (Meta.Custom ":jvm.fieldInfo",[(EConst (Int s),_)],_) :: _ ->
+				Some (DynArray.get gctx.field_infos (int_of_string s))
+			| _ :: ml ->
+				loop ml
+			| [] ->
+				None
+		in
+		gctx.current_field_info <- loop cf.cf_meta;
 		let jsig = if cf.cf_name = "main" then
 			method_sig [array_sig string_sig] None
 		else
@@ -2070,7 +2081,7 @@ module Preprocessor = struct
 			let rec loop map_type c = match c.cl_constructor with
 				| Some cf ->
 					begin match find_overload map_type cf el with
-					| Some(cf,_) -> cf
+					| Some(cf,_) -> c,cf
 					| None -> loop_super map_type c
 					end
 				| None ->
@@ -2094,8 +2105,8 @@ module Preprocessor = struct
 			| TCall({eexpr = TConst TSuper},el) ->
 				List.iter loop el;
 				if !used_this then this_before_super := true;
-				let cf = find_super_ctor el in
-				DynArray.add super_call_fields cf;
+				let c,cf = find_super_ctor el in
+				DynArray.add super_call_fields (c,cf);
 			| _ ->
 				Type.iter loop e
 			end;
@@ -2163,6 +2174,7 @@ let generate com =
 		curclass = None;
 		curfield = None;
 		field_infos = DynArray.create();
+		current_field_info = None;
 	} in
 	Preprocessor.preprocess gctx;
 	let manifest_content =
