@@ -37,34 +37,28 @@ let find_overload map_type cf tl =
 	in
 	loop (cf :: cf.cf_overloads)
 
-let find_overload_rec is_ctor map_type c cf el =
+let find_overload_rec is_ctor map_type c name el =
 	let tl = List.map (fun e -> e.etype) el in
-	let rec loop_cf map_type c cf =
-		match find_overload map_type cf tl with
-		| Some cf ->
-			Some(c,cf)
-		| None ->
-			let rec loop map_type c = match c.cl_super with
-				| None ->
-					None
-				| Some(c,tl) ->
-					let map_type = (fun t -> apply_params c.cl_params tl (map_type t)) in
-					try
-						let cf = if is_ctor then
-							(match c.cl_constructor with Some cf -> cf | None -> raise Not_found)
-						else
-							PMap.find cf.cf_name c.cl_fields
-						in
-						loop_cf map_type c cf
-					with Not_found ->
-						loop map_type c
+	let rec loop map_type c =
+		try
+			let cf = if is_ctor then
+				(match c.cl_constructor with Some cf -> cf | None -> raise Not_found)
+			else
+				PMap.find name c.cl_fields
 			in
-			loop map_type c
+			begin match find_overload map_type cf tl with
+			| Some cf -> Some(c,cf)
+			| None -> raise Not_found
+			end
+		with Not_found ->
+			match c.cl_super with
+			| None -> None
+			| Some(c,tl) -> loop (fun t -> apply_params c.cl_params (List.map map_type tl) t) c
 	in
-	loop_cf map_type c cf
+	loop map_type c
 
 let find_overload_rec is_ctor map_type c cf el =
-	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then find_overload_rec is_ctor map_type c cf el
+	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then find_overload_rec is_ctor map_type c cf.cf_name el
 	else Some(c,cf)
 
 (* Haxe *)
