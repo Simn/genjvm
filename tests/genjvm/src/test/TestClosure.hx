@@ -158,4 +158,9 @@ class TestClosure extends BaseTest {
 		for (i in 0...3)
 			eq(i, funcs[i]());
 	}
+
+	function testClosureOfClosureOfClosure() {
+		var f = function(a) return function(b) return function(c) return a + b + c;
+		eq(6, f(1)(2)(3));
+	}
 }

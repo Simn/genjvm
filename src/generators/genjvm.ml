@@ -353,7 +353,7 @@ class closure_context (jsig : jsignature) = object(self)
 	val sigs = DynArray.create()
 
 	method add (var_id : int) (var_name : string) (var_sig : jsignature) =
-		DynArray.add sigs var_sig;
+		DynArray.add sigs ((var_id,var_name),var_sig);
 		Hashtbl.add lut var_id (var_sig,var_name)
 
 	method get (code : JvmCode.builder) (var_id : int) =
@@ -381,10 +381,12 @@ class closure_context (jsig : jsignature) = object(self)
 		end
 
 	method get_constructor_sig =
-		method_sig (DynArray.to_list sigs) None
+		method_sig (List.map snd (DynArray.to_list sigs)) None
 
 	method get_jsig = jsig
 	method get_path = match jsig with TObject(path,_) -> path | _ -> assert false
+
+	method get_args = DynArray.to_list sigs
 end
 
 let create_context_class gctx jc jm name vl = match vl with
@@ -442,19 +444,21 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		Hashtbl.add local_lookup v.v_id (slot,load,store);
 		slot,load,store
 
-	method get_local v =
+	method get_local_by_id (vid,vname) =
 		try
-			Hashtbl.find local_lookup v.v_id
+			Hashtbl.find local_lookup vid
 		with Not_found -> try
 			begin match env with
 			| Some env ->
-				env#get code v.v_id
+				env#get code vid
 			| None ->
 				raise Not_found
 			end
 		with Not_found ->
-			failwith ("Unbound local: " ^ v.v_name)
+			failwith ("Unbound local: " ^ vname)
 
+	method get_local v =
+		self#get_local_by_id (v.v_id,v.v_name)
 
 	method set_context (ctx : closure_context) =
 		env <- Some ctx
@@ -481,13 +485,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				None
 			| vl ->
 				let ctx_class = create_context_class gctx jc jm name vl in
-				Some (ctx_class,vl)
+				Some ctx_class
 		in
 		let jsig =
 			let args = List.map (fun (v,_) -> self#vtype v.v_type) tf.tf_args in
 			let args = match outside with
 				| None -> args
-				| Some(ctx_class,_) -> ctx_class#get_jsig :: args
+				| Some ctx_class -> ctx_class#get_jsig :: args
 			in
 			method_sig args (if ExtType.is_void (follow tf.tf_type) then None else Some (self#vtype tf.tf_type))
 		in
@@ -495,9 +499,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let handler = new texpr_to_jvm gctx jc jm tf.tf_type in
 		begin match outside with
 		| None -> ()
-		| Some(ctx_class,vl) ->
+		| Some ctx_class ->
 			handler#set_context ctx_class;
-			let name = match vl with [v] -> v.v_name | _ -> "_hx_ctx" in
+			let name = match ctx_class#get_args with
+				| [(_,name),_] -> name
+				| _ -> "_hx_ctx"
+			in
 			ignore(handler#add_named_local name ctx_class#get_jsig)
 		end;
 		List.iter (fun (v,_) ->
@@ -1600,23 +1607,27 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match self#tfunction e tf with
 			| None ->
 				()
-			| Some(_,[v]) ->
-				let _,load,_ = self#get_local v in
-				load();
-				self#expect_reference_type;
-				jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
-			| Some(ctx_class,vl) ->
-				let f () =
-					let tl = List.map (fun v ->
-						let _,load,_ = self#get_local v in
-						load();
-						self#vtype v.v_type
-					) vl in
-					let offset = pool#add_field ctx_class#get_path "<init>" (ctx_class#get_constructor_sig) FKMethod in
-					tl,offset
-				in
-				self#construct rvalue_any ctx_class#get_path ctx_class#get_jsig f;
-				jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+			| Some ctx_class ->
+				begin match ctx_class#get_args with
+				| [(arg,jsig)] ->
+					let _,load,_ = self#get_local_by_id arg in
+					load();
+					self#expect_reference_type;
+					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+				| args ->
+					let f () =
+						let tl = List.map (fun (arg,jsig) ->
+							let _,load,_ = self#get_local_by_id arg in
+							load();
+							jm#cast jsig;
+							jsig
+						) args in
+						let offset = pool#add_field ctx_class#get_path "<init>" (ctx_class#get_constructor_sig) FKMethod in
+						tl,offset
+					in
+					self#construct rvalue_any ctx_class#get_path ctx_class#get_jsig f;
+					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+				end
 			end
 		| TArrayDecl el when ret = RVoid ->
 			List.iter (self#texpr ret) el
