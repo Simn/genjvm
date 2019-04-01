@@ -13,8 +13,7 @@ open JvmBuilder
 
 (* hacks *)
 
-let find_overload map_type cf el =
-	let tl = List.map (fun e -> e.etype) el in
+let find_overload map_type cf tl =
 	let rec loop cfl = match cfl with
 		| cf :: cfl ->
 			begin match follow cf.cf_type with
@@ -37,6 +36,36 @@ let find_overload map_type cf el =
 			None
 	in
 	loop (cf :: cf.cf_overloads)
+
+let find_overload_rec is_ctor map_type c cf el =
+	let tl = List.map (fun e -> e.etype) el in
+	let rec loop_cf map_type c cf =
+		match find_overload map_type cf tl with
+		| Some cf ->
+			Some(c,cf)
+		| None ->
+			let rec loop map_type c = match c.cl_super with
+				| None ->
+					None
+				| Some(c,tl) ->
+					let map_type = (fun t -> apply_params c.cl_params tl (map_type t)) in
+					try
+						let cf = if is_ctor then
+							(match c.cl_constructor with Some cf -> cf | None -> raise Not_found)
+						else
+							PMap.find cf.cf_name c.cl_fields
+						in
+						loop_cf map_type c cf
+					with Not_found ->
+						loop map_type c
+			in
+			loop map_type c
+	in
+	loop_cf map_type c cf
+
+let find_overload_rec is_ctor map_type c cf el =
+	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then find_overload_rec is_ctor map_type c cf el
+	else Some(c,cf)
 
 (* Haxe *)
 
@@ -1223,9 +1252,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr rvalue_any e1;
 				false
 			in
-			begin match find_overload (apply_params c.cl_params tl) cf el with
+			begin match find_overload_rec false (apply_params c.cl_params tl) c cf el with
 			| None -> Error.error "Could not find overload" e1.epos
-			| Some cf ->
+			| Some(c,cf) ->
 				let tl,tr = self#call_arguments cf.cf_type el in
 				let t1 = self#vtype e1.etype in
 				let offset = add_field pool c cf in
@@ -1576,12 +1605,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TNew(c,tl,el) ->
 			begin match get_constructor (fun cf -> cf.cf_type) c with
 			| _,cf ->
-				begin match find_overload (apply_params c.cl_params tl) cf el with
+				begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
 				| None -> Error.error "Could not find overload" e.epos
-				| Some cf ->
+				| Some (c',cf) ->
 					let f () =
 						let tl,_ = self#call_arguments  cf.cf_type el in
-						let offset = add_field pool c cf in
+						let offset = add_field pool c' cf in
 						tl,offset
 					in
 					self#construct ret c.cl_path (self#vtype (TInst(c,tl))) f;
@@ -2097,21 +2126,10 @@ module Preprocessor = struct
 				| Some {cl_super = Some(c,tl)} -> c,apply_params c.cl_params tl
 				| _ -> assert false
 			in
-			let rec loop map_type c = match c.cl_constructor with
-				| Some cf ->
-					begin match find_overload map_type cf el with
-					| Some cf -> c,cf
-					| None -> loop_super map_type c
-					end
-				| None ->
-					loop_super map_type c
-			and loop_super map_type c = match c.cl_super with
-				| None ->
-					Error.error "Could not find overload constructor" e.epos
-				| Some(c,tl) ->
-					loop (fun t -> apply_params c.cl_params tl (map_type t)) c
-			in
-			loop map_type csup
+			let _,cf = get_constructor (fun cf -> map_type cf.cf_type) csup in
+			match find_overload_rec true map_type csup cf el with
+			| Some r -> r
+			| None -> Error.error "Could not find overload constructor" e.epos
 		in
 		let rec promote_this_before_super c cf = match get_field_info gctx cf.cf_meta with
 			| None -> jerror "Something went wrong"
