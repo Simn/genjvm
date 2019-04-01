@@ -31,6 +31,7 @@ class TestChaos extends BaseTest {
 		testOps();
 		testDynamicOps();
 		testIntArray();
+		testDynamicArray();
 		testStringMap();
 		testObjectDecl();
 		testStringConcat();
@@ -283,6 +284,16 @@ class TestChaos extends BaseTest {
 		eq(9, j[5]);
 
 		// TODO: toString and join
+	}
+
+	function testDynamicArray() {
+		var x:Dynamic = [-101.5];
+		x[0] %= 100;
+		eq(-1.5, x[0]);
+
+		var x:Dynamic = [-101.5];
+		eq(-1.5, x[0] %= 100);
+		eq(-1.5, x[0]);
 	}
 
 	function testStringMap() {

@@ -304,6 +304,8 @@ let get_field_info gctx ml =
 	in
 	loop ml
 
+let follow = Abstract.follow_with_abstracts
+
 class haxe_exception gctx (t : Type.t) = object(self)
 	val native_exception =
 		if follow t == t_dynamic then
@@ -657,8 +659,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					apply (fun () -> code#dup_x2);
 					self#cast t;
 					self#write_native_array vta vte
-				| t ->
-					Error.error (s_type (print_context()) t) e.epos;
+				| _ ->
+					self#texpr rvalue_any e1;
+					if ak <> AKNone then code#dup;
+					self#texpr rvalue_any e2;
+					if ak <> AKNone then begin
+						code#dup_x1;
+						jm#invokestatic haxe_jvm_path "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
+					end;
+					apply (fun () -> code#dup_x2;);
+					self#cast t;
+					self#expect_reference_type;
+					jm#invokestatic haxe_jvm_path "arrayWrite" (method_sig [object_sig;TInt;object_sig] None);
 				end
 		| _ ->
 			print_endline (s_expr_ast false "" (s_type (print_context())) e);
@@ -1250,7 +1262,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				let jasig,_ = self#new_native_array (self#vtype t) el in
 				Some jasig
 			| _ ->
-				assert false
+				Error.error (Printf.sprintf "Bad __array__ type: %s" (s_type (print_context()) tr)) e1.epos;
 			end
 		| _ ->
 			self#texpr rvalue_any e1;

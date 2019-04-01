@@ -102,6 +102,14 @@ class Jvm {
 		throw 'Cannot array-read on $obj';
 	}
 
+	static public function arrayWrite(obj:Dynamic, index:Int, value:Dynamic):Void {
+		if (instanceof(obj, Array)) {
+			(obj : Array<Dynamic>)[index] = value;
+			return;
+		}
+		throw 'Cannot array-write on $obj';
+	}
+
 	static public function bootstrap(caller:MethodHandles.MethodHandles_Lookup, name:String, type:MethodType):CallSite {
 		var handle = caller.findStatic(caller.lookupClass(), name, type);
 		return new ConstantCallSite(handle);
