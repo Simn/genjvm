@@ -114,6 +114,21 @@ class TestChaos extends BaseTest {
 		eq(false, a <= 5);
 		eq(true, a != 5);
 		eq(false, a != 10);
+
+		eq(false, 0 > a);
+		eq(false, 0 >= a);
+		eq(true, 0 < a);
+		eq(true, 0 <= a);
+		eq(true, 0 != a);
+		eq(false, 0 == a);
+
+		var minusA = -10;
+		eq(true, 0 > minusA);
+		eq(true, 0 >= minusA);
+		eq(false, 0 < minusA);
+		eq(false, 0 <= minusA);
+		eq(true, 0 != minusA);
+		eq(false, 0 == minusA);
 	}
 
 	function testDynamicOps() {

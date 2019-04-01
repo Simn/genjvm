@@ -809,7 +809,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			(if op = CmpEq then self#if_not_null else self#if_null) (self#vtype e1.etype);
 		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 ->
-			let op = flip_cmp_op op in
+			let op = match op with
+				| CmpGt | CmpGe | CmpLt | CmpLe -> op
+				| CmpEq | CmpNe -> flip_cmp_op op
+			in
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			(fun () -> code#if_ref op)
