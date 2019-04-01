@@ -1918,7 +1918,7 @@ let generate_class gctx c =
 		| Method (MethNormal | MethInline) ->
 			List.iter (fun cf ->
 				generate_method gctx jc c mtype cf
-			) (cf :: cf.cf_overloads)
+			) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
 		| _ ->
 			if not c.cl_interface then generate_field gctx jc c mtype cf
 	in
@@ -2183,7 +2183,6 @@ module Preprocessor = struct
 			preprocess_field gctx cf mtype
 		in
 		let field mtype cf =
-			cf.cf_overloads <- List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads;
 			List.iter (field mtype) (cf :: cf.cf_overloads)
 		in
 		List.iter (field MStatic) c.cl_ordered_statics;
