@@ -19,7 +19,6 @@ class builder jc name jsig = object(self)
 
 	val mutable max_num_locals = 0
 	val mutable debug_locals = []
-	val mutable debug_locals2 = []
 	val mutable stack_frames = []
 	val mutable exceptions = []
 	val mutable argument_locals = []
@@ -59,7 +58,6 @@ class builder jc name jsig = object(self)
 							ld_index = old_offset + i - 1;
 						} in
 						debug_locals <- ld :: debug_locals;
-						debug_locals2 <- {ld with ld_descriptor_index = jc#get_pool#add_string (generate_signature true t)} :: debug_locals2;
 						loop (i - (signature_size t)) l
 					| [] ->
 						assert false
@@ -384,8 +382,8 @@ class builder jc name jsig = object(self)
 		slot,
 		load,
 		(fun () ->
+			store();
 			check_store();
-			store()
 		)
 
 	method set_this_initialized =
@@ -504,13 +502,6 @@ class builder jc name jsig = object(self)
 		| _ ->
 			let a = Array.of_list debug_locals in
 			self#add_attribute (AttributeLocalVariableTable a);
-		end;
-		begin match debug_locals2 with
-		| [] ->
-			()
-		| _ ->
-			let a = Array.of_list debug_locals2 in
-			self#add_attribute (AttributeLocalVariableTypeTable a);
 		end;
 		let attributes = self#export_attributes jc#get_pool in
 		let offset_name = jc#get_pool#add_string name in
