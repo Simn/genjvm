@@ -62,6 +62,7 @@ type j_attribute =
 	| AttributeLineNumberTable of (int * int) array
 	| AttributeSignature of jvm_constant_pool_index
 	| AttributeLocalVariableTable of jvm_local_debug array
+	| AttributeLocalVariableTypeTable of jvm_local_debug array
 	| AttributeInnerClasses of jvm_inner_class array
 	| AttributeEnclosingMethod of jvm_constant_pool_index * jvm_constant_pool_index
 	| AttributeRuntimeVisibleAnnotations of j_annotation array
@@ -155,6 +156,15 @@ let rec write_annotation ch ann =
 
 let write_attribute pool jvma =
 	let ch = IO.output_bytes () in
+	let write_local_table table =
+		write_array16 ch (fun _ d ->
+			write_ui16 ch d.ld_start_pc;
+			write_ui16 ch d.ld_length;
+			write_ui16 ch d.ld_name_index;
+			write_ui16 ch d.ld_descriptor_index;
+			write_ui16 ch d.ld_index;
+		) table
+	in
 	let name = match jvma with
 	| AttributeConstantValue const ->
 		write_ui16 ch const;
@@ -198,14 +208,11 @@ let write_attribute pool jvma =
 		write_ui16 ch offset;
 		"Signature"
 	| AttributeLocalVariableTable table ->
-		write_array16 ch (fun _ d ->
-			write_ui16 ch d.ld_start_pc;
-			write_ui16 ch d.ld_length;
-			write_ui16 ch d.ld_name_index;
-			write_ui16 ch d.ld_descriptor_index;
-			write_ui16 ch d.ld_index;
-		) table;
+		write_local_table table;
 		"LocalVariableTable"
+	| AttributeLocalVariableTypeTable table ->
+		write_local_table table;
+		"LocalVariableTypeTable"
 	| AttributeRuntimeVisibleAnnotations al ->
 		write_array16 ch write_annotation al;
 		"RuntimeVisibleAnnotations"
