@@ -24,7 +24,7 @@ let find_overload map_type cf el =
 							let t = (map_type (monomorphs cf.cf_params t)) in
 							(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
 						| [],[] ->
-							Some (cf,tl'')
+							Some cf
 						| _ ->
 							loop cfl
 					in
@@ -1136,24 +1136,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* calls *)
 
-	(* TODO: this bloody mess tries to find the right overload because TNew loses it... *)
-	method check_hack hack tl el = match hack with
-		| None ->
-			tl
-		| Some rcf ->
-			match find_overload (fun t -> t) !rcf el with
-			| None ->
-				tl
-			| Some(cf,tl) ->
-				rcf := cf;
-				tl
-
-	method call_arguments ?(hack=None) t el =
+	method call_arguments t el =
 		let tl,tr = match follow t with
 			| TFun(tl,tr) -> tl,tr
 			| _ -> (List.map (fun _ -> "",false,t_dynamic) el),t_dynamic
 		in
-		let tl = self#check_hack hack tl el in
 		let rec loop acc tl el = match tl,el with
 			| (_,_,t) :: tl,e :: el ->
 				self#texpr (rvalue_type t) e;
@@ -1236,12 +1223,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr rvalue_any e1;
 				false
 			in
-			let hack_cf = ref cf in
-			let tl,tr = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
-			let t1 = self#vtype e1.etype in
-			let offset = add_field pool c !hack_cf in
-			(if is_super then code#invokespecial else if c.cl_interface then code#invokeinterface else code#invokevirtual) offset t1 tl (retype tr);
-			tr
+			begin match find_overload (apply_params c.cl_params tl) cf el with
+			| None -> Error.error "Could not find overload" e1.epos
+			| Some cf ->
+				let tl,tr = self#call_arguments cf.cf_type el in
+				let t1 = self#vtype e1.etype in
+				let offset = add_field pool c cf in
+				(if is_super then code#invokespecial else if c.cl_interface then code#invokeinterface else code#invokevirtual) offset t1 tl (retype tr);
+				tr
+			end
 		| TField(_,FEnum(en,ef)) ->
 			let tl,_ = self#call_arguments ef.ef_type el in
 			let tr = self#vtype tr in
@@ -1586,13 +1576,16 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TNew(c,tl,el) ->
 			begin match get_constructor (fun cf -> cf.cf_type) c with
 			| _,cf ->
-				let f () =
-					let hack_cf = ref cf in
-					let tl,_ = self#call_arguments ~hack:(Some hack_cf) cf.cf_type el in
-					let offset = add_field pool c !hack_cf in
-					tl,offset
-				in
-				self#construct ret c.cl_path (self#vtype (TInst(c,tl))) f;
+				begin match find_overload (apply_params c.cl_params tl) cf el with
+				| None -> Error.error "Could not find overload" e.epos
+				| Some cf ->
+					let f () =
+						let tl,_ = self#call_arguments  cf.cf_type el in
+						let offset = add_field pool c cf in
+						tl,offset
+					in
+					self#construct ret c.cl_path (self#vtype (TInst(c,tl))) f;
+				end
 			end
 		| TReturn None ->
 			code#return_void;
@@ -2107,7 +2100,7 @@ module Preprocessor = struct
 			let rec loop map_type c = match c.cl_constructor with
 				| Some cf ->
 					begin match find_overload map_type cf el with
-					| Some(cf,_) -> c,cf
+					| Some cf -> c,cf
 					| None -> loop_super map_type c
 					end
 				| None ->
