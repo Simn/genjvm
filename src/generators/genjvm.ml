@@ -1923,7 +1923,11 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 			e,[],t_dynamic
 	in
 	let handler = new texpr_to_jvm gctx jc jm tr in
-	if is_main then ignore(jm#add_local "args" (TArray(string_sig,None)) VarArgument);
+	if is_main then begin
+		let _,load,_ = jm#add_local "args" (TArray(string_sig,None)) VarArgument in
+		load();
+		jm#putstatic ([],"Sys") "_args" (TArray(string_sig,None))
+	end;
 	List.iter (fun (v,_) ->
 		ignore(handler#add_local v VarArgument);
 	) args;
