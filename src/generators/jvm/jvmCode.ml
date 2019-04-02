@@ -401,7 +401,9 @@ class builder pool = object(self)
 
 	(* stack *)
 
-	method pop = self#op OpPop 1 [stack#top] []
+	method pop =
+		let top = stack#top in
+		self#op (if signature_size top = 1 then OpPop else OpPop2) 1 [top] []
 
 	method dup = match stack#top with
 		| TLong | TDouble -> self#op OpDup2 1 [] [stack#top]
