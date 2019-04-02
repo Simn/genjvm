@@ -181,23 +181,42 @@ class builder jc name jsig = object(self)
 		| TBool as t -> wrap_null t "Boolean"
 		| _ -> ()
 
-	method private expect_basic_type jsig =
-		let unwrap_null tname name =
-			self#invokestatic (["haxe";"jvm"],"Jvm") name (method_sig [object_sig] (Some jsig))
-		in
-		match jsig with
-		| TByte -> unwrap_null "Byte" "toByte"
-		| TChar -> unwrap_null "Character" "toChar"
-		| TDouble -> unwrap_null "Double" "toDouble"
-		| TFloat -> unwrap_null "Float" "toFloat"
-		| TInt -> unwrap_null "Integer" "toInt"
-		| TLong -> unwrap_null "Long" "toLong"
-		| TShort -> unwrap_null "Short" "toShort"
-		| TBool -> unwrap_null "Boolean" "toBoolean"
-		| _ -> ()
+	method private expect_basic_type ?(not_null=false) jsig =
+		if not_null then begin
+			let unwrap_null tname name =
+				let path = (["java";"lang"],tname) in
+				let jsig_wrapper = object_path_sig path in
+				self#cast jsig_wrapper;
+				self#invokevirtual path name jsig_wrapper (method_sig [] (Some jsig))
+			in
+			match jsig with
+			| TByte -> unwrap_null "Number" "byteValue"
+			| TChar -> unwrap_null "Character" "charValue"
+			| TDouble -> unwrap_null "Number" "doubleValue"
+			| TFloat -> unwrap_null "Number" "floatValue"
+			| TInt -> unwrap_null "Number" "intValue"
+			| TLong -> unwrap_null "Number" "longValue"
+			| TShort -> unwrap_null "Number" "shortValue"
+			| TBool -> unwrap_null "Boolean" "booleanValue"
+			| _ -> ()
+		end else begin
+			let unwrap_null tname name =
+				self#invokestatic (["haxe";"jvm"],"Jvm") name (method_sig [object_sig] (Some jsig))
+			in
+			match jsig with
+			| TByte -> unwrap_null "Byte" "toByte"
+			| TChar -> unwrap_null "Character" "toChar"
+			| TDouble -> unwrap_null "Double" "toDouble"
+			| TFloat -> unwrap_null "Float" "toFloat"
+			| TInt -> unwrap_null "Integer" "toInt"
+			| TLong -> unwrap_null "Long" "toLong"
+			| TShort -> unwrap_null "Short" "toShort"
+			| TBool -> unwrap_null "Boolean" "toBoolean"
+			| _ -> ()
+		end
 
 	(** Casts the top of the stack to [jsig]. If [allow_to_string] is true, Jvm.toString is called. **)
-	method cast ?(allow_to_string=false) jsig =
+	method cast ?(not_null=false) ?(allow_to_string=false) jsig =
 		let jsig' = code#get_stack#top in
 		begin match jsig,jsig' with
 		| TObject((["java";"lang"],"Double"),_),TInt ->
@@ -266,7 +285,7 @@ class builder jc name jsig = object(self)
 			code#checkcast_sig jsig
 		| t1,t2 ->
 			match is_unboxed t1,is_unboxed t2 with
-			| true,false -> self#expect_basic_type t1
+			| true,false -> self#expect_basic_type ~not_null t1
 			| false,true -> self#expect_reference_type
 			| _ -> ()
 		end

@@ -948,7 +948,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 							self#boolop (CmpSpecial (self#if_not_null sig2))
 						)
 						(fun () ->
-							jm#cast cast_type;
+							jm#cast ~not_null:true cast_type;
 							self#texpr rvalue_any e2;
 							jm#get_code#dup;
 							jm#if_then_else
@@ -959,7 +959,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 									jm#get_code#bconst (op = CmpNe);
 								)
 								(fun () ->
-									jm#cast cast_type;
+									jm#cast ~not_null:true cast_type;
 									self#boolop (self#do_compare op);
 								)
 						);
@@ -975,7 +975,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						jm#get_code#bconst (op = CmpNe)
 					)
 					(fun () ->
-						jm#cast sig2;
+						jm#cast ~not_null:true sig2;
 						self#texpr rvalue_any e2;
 						self#boolop (self#do_compare op)
 					);
@@ -992,7 +992,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						jm#get_code#bconst (op = CmpNe);
 					)
 					(fun () ->
-						jm#cast sig1;
+						jm#cast ~not_null:true sig1;
 						self#boolop (self#do_compare op)
 					);
 				CmpNormal(CmpEq,TBool)
