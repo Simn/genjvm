@@ -186,7 +186,7 @@ class builder jc name jsig = object(self)
 			let unwrap_null tname name =
 				let path = (["java";"lang"],tname) in
 				let jsig_wrapper = object_path_sig path in
-				self#cast jsig_wrapper;
+				self#cast (get_boxed_type jsig);
 				self#invokevirtual path name jsig_wrapper (method_sig [] (Some jsig))
 			in
 			match jsig with
