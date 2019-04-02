@@ -1931,38 +1931,41 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 	end;
 	handler#texpr RReturn e
 
-let generate_method gctx jc c mtype cf =
+let failsafe p f =
 	try
-		gctx.current_field_info <- get_field_info gctx cf.cf_meta;
-		let jsig = if cf.cf_name = "main" then
-			method_sig [array_sig string_sig] None
-		else
-			jsignature_of_type cf.cf_type
-		in
-		let flags = [MPublic] in
-		let flags = if c.cl_interface then MAbstract :: flags else flags in
-		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
-		let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
-		let jm = jc#spawn_method cf.cf_name jsig flags in
-		begin match cf.cf_expr with
-		| None -> ()
-		| Some e ->
-			generate_expr gctx jc jm e (cf.cf_name = "main") true mtype;
-		end;
-		begin match cf.cf_params with
-			| [] when c.cl_params = [] ->
-				()
-			| _ ->
-				let stl = String.concat "" (List.map (fun (n,_) ->
-					Printf.sprintf "%s:Ljava/lang/Object;" n
-				) cf.cf_params) in
-				let ssig = generate_method_signature true (jsignature_of_type cf.cf_type) in
-				let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
-				let offset = jc#get_pool#add_string s in
-				jm#add_attribute (AttributeSignature offset);
-		end;
+		f ()
 	with Failure s | HarderFailure s ->
-		failwith (Printf.sprintf "%s\nMethod %s.%s" s (s_type_path c.cl_path) cf.cf_name)
+		Error.error s p
+
+let generate_method gctx jc c mtype cf =
+	gctx.current_field_info <- get_field_info gctx cf.cf_meta;
+	let jsig = if cf.cf_name = "main" then
+		method_sig [array_sig string_sig] None
+	else
+		jsignature_of_type cf.cf_type
+	in
+	let flags = [MPublic] in
+	let flags = if c.cl_interface then MAbstract :: flags else flags in
+	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+	let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
+	let jm = jc#spawn_method cf.cf_name jsig flags in
+	begin match cf.cf_expr with
+	| None -> ()
+	| Some e ->
+		generate_expr gctx jc jm e (cf.cf_name = "main") true mtype;
+	end;
+	begin match cf.cf_params with
+		| [] when c.cl_params = [] ->
+			()
+		| _ ->
+			let stl = String.concat "" (List.map (fun (n,_) ->
+				Printf.sprintf "%s:Ljava/lang/Object;" n
+			) cf.cf_params) in
+			let ssig = generate_method_signature true (jsignature_of_type cf.cf_type) in
+			let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
+			let offset = jc#get_pool#add_string s in
+			jm#add_attribute (AttributeSignature offset);
+	end
 
 let generate_field gctx jc c mtype cf =
 	let jsig = jsignature_of_type cf.cf_type in
@@ -2038,10 +2041,10 @@ let generate_class gctx c =
 	let field mtype cf = match cf.cf_kind with
 		| Method (MethNormal | MethInline) ->
 			List.iter (fun cf ->
-				generate_method gctx jc c mtype cf
+				failsafe cf.cf_pos (fun () -> generate_method gctx jc c mtype cf)
 			) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
 		| _ ->
-			if not c.cl_interface then generate_field gctx jc c mtype cf
+			if not c.cl_interface then failsafe cf.cf_pos (fun () -> generate_field gctx jc c mtype cf)
 	in
 	List.iter (field MStatic) c.cl_ordered_statics;
 	List.iter (field MInstance) c.cl_ordered_fields;
@@ -2194,11 +2197,14 @@ let is_extern_abstract a = match a.a_impl with
 	| Some {cl_extern = true} -> true
 	| _ -> false
 
-let generate_module_type ctx mt = match mt with
-	| TClassDecl c when not c.cl_extern && debug_path c.cl_path -> generate_class ctx c
-	| TEnumDecl en when not en.e_extern -> generate_enum ctx en
-	| TAbstractDecl a when not (is_extern_abstract a) && Meta.has Meta.CoreType a.a_meta -> generate_abstract ctx a
-	| _ -> ()
+let generate_module_type ctx mt =
+	failsafe (t_infos mt).mt_pos (fun () ->
+		match mt with
+		| TClassDecl c when not c.cl_extern && debug_path c.cl_path -> generate_class ctx c
+		| TEnumDecl en when not en.e_extern -> generate_enum ctx en
+		| TAbstractDecl a when not (is_extern_abstract a) && Meta.has Meta.CoreType a.a_meta -> generate_abstract ctx a
+		| _ -> ()
+	)
 
 module Preprocessor = struct
 
