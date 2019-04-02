@@ -151,7 +151,9 @@ module NativeArray = struct
 		| TObject(path,_) -> reference path
 		| TMethod _ -> reference NativeSignatures.method_handle_path
 		| TTypeParameter _ -> reference NativeSignatures.object_path
-		| TArray _ -> assert false (* TODO: hmm... *)
+		| TArray _ ->
+			let offset = pool#add_type (generate_signature false je) in
+			code#anewarray ja offset
 		| TObjectInner _ | TUninitialized _ -> assert false
 		end;
 		ja

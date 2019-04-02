@@ -39,6 +39,7 @@ class TestChaos extends BaseTest {
 		testStringConcat();
 		testBranchingCtorArgs();
 		testNaN();
+		testNativeArray();
 	}
 
 	function testAssignment() {
@@ -515,5 +516,19 @@ class TestChaos extends BaseTest {
 		f(NaN <= NaN);
 		f(NaN < NaN);
 		t(NaN != NaN);
+	}
+
+	function testNativeArray() {
+		var a = new java.NativeArray(1);
+		a[0] = new java.NativeArray(1);
+		eq(0, a[0][0]);
+		eq(12, a[0][0] = 12);
+		eq(12, a[0][0]);
+
+		var a = new java.NativeArray(1);
+		a[0] = new java.NativeArray(1);
+		eq(null, a[0][0]);
+		eq("foo", a[0][0] = "foo");
+		eq("foo", a[0][0]);
 	}
 }
