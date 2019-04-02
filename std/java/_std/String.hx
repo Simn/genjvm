@@ -30,10 +30,11 @@
 	function new(string:String) : Void;
 
 	function toUpperCase() : String;
-
 	function toLowerCase() : String;
 
-	function charAt( index : Int) : String;
+	inline function charAt( index : Int) : String {
+		return jvm.StringExt.charAt(this, index);
+	}
 
 	function charCodeAt( index : Int) : Null<Int>;
 
