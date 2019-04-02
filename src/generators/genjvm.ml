@@ -804,11 +804,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#lookupswitch offset_def a;
 		end;
 		let restore = jm#start_branch in
-		offset_def := code#get_fp - !offset_def;
 		let r_def = match def with
 			| None ->
-				if ret = RVoid then offset_def else (ref 0)
+				ref 0
 			| Some e ->
+				offset_def := code#get_fp - !offset_def;
 				jm#add_stack_frame;
 				self#texpr ret e;
 				self#maybe_make_jump
@@ -825,7 +825,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			List.rev acc
 		in
 		let rl = loop [] cases in
-		self#close_jumps ((jm#is_terminated,r_def) :: rl)
+		self#close_jumps ((jm#is_terminated,if def = None then offset_def else r_def) :: rl)
 
 	method switch ret e1 cases def =
 		if cases = [] then
