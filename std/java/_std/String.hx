@@ -40,7 +40,11 @@
 		return jvm.StringExt.charCodeAt(this, index);
 	}
 
-	function indexOf( str : String, ?startIndex : Int ) : Int;
+	inline function indexOf( str : String, ?startIndex : Int ) : Int {
+		return
+			if (startIndex == null) (cast this : java.lang.JavaString.String).indexOf(str)
+			else (cast this : java.lang.JavaString.String).indexOf(str, startIndex);
+	}
 
 	function lastIndexOf( str : String, ?startIndex : Int ) : Int;
 

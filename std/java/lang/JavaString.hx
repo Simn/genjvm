@@ -7,4 +7,7 @@ extern class String {
 	function concat(s:std.String):std.String;
 	function equals(obj:Dynamic):Bool;
 	function hashCode():Int;
+
+	@:overload function indexOf(str:std.String):Int;
+	@:overload function indexOf(str:std.String, fromIndex:Int):Int;
 }
