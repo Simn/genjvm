@@ -883,13 +883,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| [TInt | TByte | TChar | TBool;TInt | TByte | TChar | TBool] ->
 			let op = flip_cmp_op op in
 			CmpSpecial (fun () -> code#if_icmp_ref op)
-		| [t2;TObject((["java";"lang"],"String"),[]) as t1] ->
-			(* TODO: We need a slow compare if java.lang.Object is involved because it could refer to String *)
-			jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
-			CmpNormal(op,TBool)
-		| [TObject((["java";"lang"],"String"),[]) as t1;t2] ->
-			code#swap;
-			jm#invokevirtual string_path "equals" t1 (method_sig [object_sig] (Some TBool));
+		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[])] ->
+			jm#invokestatic haxe_jvm_path "stringEquals" (method_sig [string_sig;string_sig] (Some TBool));
 			CmpNormal(op,TBool)
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _;_]
 		| [_;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _] ->

@@ -1,7 +1,6 @@
 -cp src
 -main Main
 -D jvm
--D no_map_cache
 -java export
 -D dump=pretty
 -dce no
