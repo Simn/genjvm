@@ -258,6 +258,11 @@ class builder jc name jsig = object(self)
 			code#l2f
 		| TInt,TLong ->
 			code#l2i;
+		(* widening *)
+		| TInt,(TByte | TShort | TChar) ->
+			(* No cast, but rewrite stack top *)
+			ignore(code#get_stack#pop);
+			code#get_stack#push jsig;
 		| TObject(path1,_),TObject(path2,_) when path1 = path2 ->
 			()
 		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
@@ -350,7 +355,7 @@ class builder jc name jsig = object(self)
 	method add_local (name : string) (jsig : jsignature) (init_state : var_init_state) =
 		let slot = local_offset in
 		let load,store,d = match jsig with
-			| TInt | TBool ->
+			| TInt | TBool | TByte | TShort | TChar ->
 				if init_state = VarNeedDefault then begin
 					code#iconst Int32.zero;
 					code#istore slot
