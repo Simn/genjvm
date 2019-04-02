@@ -1182,13 +1182,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			self#read_write ret AKNone e1 f t
 		| OpAssignOp op ->
+			let jsig1 = jsignature_of_type e1.etype in
 			begin match op,(Texpr.skip e1).eexpr,(Texpr.skip e2).eexpr with
-			| OpAdd,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range false Int8Range (Int32.to_int i32) && self#var_slot_is_in_int8_range v->
+			| OpAdd,TLocal v,TConst (TInt i32) when is_unboxed (self#vtype v.v_type) && in_range false Int8Range (Int32.to_int i32) && self#var_slot_is_in_int8_range v->
 				let slot,load,_ = self#get_local v in
 				let i = Int32.to_int i32 in
 				code#iinc slot i;
 				if ret <> RVoid then load();
-			| OpSub,TLocal v,TConst (TInt i32) when not (is_null v.v_type) && in_range false Int8Range (-Int32.to_int i32) && self#var_slot_is_in_int8_range v ->
+			| OpSub,TLocal v,TConst (TInt i32) when is_unboxed (self#vtype v.v_type) && in_range false Int8Range (-Int32.to_int i32) && self#var_slot_is_in_int8_range v ->
 				let slot,load,_ = self#get_local v in
 				let i = -Int32.to_int i32 in
 				code#iinc slot i;
@@ -1196,7 +1197,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				let f () =
 					self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (fun () -> ()) (fun () -> self#texpr rvalue_any e2);
-					if is_null e1.etype then self#expect_reference_type;
+					jm#cast jsig1;
 				in
 				self#read_write ret AKPre e1 f t
 			end
@@ -1214,23 +1215,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| (Increment | Decrement),_ ->
 			let is_null = is_null e.etype in
 			let f () =
-				let t = jsignature_of_type (follow e.etype) in
-				begin match t with
+				begin match jm#get_code#get_stack#top with
 				| TLong ->
-					jm#cast TLong;
 					code#lconst Int64.zero;
 					if op = Increment then code#ladd else code#lsub
 				| TDouble ->
-					jm#cast TDouble;
 					code#dconst 1.;
 					if op = Increment then code#dadd else code#dsub
 				| TByte | TShort | TInt ->
-					jm#cast TInt;
 					code#iconst Int32.one;
 					if op = Increment then code#iadd else code#isub;
 					if is_null then self#expect_reference_type;
 				| _ ->
-					Error.error (Printf.sprintf "Unuspported unop on %s" (generate_signature false t)) e.epos;
+					jm#invokestatic haxe_jvm_path (if op = Increment then "++" else "--") (method_sig [object_sig] (Some object_sig))
 				end
 			in
 			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f e.etype;

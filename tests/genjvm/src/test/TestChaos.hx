@@ -19,15 +19,18 @@ private class ChaosConstructorChild extends ChaosConstructor {
 @:analyzer(ignore)
 class TestChaos extends BaseTest {
 	var intField:Int;
+	var intFieldDynamic:Dynamic;
 
 	static var NaN = java.lang.Double.DoubleClass.NaN;
 	static var staticIntField:Int;
+	static var staticIntFieldDynamic:Dynamic;
 	static var trueValue = true;
 	static var falseValue = false;
 
 	public function new() {
 		super();
 		testAssignment();
+		testAssignmentDynamic();
 		testOps();
 		testNullOps();
 		testNadakoOps();
@@ -75,6 +78,41 @@ class TestChaos extends BaseTest {
 		eq(3, staticIntField++);
 		eq(4, staticIntField);
 		eq(5, ++staticIntField);
+	}
+
+	function testAssignmentDynamic() {
+		// var
+		var a:Dynamic = 1;
+		eq(1, a);
+		a = 2;
+		eq(2, a);
+		a += 1;
+		eq(3, a);
+		eq(3., a++);
+		eq(4, a);
+		eq(5., ++a);
+
+		// instance field
+		intFieldDynamic = 1;
+		eq(1, intFieldDynamic);
+		intFieldDynamic = 2;
+		eq(2, intFieldDynamic);
+		intFieldDynamic += 1;
+		eq(3, intFieldDynamic);
+		eq(3., intFieldDynamic++);
+		eq(4, intFieldDynamic);
+		eq(5., ++intFieldDynamic);
+
+		// static field
+		staticIntFieldDynamic = 1;
+		eq(1, staticIntFieldDynamic);
+		staticIntFieldDynamic = 2;
+		eq(2, staticIntFieldDynamic);
+		staticIntFieldDynamic += 1;
+		eq(3, staticIntFieldDynamic);
+		eq(3., staticIntFieldDynamic++);
+		eq(4, staticIntFieldDynamic);
+		eq(5., ++staticIntFieldDynamic);
 	}
 
 	function testOps() {

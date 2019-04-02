@@ -335,6 +335,34 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
+	@:native("++")
+	static public function opIncrement<T1:java.lang.Object>(a:T1):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() + 1.;
+		}
+		if (instanceof(a, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() + 1.;
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() + 1;
+		}
+		throw "Invalid operation";
+	}
+
+	@:native("--")
+	static public function opDecrement<T1:java.lang.Object>(a:T1):Dynamic {
+		if (instanceof(a, java.lang.Double.DoubleClass)) {
+			return (cast a : java.lang.Number).doubleValue() - 1.;
+		}
+		if (instanceof(a, java.lang.Long.LongClass)) {
+			return (cast a : java.lang.Number).longValue() - 1.;
+		}
+		if (instanceof(a, java.lang.Integer.IntegerClass)) {
+			return (cast a : java.lang.Number).intValue() - 1;
+		}
+		throw "Invalid operation";
+	}
+
 	@:native("neg")
 	static public function opNeg<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
