@@ -216,6 +216,17 @@ module NativeSignatures = struct
 		| TDouble -> double_sig
 		| _ -> jsig
 
+	let get_unboxed_type jsig = match jsig with
+		| TObject((["java";"lang"],"Boolean"),_) -> TBool
+		| TObject((["java";"lang"],"Charcter"),_) -> TChar
+		| TObject((["java";"lang"],"Byte"),_) -> TByte
+		| TObject((["java";"lang"],"Short"),_) -> TShort
+		| TObject((["java";"lang"],"Integer"),_) -> TInt
+		| TObject((["java";"lang"],"Long"),_) -> TLong
+		| TObject((["java";"lang"],"Float"),_) -> TFloat
+		| TObject((["java";"lang"],"Double"),_) -> TDouble
+		| _ -> jsig
+
 	let is_unboxed jsig = match jsig with
 		| TBool | TChar
 		| TByte | TShort | TInt | TLong

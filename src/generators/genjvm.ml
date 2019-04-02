@@ -837,7 +837,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		f2();
 		jm#cast ~allow_to_string:true cast_type;
 
-	method get_binop_type t1 t2 = match jsignature_of_type (follow t1),jsignature_of_type (follow t2) with
+	method get_binop_type_sig jsig1 jsig2 = match jsig1,jsig2 with
 		| TObject((["java";"lang"],"String"),_),_
 		| _,TObject((["java";"lang"],"String"),_) ->
 			string_sig
@@ -854,6 +854,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				string_sig
 			else
 				object_sig
+
+	method get_binop_type t1 t2 = self#get_binop_type_sig (jsignature_of_type t1) (jsignature_of_type t2)
 
 	method do_compare op =
 		match code#get_stack#get_stack_items 2 with
@@ -916,9 +918,82 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#cast t2;
 			(fun () -> code#if_ref op)
 		| _ ->
-			let f e () = self#texpr rvalue_any e in
-			self#binop_exprs (self#get_binop_type e1.etype e2.etype) (f e1) (f e2);
-			self#do_compare op
+			let sig1 = jsignature_of_type e1.etype in
+			let sig2 = jsignature_of_type e2.etype in
+			match is_unboxed sig1,is_unboxed sig2 with
+			| true,true ->
+				let f e () = self#texpr rvalue_any e in
+				self#binop_exprs (self#get_binop_type e1.etype e2.etype) (f e1) (f e2);
+				self#do_compare op
+			| false,false ->
+				let sig_unboxed1 = get_unboxed_type sig1 in
+				let sig_unboxed2 = get_unboxed_type sig2 in
+				if sig1 = sig_unboxed1 && sig2 = sig_unboxed2 then begin
+					(* No basic types involved, do normal comparison *)
+					self#texpr rvalue_any e1;
+					self#texpr rvalue_any e2;
+					self#do_compare op
+				end else begin
+					(* At least one of the types is a wrapped numeric one *)
+					let cast_type = self#get_binop_type_sig sig_unboxed1 sig_unboxed2 in
+					self#texpr rvalue_any e1;
+					jm#get_code#dup;
+					jm#if_then_else
+						(self#if_not_null sig1)
+						(fun () ->
+							jm#get_code#pop;
+							self#texpr rvalue_any e2;
+							self#boolop (self#if_not_null sig2)
+						)
+						(fun () ->
+							jm#cast cast_type;
+							self#texpr rvalue_any e2;
+							jm#get_code#dup;
+							jm#if_then_else
+								(self#if_not_null sig2)
+								(fun () ->
+									jm#get_code#pop;
+									jm#get_code#pop;
+									jm#get_code#bconst false
+								)
+								(fun () ->
+									jm#cast cast_type;
+									self#boolop (self#do_compare op)
+								)
+						);
+					(fun () -> code#if_ref CmpEq)
+				end
+			| false,true ->
+				self#texpr rvalue_any e1;
+				jm#get_code#dup;
+				jm#if_then_else
+					(self#if_not_null sig1)
+					(fun () ->
+						jm#get_code#pop;
+						jm#get_code#bconst false
+					)
+					(fun () ->
+						jm#cast sig2;
+						self#texpr rvalue_any e2;
+						self#boolop (self#do_compare op)
+					);
+				(fun () -> code#if_ref CmpEq)
+			| true,false ->
+				self#texpr rvalue_any e1;
+				self#texpr rvalue_any e2;
+				jm#get_code#dup;
+				jm#if_then_else
+					(self#if_not_null sig2)
+					(fun () ->
+						jm#get_code#pop;
+						jm#get_code#pop;
+						jm#get_code#bconst false;
+					)
+					(fun () ->
+						jm#cast sig1;
+						self#boolop (self#do_compare op)
+					);
+				(fun () -> code#if_ref CmpEq)
 
 	method binop_basic ret op cast_type f1 f2 =
 		let emit_exprs () = self#binop_exprs cast_type f1 f2 in
