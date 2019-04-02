@@ -190,6 +190,8 @@ let rec jsignature_of_type depth t =
 				end
 			| [],"Dynamic" ->
 				object_sig
+			| [],("Class" | "Enum") ->
+				java_class_sig
 			| _ ->
 				if Meta.has Meta.CoreType a.a_meta then
 					TObject(a.a_path,List.map jtype_argument_of_type tl)
@@ -210,6 +212,8 @@ let rec jsignature_of_type depth t =
 	| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
 		TArray(jsignature_of_type t,None)
 	| TInst({cl_kind = KTypeParameter _; cl_path = (_,name)},_) -> TTypeParameter name
+	| TInst({cl_path = ["_Class"],"Class_Impl_"},_) -> java_class_sig
+	| TInst({cl_path = ["_Enum"],"Enum_Impl_"},_) -> java_class_sig
 	| TInst(c,tl) -> TObject(c.cl_path,List.map jtype_argument_of_type tl)
 	| TEnum(en,tl) -> TObject(en.e_path,List.map jtype_argument_of_type tl)
 	| TFun(tl,tr) -> method_sig (List.map (fun (_,_,t) -> jsignature_of_type t) tl) (if ExtType.is_void (follow tr) then None else Some (jsignature_of_type tr))
@@ -1296,10 +1300,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			tr
 		| TField(_,FStatic({cl_path = ["haxe";"jvm"],"Jvm"},({cf_name = "instanceof"}))) ->
 			begin match el with
-				| [e1;{eexpr = TTypeExpr mt}] ->
+				| [e1;{eexpr = TTypeExpr mt;epos = pe}] ->
 					self#texpr rvalue_any e1;
 					self#expect_reference_type;
-					code#instanceof (path_map (t_infos mt).mt_path);
+					let path = match jsignature_of_type (type_of_module_type mt) with
+						| TObject(path,_) -> path
+						| _ -> Error.error "Class expected" pe
+					in
+					code#instanceof path;
 					Some TBool
 				| _ -> Error.error "Type expression expected" e1.epos
 			end;

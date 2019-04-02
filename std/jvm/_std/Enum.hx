@@ -31,7 +31,6 @@
 **/
 @:coreType
 @:runtimeValue
-@:native("java.lang.Class")
 abstract Enum<T> {
 	public inline function native():java.lang.Class<Dynamic>
 		return cast this;
