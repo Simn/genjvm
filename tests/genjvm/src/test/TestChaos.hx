@@ -30,6 +30,7 @@ class TestChaos extends BaseTest {
 		testAssignment();
 		testOps();
 		testNullOps();
+		testNadakoOps();
 		testDynamicOps();
 		testIntArray();
 		testDynamicArray();
@@ -189,6 +190,98 @@ class TestChaos extends BaseTest {
 		eq(false, 0 <= minusA);
 		eq(true, 0 != minusA);
 		eq(false, 0 == minusA);
+	}
+
+	function testNadakoOps() {
+		// bool
+		var nullBool:Null<Bool> = null;
+
+		t(null == nullBool);
+		t(nullBool == null);
+		f(false == nullBool);
+		f(nullBool == false);
+		t(false != nullBool);
+		t(nullBool != false);
+
+		// int
+		var nullInt:Null<Int> = null;
+
+		t(null == nullInt);
+		t(nullInt == null);
+		f(0 == nullInt);
+		f(nullInt == 0);
+		t(0 != nullInt);
+		t(nullInt != 0);
+
+		f(0 > nullInt);
+		f(0 >= nullInt);
+		f(0 < nullInt);
+		f(0 <= nullInt);
+
+		f(nullInt > 0);
+		f(nullInt >= 0);
+		f(nullInt < 0);
+		f(nullInt <= 0);
+
+		f(1 > nullInt);
+		f(1 >= nullInt);
+		f(1 < nullInt);
+		f(1 <= nullInt);
+
+		f(nullInt > 1);
+		f(nullInt >= 1);
+		f(nullInt < 1);
+		f(nullInt <= 1);
+
+		f(-1 > nullInt);
+		f(-1 >= nullInt);
+		f(-1 < nullInt);
+		f(-1 <= nullInt);
+
+		f(nullInt > -1);
+		f(nullInt >= -1);
+		f(nullInt < -1);
+		f(nullInt <= -1);
+
+		// // float
+		var nullFloat:Null<Float> = null;
+
+		t(null == nullFloat);
+		t(nullFloat == null);
+		f(0. == nullFloat);
+		f(nullFloat == 0.);
+		t(0. != nullFloat);
+		t(nullFloat != 0.);
+
+		f(0. > nullFloat);
+		f(0. >= nullFloat);
+		f(0. < nullFloat);
+		f(0. <= nullFloat);
+
+		f(nullFloat > 0.);
+		f(nullFloat >= 0.);
+		f(nullFloat < 0.);
+		f(nullFloat <= 0.);
+
+		f(1. > nullFloat);
+		f(1. >= nullFloat);
+		f(1. < nullFloat);
+		f(1. <= nullFloat);
+
+		f(nullFloat > 1.);
+		f(nullFloat >= 1.);
+		f(nullFloat < 1.);
+		f(nullFloat <= 1.);
+
+		f(-1. > nullFloat);
+		f(-1. >= nullFloat);
+		f(-1. < nullFloat);
+		f(-1. <= nullFloat);
+
+		f(nullFloat > -1.);
+		f(nullFloat >= -1.);
+		f(nullFloat < -1.);
+		f(nullFloat <= -1.);
 	}
 
 

@@ -901,12 +901,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jerror (Printf.sprintf "Bad stack: %s" (String.concat ", " (List.map (generate_signature false) tl)));
 
 	method binop_compare op e1 e2 =
+		let sig1 = jsignature_of_type e1.etype in
+		let sig2 = jsignature_of_type e2.etype in
 		match (Texpr.skip e1),(Texpr.skip e2) with
 		| {eexpr = TConst TNull},e1
 		| e1,{eexpr = TConst TNull} ->
 			self#texpr rvalue_any e1;
 			CmpSpecial ((if op = CmpEq then self#if_not_null else self#if_null) (self#vtype e1.etype))
-		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 ->
+		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 && is_unboxed sig2 ->
 			let op = match op with
 				| CmpGt | CmpGe | CmpLt | CmpLe -> op
 				| CmpEq | CmpNe -> flip_cmp_op op
@@ -914,14 +916,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			CmpNormal(op,TInt)
-		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 ->
+		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 && is_unboxed sig1 ->
 			let op = flip_cmp_op op in
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			CmpNormal(op,TInt)
 		| _ ->
-			let sig1 = jsignature_of_type e1.etype in
-			let sig2 = jsignature_of_type e2.etype in
 			match is_unboxed sig1,is_unboxed sig2 with
 			| true,true ->
 				let f e () = self#texpr rvalue_any e in
@@ -956,11 +956,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 								(fun () ->
 									jm#get_code#pop;
 									jm#get_code#pop;
-									jm#get_code#bconst false
+									jm#get_code#bconst (op = CmpNe);
 								)
 								(fun () ->
 									jm#cast cast_type;
-									self#boolop (self#do_compare op)
+									self#boolop (self#do_compare op);
 								)
 						);
 					CmpNormal(CmpEq,TBool)
@@ -972,7 +972,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					(self#if_not_null sig1)
 					(fun () ->
 						jm#get_code#pop;
-						jm#get_code#bconst false
+						jm#get_code#bconst (op = CmpNe)
 					)
 					(fun () ->
 						jm#cast sig2;
@@ -989,7 +989,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					(fun () ->
 						jm#get_code#pop;
 						jm#get_code#pop;
-						jm#get_code#bconst false;
+						jm#get_code#bconst (op = CmpNe);
 					)
 					(fun () ->
 						jm#cast sig1;
