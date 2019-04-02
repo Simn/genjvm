@@ -9,4 +9,11 @@ class StringExt {
 		else
 			return java.lang.Character._toString((cast me : JavaString).charAt(index));
 	}
+
+	public static function charCodeAt(me:String, index:Int):Null<Int> {
+		if (index >= me.length || index < 0)
+			return null;
+		else
+			return cast((cast me : JavaString).charAt(index), Int);
+	}
 }

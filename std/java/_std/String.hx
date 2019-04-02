@@ -36,7 +36,9 @@
 		return jvm.StringExt.charAt(this, index);
 	}
 
-	function charCodeAt( index : Int) : Null<Int>;
+	inline function charCodeAt( index : Int) : Null<Int> {
+		return jvm.StringExt.charCodeAt(this, index);
+	}
 
 	function indexOf( str : String, ?startIndex : Int ) : Int;
 
