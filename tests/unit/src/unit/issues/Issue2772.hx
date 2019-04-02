@@ -2,7 +2,7 @@ package unit.issues;
 
 class Issue2772 extends Test
 {
-#if java
+#if (java && !jvm)
 	public function test()
 	{
 		var f = false;
