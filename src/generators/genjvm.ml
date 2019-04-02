@@ -2096,7 +2096,10 @@ let generate_class gctx c =
 				| Some(c,tl) -> generate_method_signature true (jsignature_of_type (TInst(c,tl)))
 				| None -> generate_method_signature true object_sig
 			in
-			let s = Printf.sprintf "<%s>%s" stl ssuper in
+			let sinterfaces = String.concat "" (List.map (fun(c,tl) ->
+				generate_method_signature true (jsignature_of_type (TInst(c,tl)))
+			) c.cl_implements) in
+			let s = Printf.sprintf "<%s>%s%s" stl ssuper sinterfaces in
 			let offset = pool#add_string s in
 			jc#add_attribute (AttributeSignature offset)
 	end;
