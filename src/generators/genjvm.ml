@@ -2016,18 +2016,41 @@ type super_situation =
 	| SuperNoConstructor
 	| SuperGood of jsignature
 
-let generate_class gctx c =
-	let is_annotation = Meta.has Meta.Annotation c.cl_meta in
-	let path_super,sig_super_ctor = match c.cl_super with
-		| None -> object_path,SuperNo
-		| Some(c,_) -> path_map c.cl_path,match c.cl_constructor with
+class tclass_to_jvm gctx c = object(self)
+	val is_annotation = Meta.has Meta.Annotation c.cl_meta
+	val sig_super_ctor = match c.cl_super with
+		| None -> SuperNo
+		| Some(c,_) -> match c.cl_constructor with
 			| Some cf ->
 				SuperGood (jsignature_of_type cf.cf_type)
 			| None ->
 				SuperNoConstructor
-	in
-	let jc = new JvmClass.builder (path_map c.cl_path) path_super in
-	begin
+
+	val jc = new JvmClass.builder c.cl_path (Option.map_default (fun (c,_) -> c.cl_path) object_path c.cl_super)
+
+	method private set_access_flags =
+		jc#add_access_flag 1; (* public *)
+		if c.cl_final then jc#add_access_flag 0x10;
+		if c.cl_interface then begin
+			jc#add_access_flag 0x200;
+			jc#add_access_flag 0x400;
+		end;
+		if is_annotation then begin
+			jc#add_access_flag 0x2000;
+			jc#add_interface (["java";"lang";"annotation"],"Annotation");
+			(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
+			jc#add_annotation retention_path ["value",(AEnum(retention_policy_sig,"RUNTIME"))];
+		end;
+
+	method private set_interfaces =
+		List.iter (fun (c,_) ->
+			if is_annotation && c.cl_path = (["java";"lang";"annotation"],"Annotation") then
+				()
+			else
+				jc#add_interface c.cl_path
+		) c.cl_implements;
+
+	method private generate_empty_ctor =
 		let jsig_empty = method_sig [haxe_empty_constructor_sig] None in
 		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
 		let _,load,_ = jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument in
@@ -2042,82 +2065,78 @@ let generate_class gctx c =
 			jm_empty_ctor#call_super_ctor jsig_empty
 		end;
 		jm_empty_ctor#get_code#return_void;
-	end;
-	let pool = jc#get_pool in
-	let field mtype cf = match cf.cf_kind with
-		| Method (MethNormal | MethInline) ->
-			List.iter (fun cf ->
-				failsafe cf.cf_pos (fun () -> generate_method gctx jc c mtype cf)
-			) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
-		| _ ->
-			if not c.cl_interface then failsafe cf.cf_pos (fun () -> generate_field gctx jc c mtype cf)
-	in
-	List.iter (field MStatic) c.cl_ordered_statics;
-	List.iter (field MInstance) c.cl_ordered_fields;
-	begin match c.cl_constructor,sig_super_ctor with
-		| Some cf,SuperGood _ -> field MConstructor cf
-		| Some cf,_ -> field MConstructorTop cf
-		| None,_ ->
-			let jm = jc#spawn_method "<init>" (method_sig [] None) [MPublic] in
-			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
-			handler#object_constructor;
-			jm#get_code#return_void;
-	end;
-	begin match c.cl_init with
-		| None ->
-			()
-		| Some e ->
-			let cf = mk_field "<clinit>" (tfun [] gctx.com.basic.tvoid) null_pos null_pos in
-			cf.cf_kind <- Method MethNormal;
-			let tf = {
-				tf_args = [];
-				tf_type = gctx.com.basic.tvoid;
-				tf_expr = mk_block e;
-			} in
-			let e = mk (TFunction tf) cf.cf_type null_pos in
-			cf.cf_expr <- Some e;
-			field MStatic cf
-	end;
-	List.iter (fun (c,_) ->
-		if is_annotation && c.cl_path = (["java";"lang";"annotation"],"Annotation") then
-			()
-		else
-			jc#add_interface c.cl_path
-	) c.cl_implements;
-	jc#add_attribute (AttributeSourceFile (pool#add_string c.cl_pos.pfile));
-	begin match c.cl_params with
-		| [] ->
-			()
-		| _ ->
-			let stl = String.concat "" (List.map (fun (n,_) ->
-				Printf.sprintf "%s:Ljava/lang/Object;" n
-			) c.cl_params) in
-			let ssuper = match c.cl_super with
-				| Some(c,tl) -> generate_method_signature true (jsignature_of_type (TInst(c,tl)))
-				| None -> generate_method_signature true object_sig
-			in
-			let sinterfaces = String.concat "" (List.map (fun(c,tl) ->
-				generate_method_signature true (jsignature_of_type (TInst(c,tl)))
-			) c.cl_implements) in
-			let s = Printf.sprintf "<%s>%s%s" stl ssuper sinterfaces in
-			let offset = pool#add_string s in
-			jc#add_attribute (AttributeSignature offset)
-	end;
-	jc#add_access_flag 1; (* public *)
-	if c.cl_final then jc#add_access_flag 0x10;
-	if c.cl_interface then begin
-		jc#add_access_flag 0x200;
-		jc#add_access_flag 0x400;
-	end;
-	if is_annotation then begin
-		jc#add_access_flag 0x2000;
-		jc#add_interface (["java";"lang";"annotation"],"Annotation");
-		(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
-		jc#add_annotation retention_path ["value",(AEnum(retention_policy_sig,"RUNTIME"))];
-	end;
-	jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
-	let jc = jc#export_class in
-	write_class gctx.jar (path_map c.cl_path) jc
+
+	method private generate_fields =
+		let field mtype cf = match cf.cf_kind with
+			| Method (MethNormal | MethInline) ->
+				List.iter (fun cf ->
+					failsafe cf.cf_pos (fun () -> generate_method gctx jc c mtype cf)
+				) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
+			| _ ->
+				if not c.cl_interface then failsafe cf.cf_pos (fun () -> generate_field gctx jc c mtype cf)
+		in
+		List.iter (field MStatic) c.cl_ordered_statics;
+		List.iter (field MInstance) c.cl_ordered_fields;
+		begin match c.cl_constructor,sig_super_ctor with
+			| Some cf,SuperGood _ -> field MConstructor cf
+			| Some cf,_ -> field MConstructorTop cf
+			| None,_ ->
+				let jm = jc#spawn_method "<init>" (method_sig [] None) [MPublic] in
+				let handler = new texpr_to_jvm gctx jc jm t_dynamic in
+				handler#object_constructor;
+				jm#get_code#return_void;
+		end;
+		begin match c.cl_init with
+			| None ->
+				()
+			| Some e ->
+				let cf = mk_field "<clinit>" (tfun [] gctx.com.basic.tvoid) null_pos null_pos in
+				cf.cf_kind <- Method MethNormal;
+				let tf = {
+					tf_args = [];
+					tf_type = gctx.com.basic.tvoid;
+					tf_expr = mk_block e;
+				} in
+				let e = mk (TFunction tf) cf.cf_type null_pos in
+				cf.cf_expr <- Some e;
+				field MStatic cf
+		end;
+
+	method private generate_signature =
+		begin match c.cl_params with
+			| [] ->
+				()
+			| _ ->
+				let stl = String.concat "" (List.map (fun (n,_) ->
+					Printf.sprintf "%s:Ljava/lang/Object;" n
+				) c.cl_params) in
+				let ssuper = match c.cl_super with
+					| Some(c,tl) -> generate_method_signature true (jsignature_of_type (TInst(c,tl)))
+					| None -> generate_method_signature true object_sig
+				in
+				let sinterfaces = String.concat "" (List.map (fun(c,tl) ->
+					generate_method_signature true (jsignature_of_type (TInst(c,tl)))
+				) c.cl_implements) in
+				let s = Printf.sprintf "<%s>%s%s" stl ssuper sinterfaces in
+				let offset = jc#get_pool#add_string s in
+				jc#add_attribute (AttributeSignature offset)
+		end;
+
+	method generate =
+		self#set_access_flags;
+		self#generate_empty_ctor;
+		self#set_interfaces;
+		self#generate_fields;
+		self#generate_signature;
+		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
+		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
+		let jc = jc#export_class in
+		write_class gctx.jar (path_map c.cl_path) jc
+end
+
+let generate_class gctx c =
+	let conv = new tclass_to_jvm gctx c in
+	conv#generate
 
 let generate_enum gctx en =
 	let jc_enum = new JvmClass.builder en.e_path haxe_enum_path in
