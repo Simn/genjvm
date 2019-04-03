@@ -9,7 +9,7 @@ class DynamicObject implements java.lang.Cloneable {
 
 	public var _hx_deletedAField:Null<Int>;
 
-	public function new() {}
+	@:nativeGen public function new() {}
 
 	public function toString() {
 		_hx_initReflection();

@@ -60,6 +60,10 @@ let find_overload_rec is_ctor map_type c cf el =
 	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then find_overload_rec' is_ctor map_type c cf.cf_name (List.map (fun e -> e.etype) el)
 	else Some(c,cf)
 
+let get_construction_mode c cf =
+	if c.cl_extern || Meta.has Meta.NativeGen cf.cf_meta then ConstructInit
+	else ConstructInitPlusNew
+
 (* Haxe *)
 
 exception HarderFailure of string
@@ -95,7 +99,6 @@ type method_type =
 	| MStatic
 	| MInstance
 	| MConstructor
-	| MConstructorTop
 
 type access_kind =
 	| AKPost
@@ -441,7 +444,7 @@ let create_context_class gctx jc jm name vl = match vl with
 		let jsigs = List.map (fun v -> jsignature_of_type v.v_type) vl in
 		let jm_ctor = jc#spawn_method "<init>" (method_sig jsigs None) [MPublic] in
 		jm_ctor#load_this;
-		jm_ctor#call_super_ctor (method_sig [] None);
+		jm_ctor#call_super_ctor ConstructInit (method_sig [] None);
 		List.iter2 (fun v jsig ->
 			jm_ctor#add_argument_and_field v.v_name jsig;
 			ctx_class#add v.v_id v.v_name jsig;
@@ -1365,8 +1368,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#invokestatic en.e_path ef.ef_name (method_sig tl (Some tr));
 			Some tr
 		| TConst TSuper ->
-			let jsig = (TUninitialized None) in
-			code#aload jsig 0;
 			let c,cf = match gctx.current_field_info with
 				| Some ({super_call_fields = hd :: tl} as info) ->
 					info.super_call_fields <- tl;
@@ -1374,10 +1375,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| _ ->
 					Error.error "Something went wrong" e1.epos
 			in
+			let kind = get_construction_mode c cf in
+			let jsig = match kind with
+				| ConstructInit -> TUninitialized None
+				| ConstructInitPlusNew -> jc#get_jsig
+			in
+			code#aload jsig 0;
 			let tl,_ = self#call_arguments cf.cf_type el in
-			let offset = add_field pool c cf in
-			code#invokespecial offset jsig tl [];
-			jm#set_this_initialized;
+			jm#call_super_ctor kind (method_sig tl None);
 			None
 		| TIdent "__array__" ->
 			begin match follow tr with
@@ -1606,7 +1611,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TBinop(OpAdd,e1,e2) when ExtType.is_string (follow e.etype) ->
 			let string_builder_path = (["java";"lang"],"StringBuilder") in
 			let string_builder_sig = object_path_sig string_builder_path in
-			jm#construct string_builder_path (fun () -> []);
+			jm#construct ConstructInit string_builder_path (fun () -> []);
 			let rec loop e = match e.eexpr with
 				| TBinop(OpAdd,e1,e2) ->
 					loop e1;
@@ -1702,7 +1707,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						let tl,_ = self#call_arguments  cf.cf_type el in
 						tl
 					in
-					jm#construct c.cl_path f
+					jm#construct (get_construction_mode c cf) c.cl_path f
 				end
 			end
 		| TReturn None ->
@@ -1735,7 +1740,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						) args in
 						tl
 					in
-					jm#construct ctx_class#get_path f;
+					jm#construct ConstructInit ctx_class#get_path f;
 					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 				end
 			end
@@ -1836,7 +1841,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match follow e.etype with
 			| TAnon an ->
 				let path,fl' = TAnonIdentifiaction.identify gctx an.a_fields in
-				jm#construct path (fun () ->
+				jm#construct ConstructInit path (fun () ->
 					(* We have to respect declaration order, so let's temp var where necessary *)
 					let rec loop fl fl' ok acc = match fl,fl' with
 						| ((name,_,_),e) :: fl,(name',jsig) :: fl' ->
@@ -1873,7 +1878,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					List.map snd fl';
 				)
 			| _ ->
-				jm#construct haxe_dynamic_object_path (fun () -> []);
+				jm#construct ConstructInit haxe_dynamic_object_path (fun () -> []);
 				List.iter (fun ((name,_,_),e) ->
 					code#dup;
 					self#string name;
@@ -1895,7 +1900,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jm#set_this_initialized
 end
 
-let generate_expr gctx jc jm e is_main is_method mtype =
+let generate_expr gctx jc jm e is_main is_method is_top mtype =
 	let e,args,tr = match e.eexpr with
 		| TFunction tf when is_method ->
 			tf.tf_expr,tf.tf_args,tf.tf_type
@@ -1915,7 +1920,7 @@ let generate_expr gctx jc jm e is_main is_method mtype =
 	) args;
 	jm#finalize_arguments;
 	begin match mtype with
-	| MConstructorTop ->
+	| MConstructor when is_top ->
 		handler#object_constructor
 	| _ ->
 		()
@@ -1939,11 +1944,17 @@ let generate_method gctx jc c mtype cf =
 	let flags = if c.cl_interface then MAbstract :: flags else flags in
 	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
 	let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
-	let jm = jc#spawn_method cf.cf_name jsig flags in
+	let name,is_top,flags = match mtype with
+		| MConstructor ->
+			if Meta.has Meta.NativeGen cf.cf_meta then "<init>",c.cl_super = None,flags
+			else cf.cf_name,false,MSynthetic :: flags
+		| _ -> cf.cf_name,false,flags
+	in
+	let jm = jc#spawn_method name jsig flags in
 	begin match cf.cf_expr with
 	| None -> ()
 	| Some e ->
-		generate_expr gctx jc jm e (cf.cf_name = "main") true mtype;
+		generate_expr gctx jc jm e (cf.cf_name = "main") true is_top mtype;
 	end;
 	begin match cf.cf_params with
 		| [] when c.cl_params = [] ->
@@ -1996,20 +2007,8 @@ let generate_field gctx jc c mtype cf =
 	let offset = jc#get_pool#add_string ssig in
 	jm#add_attribute (AttributeSignature offset)
 
-type super_situation =
-	| SuperNo
-	| SuperNoConstructor
-	| SuperGood of jsignature
-
 class tclass_to_jvm gctx c = object(self)
 	val is_annotation = Meta.has Meta.Annotation c.cl_meta
-	val sig_super_ctor = match c.cl_super with
-		| None -> SuperNo
-		| Some(c,_) -> match c.cl_constructor with
-			| Some cf ->
-				SuperGood (jsignature_of_type cf.cf_type)
-			| None ->
-				SuperNoConstructor
 
 	val jc = new JvmClass.builder c.cl_path (Option.map_default (fun (c,_) -> c.cl_path) object_path c.cl_super)
 
@@ -2096,14 +2095,14 @@ class tclass_to_jvm gctx c = object(self)
 		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
 		let _,load,_ = jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument in
 		jm_empty_ctor#load_this;
-		begin match sig_super_ctor with
-		| SuperNo ->
+		begin match c.cl_super with
+		| None ->
 			(* Haxe type with no parent class, call Object.<init>() *)
-			jm_empty_ctor#call_super_ctor (method_sig [] None)
+			jm_empty_ctor#call_super_ctor ConstructInit (method_sig [] None)
 		| _ ->
 			(* Parent class exists, call SuperClass.<init>(EmptyConstructor) *)
 			load();
-			jm_empty_ctor#call_super_ctor jsig_empty
+			jm_empty_ctor#call_super_ctor ConstructInit jsig_empty
 		end;
 		jm_empty_ctor#get_code#return_void;
 
@@ -2118,14 +2117,10 @@ class tclass_to_jvm gctx c = object(self)
 		in
 		List.iter (field MStatic) c.cl_ordered_statics;
 		List.iter (field MInstance) c.cl_ordered_fields;
-		begin match c.cl_constructor,sig_super_ctor with
-			| Some cf,SuperGood _ -> field MConstructor cf
-			| Some cf,_ -> field MConstructorTop cf
-			| None,_ ->
-				let jm = jc#spawn_method "<init>" (method_sig [] None) [MPublic] in
-				let handler = new texpr_to_jvm gctx jc jm t_dynamic in
-				handler#object_constructor;
-				jm#get_code#return_void;
+		begin match c.cl_constructor,c.cl_super with
+			| Some cf,Some _ -> field MConstructor cf
+			| Some cf,None -> field MConstructor cf
+			| None,_ -> ()
 		end;
 		begin match c.cl_init with
 			| None ->
@@ -2190,7 +2185,7 @@ let generate_enum gctx en =
 		jm_ctor#load_this;
 		let _,load,_ = jm_ctor#add_local "index" TInt VarArgument in
 		load();
-		jm_ctor#call_super_ctor jsig_enum_ctor;
+		jm_ctor#call_super_ctor ConstructInit jsig_enum_ctor;
 		jm_ctor#get_code#return_void;
 	end;
 	let inits = DynArray.create () in
@@ -2209,7 +2204,7 @@ let generate_enum gctx en =
 			let jm_ctor = jc_ctor#spawn_method "<init>" jsig_method [MPublic] in
 			jm_ctor#load_this;
 			jm_ctor#get_code#iconst (Int32.of_int ef.ef_index);
-			jm_ctor#call_super_ctor jsig_enum_ctor;
+			jm_ctor#call_super_ctor ConstructInit jsig_enum_ctor;
 			List.iter (fun (n,jsig) ->
 				jm_ctor#add_argument_and_field n jsig
 			) args;
@@ -2227,7 +2222,7 @@ let generate_enum gctx en =
 				(* Create static function for ctor with args *)
 				let jsig_static = method_sig jsigs (Some jc_enum#get_jsig) in
 				let jm_static = jc_enum#spawn_method ef.ef_name jsig_static [MPublic;MStatic] in
-				jm_static#construct jc_ctor#get_this_path (fun () ->
+				jm_static#construct ConstructInit jc_ctor#get_this_path (fun () ->
 					List.iter (fun (n,jsig) ->
 						let _,load,_ = jm_static#add_local n jsig VarArgument in
 						load();
@@ -2242,7 +2237,7 @@ let generate_enum gctx en =
 	if DynArray.length inits > 0 then begin
 		let jm_clinit = jc_enum#spawn_method "<clinit>" (method_sig [] None) [MStatic] in
 		DynArray.iter (fun (jm_static,jc_ctor) ->
-			jm_clinit#construct jc_ctor#get_this_path (fun () -> []);
+			jm_clinit#construct ConstructInit jc_ctor#get_this_path (fun () -> []);
 			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
 		) inits;
 		jm_clinit#get_code#return_void;
@@ -2368,6 +2363,15 @@ module Preprocessor = struct
 			preprocess_field gctx cf mtype
 		in
 		let field mtype cf =
+			if mtype = MConstructor then begin
+				if not (Meta.has Meta.NativeGen cf.cf_meta) then begin
+					let rec loop c =
+						if c.cl_extern then cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
+						else match c.cl_super with Some(c,_) -> loop c | None -> ()
+					in
+					loop c
+				end;
+			end;
 			List.iter (field mtype) (cf :: cf.cf_overloads)
 		in
 		List.iter (field MStatic) c.cl_ordered_statics;
@@ -2417,7 +2421,8 @@ let generate com =
 		begin
 			let jm_ctor = jc#spawn_method "<init>" (method_sig (List.map snd fields) None) [MPublic] in
 			jm_ctor#load_this;
-			jm_ctor#call_super_ctor (method_sig [] None);
+			jm_ctor#get_code#aconst_null haxe_empty_constructor_sig;
+			jm_ctor#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
 			List.iter (fun (name,jsig) ->
 				jm_ctor#add_argument_and_field name jsig;
 			) fields;
@@ -2428,7 +2433,7 @@ let generate com =
 			let string_map_sig = object_path_sig string_map_path in
 			let jm_fields = jc#spawn_method "_hx_getKnownFields" (method_sig [] (Some string_map_sig)) [MProtected] in
 			let _,load,save = jm_fields#add_local "tmp" string_map_sig VarWillInit in
-			jm_fields#construct string_map_path (fun () -> []);
+			jm_fields#construct ConstructInitPlusNew string_map_path (fun () -> []);
 			save();
 			List.iter (fun (name,jsig) ->
 				load();

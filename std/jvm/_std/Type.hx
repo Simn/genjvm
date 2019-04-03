@@ -108,7 +108,20 @@ class Type {
 		}
 	}
 
+	static final emptyArg = {
+		var a = new java.NativeArray(1);
+		a[0] = (null : jvm.EmptyConstructor);
+		a;
+	}
+
+	static final emptyClass = {
+		var a = new java.NativeArray(1);
+		a[0] = (cast jvm.EmptyConstructor : java.lang.Class<Dynamic>);
+		a;
+	}
+
 	public static function createInstance<T>(cl:Class<T>, args:Array<Dynamic>):T {
+		var obj = cl.native().getConstructor(emptyClass).newInstance(emptyArg);
 		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
 		var cl = cl.native();
 		for (i in 0...args.length) {
@@ -119,12 +132,12 @@ class Type {
 		var methodType = MethodType.methodType(cast Void, argTypes);
 
 		var ctor2 = try {
-			MethodHandles.lookup().findConstructor(cl, methodType);
+			MethodHandles.lookup().findVirtual(cl, "new", methodType);
 		} catch (_:NoSuchMethodException) {
 			null;
 		}
 		if (ctor2 == null) {
-			for (ctor in cl.getConstructors()) {
+			for (ctor in cl.getDeclaredMethods()) {
 				var params = ctor.getParameterTypes();
 				if (params.length != args.length) {
 					continue;
@@ -137,19 +150,21 @@ class Type {
 					}
 				}
 				if (valid) {
-					ctor2 = MethodHandles.lookup().unreflectConstructor(ctor);
+					ctor2 = MethodHandles.lookup().unreflect(ctor);
 					break;
 				}
 			}
 		}
 		if (ctor2 != null) {
-			return ctor2.invokeWithArguments(@:privateAccess args.__a);
+			ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
+			return obj;
 		}
 		return null;
 	}
 
 	public static function createEmptyInstance<T>(cl:Class<T>):T {
-		return cl.native().newInstance();
+		// TODO: distinguish <init>().new(args) and <init>(args)
+		return cl.native().getConstructor(emptyClass).newInstance(emptyArg);
 	}
 
 	public static function createEnum<T>(e:Enum<T>, constr:String, ?params:Array<Dynamic>):T {
@@ -173,12 +188,12 @@ class Type {
 	static function getFields<T>(c:java.lang.Class<T>, statics:Bool):Array<String> {
 		var ret = [];
 		for (f in c.getDeclaredFields()) {
-			if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) == statics) {
+			if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) == statics && !f.isSynthetic()) {
 				ret.push(f.getName());
 			}
 		}
 		for (m in c.getDeclaredMethods()) {
-			if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) == statics) {
+			if (java.lang.reflect.Modifier.isStatic(m.getModifiers()) == statics && !m.isSynthetic()) {
 				ret.push(m.getName());
 			}
 		}

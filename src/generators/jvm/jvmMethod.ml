@@ -12,9 +12,12 @@ type var_init_state =
 	| VarWillInit
 	| VarNeedDefault
 
+type construction_kind =
+	| ConstructInitPlusNew
+	| ConstructInit
+
 class builder jc name jsig = object(self)
 	inherit base_builder
-	val name = if name = "new" then "<init>" else name
 	val code = new JvmCode.builder jc#get_pool
 
 	val mutable max_num_locals = 0
@@ -130,10 +133,14 @@ class builder jc name jsig = object(self)
 		assert (not (self#has_method_flag MStatic));
 		code#aload jc#get_jsig 0
 
-	method call_super_ctor (jsig_method : jsignature) =
+	method call_super_ctor (kind : construction_kind) (jsig_method : jsignature) =
 		assert (not (self#has_method_flag MStatic));
-		self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method;
-		self#set_this_initialized
+		match kind with
+		| ConstructInitPlusNew ->
+			self#invokespecial jc#get_super_path "new" jc#get_jsig jsig_method;
+		| ConstructInit ->
+			self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method;
+			self#set_this_initialized
 
 	method add_argument_and_field (name : string) (jsig_field : jsignature) =
 		assert (not (self#has_method_flag MStatic));
@@ -145,14 +152,23 @@ class builder jc name jsig = object(self)
 		load();
 		self#putfield jc#get_this_path name jsig_field;
 
-	method construct (path : jpath) (f : unit -> jsignature list) =
+	method construct (kind : construction_kind) (path : jpath) (f : unit -> jsignature list) =
 		let pool = code#get_pool in
 		let offset = pool#add_path path in
 		code#new_ offset;
 		code#dup;
-		let jsigs = f () in
-		self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
-		self#set_top_initialized (object_path_sig path)
+		match kind with
+		| ConstructInitPlusNew ->
+			code#aconst_null haxe_empty_constructor_sig;
+			self#invokespecial path "<init>" jc#get_jsig (method_sig [haxe_empty_constructor_sig] None);
+			self#set_top_initialized (object_path_sig path);
+			code#dup;
+			let jsigs = f () in
+			self#invokevirtual path "new" jc#get_jsig (method_sig jsigs None);
+		| ConstructInit ->
+			let jsigs = f () in
+			self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
+			self#set_top_initialized (object_path_sig path)
 
 	method load_default_value = function
 		| TByte | TBool | TChar | TShort | TInt ->

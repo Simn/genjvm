@@ -7,7 +7,7 @@ import java.NativeArray;
 class Enum {
 	public var _hx_index:Int;
 
-	public function new(index:Int) {
+	@:nativeGen public function new(index:Int) {
 		this._hx_index = index;
 	}
 
