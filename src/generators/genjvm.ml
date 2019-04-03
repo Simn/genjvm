@@ -1543,14 +1543,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method new_native_array jsig el =
 		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr rvalue_any e) el)
 
-	method construct ret path t f =
-		let offset_class = pool#add_path (path_map path) in
-		code#new_ offset_class;
-		if ret <> RVoid then code#dup;
-		let tl,offset = f() in
-		code#invokespecial offset t tl [];
-		if ret <> RVoid then jm#set_top_initialized (object_path_sig path)
-
 	method basic_type_path name =
 		let offset = pool#add_field (["java";"lang"],name) "TYPE" java_class_sig FKField in
 		code#getstatic offset java_class_sig
@@ -1708,10 +1700,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| Some (c',cf) ->
 					let f () =
 						let tl,_ = self#call_arguments  cf.cf_type el in
-						let offset = add_field pool c' cf in
-						tl,offset
+						tl
 					in
-					self#construct ret c.cl_path (self#vtype (TInst(c,tl))) f;
+					jm#construct c.cl_path f
 				end
 			end
 		| TReturn None ->
@@ -1742,10 +1733,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 							jm#cast jsig;
 							jsig
 						) args in
-						let offset = pool#add_field ctx_class#get_path "<init>" (ctx_class#get_constructor_sig) FKMethod in
-						tl,offset
+						tl
 					in
-					self#construct rvalue_any ctx_class#get_path ctx_class#get_jsig f;
+					jm#construct ctx_class#get_path f;
 					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
 				end
 			end
@@ -1883,11 +1873,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					List.map snd fl';
 				)
 			| _ ->
-				let f () =
-					let offset = pool#add_field haxe_dynamic_object_path "<init>" (method_sig [] None) FKMethod in
-					[],offset
-				in
-				self#construct ret haxe_dynamic_object_path object_sig f;
+				jm#construct haxe_dynamic_object_path (fun () -> []);
 				List.iter (fun ((name,_,_),e) ->
 					code#dup;
 					self#string name;
