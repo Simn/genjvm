@@ -162,6 +162,17 @@ class builder jc name jsig = object(self)
 		| TLong -> code#lconst Int64.zero
 		| jsig -> code#aconst_null jsig
 
+	method return = match jsig with
+		| TMethod(_,tr) ->
+			begin match tr with
+			| None ->
+				code#return_void
+			| Some jsig ->
+				code#return_value jsig
+			end
+		| _ ->
+			assert false
+
 	(* casting *)
 
 	(** Checks if the stack top is a basic type and wraps accordingly. **)

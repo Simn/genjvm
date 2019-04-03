@@ -1,5 +1,6 @@
 package test;
 
+import haxe.ds.IntMap;
 import haxe.ds.StringMap;
 
 private class ChaosConstructor {
@@ -37,6 +38,7 @@ class TestChaos extends BaseTest {
 		testDynamicOps();
 		testIntArray();
 		testDynamicArray();
+		testIntMap();
 		testStringMap();
 		testObjectDecl();
 		testStringConcat();
@@ -490,13 +492,60 @@ class TestChaos extends BaseTest {
 
 	function testStringMap() {
 		var sm = new StringMap();
-		eq(null, sm.get("foo")); // TODO This fails with a null pointer unless -D no_map_cache
+		eq(null, sm.get("foo"));
 		eq(false, sm.exists("foo"));
 		sm.set("foo", 12);
 		eq(true, sm.exists("foo"));
 		eq(12, sm.get("foo"));
 		sm.remove("foo");
 		eq(null, sm.get("foo"));
+
+		var sm = new StringMap();
+		sm.set("foo", 12);
+		sm.set("bar", 13);
+		var keys = [];
+		var values = [];
+		for (key => value in sm) {
+			keys.push(key);
+			values.push(value);
+		}
+		keys.sort(Reflect.compare);
+		values.sort(Reflect.compare);
+		eq(2, keys.length);
+		eq(2, values.length);
+		eq("bar", keys[0]);
+		eq("foo", keys[1]);
+		eq(12, values[0]);
+		eq(13, values[1]);
+	}
+
+	function testIntMap() {
+		var sm = new IntMap();
+		eq(null, sm.get(12));
+		eq(false, sm.exists(12));
+		sm.set(12, 12);
+		eq(true, sm.exists(12));
+		eq(12, sm.get(12));
+		sm.remove(12);
+		eq(null, sm.get(12));
+
+		var sm = new IntMap();
+		sm.set(12, 12);
+		sm.set(13, 13);
+		var keys = [];
+		var values = [];
+		for (key => value in sm) {
+			keys.push(key);
+			values.push(value);
+		}
+		keys.sort(Reflect.compare);
+		values.sort(Reflect.compare);
+		eq(2, keys.length);
+		eq(2, values.length);
+		eq(12, keys[0]);
+		eq(13, keys[1]);
+		eq(12, values[0]);
+		eq(13, values[1]);
 	}
 
 	function testObjectDecl() {
