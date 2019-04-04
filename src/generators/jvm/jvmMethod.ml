@@ -152,23 +152,23 @@ class builder jc name jsig = object(self)
 		load();
 		self#putfield jc#get_this_path name jsig_field;
 
-	method construct (kind : construction_kind) (path : jpath) (f : unit -> jsignature list) =
+	method construct ?(no_value=false) (kind : construction_kind) (path : jpath) (f : unit -> jsignature list) =
 		let pool = code#get_pool in
 		let offset = pool#add_path path in
 		code#new_ offset;
-		code#dup;
+		if not no_value then code#dup;
 		match kind with
 		| ConstructInitPlusNew ->
 			code#aconst_null haxe_empty_constructor_sig;
 			self#invokespecial path "<init>" jc#get_jsig (method_sig [haxe_empty_constructor_sig] None);
-			self#set_top_initialized (object_path_sig path);
+			if not no_value then self#set_top_initialized (object_path_sig path);
 			code#dup;
 			let jsigs = f () in
 			self#invokevirtual path "new" jc#get_jsig (method_sig jsigs None);
 		| ConstructInit ->
 			let jsigs = f () in
 			self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
-			self#set_top_initialized (object_path_sig path)
+			if not no_value then self#set_top_initialized (object_path_sig path)
 
 	method load_default_value = function
 		| TByte | TBool | TChar | TShort | TInt ->
