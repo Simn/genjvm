@@ -1921,8 +1921,9 @@ let generate_expr gctx jc jm e is_main is_method is_top mtype =
 	) args;
 	jm#finalize_arguments;
 	begin match mtype with
-	| MConstructor when is_top ->
-		handler#object_constructor
+	| MConstructor ->
+		jm#get_code#inline jc#get_field_init_method#get_code;
+		if is_top then handler#object_constructor
 	| _ ->
 		()
 	end;
@@ -1948,7 +1949,7 @@ let generate_method gctx jc c mtype cf =
 	let name,is_top,flags = match mtype with
 		| MConstructor ->
 			if get_construction_mode c cf = ConstructInit then "<init>",c.cl_super = None,flags
-			else cf.cf_name,false,MSynthetic :: flags
+			else cf.cf_name,false,flags
 		| _ -> cf.cf_name,false,flags
 	in
 	let jm = jc#spawn_method name jsig flags in
@@ -1979,6 +1980,14 @@ let generate_field gctx jc c mtype cf =
 	begin match cf.cf_expr with
 		| None ->
 			()
+		| Some e when mtype <> MStatic ->
+			let jm = jc#get_field_init_method in
+			let handler = new texpr_to_jvm gctx jc jm gctx.com.basic.tvoid in
+			let tl = List.map snd c.cl_params in
+			let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
+			let efield = mk (TField(ethis,FInstance(c,tl,cf))) cf.cf_type null_pos in
+			let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type null_pos in
+			handler#texpr RVoid eop;
 		| Some e ->
 			let default () =
 				let p = null_pos in
@@ -2095,6 +2104,7 @@ class tclass_to_jvm gctx c = object(self)
 		let jsig_empty = method_sig [haxe_empty_constructor_sig] None in
 		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
 		let _,load,_ = jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument in
+		jm_empty_ctor#get_code#inline jc#get_field_init_method#get_code;
 		jm_empty_ctor#load_this;
 		begin match c.cl_super with
 		| None ->
@@ -2113,6 +2123,7 @@ class tclass_to_jvm gctx c = object(self)
 			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
 			PMap.iter (fun _ (c,cf) ->
 				let jm = jc#spawn_method "<init>" (jsignature_of_type cf.cf_type) [MPublic] in
+				jm#get_code#inline jc#get_field_init_method#get_code;
 				jm#load_this;
 				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
 				List.iter (fun (n,_,t) ->
@@ -2179,10 +2190,10 @@ class tclass_to_jvm gctx c = object(self)
 
 	method generate =
 		self#set_access_flags;
+		self#generate_fields;
 		self#generate_empty_ctor;
 		self#generate_implicit_ctors;
 		self#set_interfaces;
-		self#generate_fields;
 		self#generate_signature;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
@@ -2303,11 +2314,11 @@ module Preprocessor = struct
 			()
 
 	let add_implicit_ctor gctx c c' cf =
-				try
-					let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
-					Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) sm);
-				with Not_found ->
-					Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
+		try
+			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
+			Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) sm);
+		with Not_found ->
+			Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
 
 	let check_tnew gctx c tl el p =
 		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" (List.map (fun e -> e.etype) el) with

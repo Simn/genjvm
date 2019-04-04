@@ -81,6 +81,34 @@ class PassThroughChild extends PassThroughCurrent {
     }
 }
 
+class FieldInitParent {
+    public function new() { }
+}
+
+class FieldInitCurrent extends FieldInitParent {
+    public var hasInit = true;
+}
+
+class FieldInitChild extends FieldInitCurrent {
+    public function new() {
+        super();
+    }
+}
+
+class HxGenFieldInitParent {
+    @:hxGen public function new() { }
+}
+
+class HxGenFieldInitCurrent extends HxGenFieldInitParent {
+    public var hasInit = true;
+}
+
+class HxGenFieldInitChild extends HxGenFieldInitCurrent {
+    public function new() {
+        super();
+    }
+}
+
 typedef TestStructure = {
 	function test(value:String):String;
 }
@@ -120,5 +148,11 @@ class TestOop extends BaseTest {
 
 		var c = new PassThroughChild();
 		eq("PassThroughParent.new()VPassThroughChild.new()V", c.value);
+
+		var c = new FieldInitChild();
+		t(c.hasInit);
+
+		var c = new HxGenFieldInitChild();
+		t(c.hasInit);
 	}
 }
