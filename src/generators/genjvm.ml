@@ -761,8 +761,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jm#set_terminated term;
 		if not term then jm#add_stack_frame;
 
-	method int_switch ret e1 cases def =
-		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 in
+	method int_switch ret is_exhaustive e1 cases def =
 		let def,cases = match def,cases with
 			| None,(_,ec) :: cases when is_exhaustive ->
 				Some ec,cases
@@ -831,10 +830,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		self#close_jumps ((jm#is_terminated,if def = None then offset_def else r_def) :: rl)
 
 	method switch ret e1 cases def =
+		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 in
 		if cases = [] then
 			self#texpr ret e1
 		else if List.for_all is_const_int_pattern cases then
-			self#int_switch ret e1 cases def
+			self#int_switch ret is_exhaustive e1 cases def
 		else begin
 			(* TODO: rewriting this is stupid *)
 			let el = List.rev_map (fun (el,e) ->
@@ -849,6 +849,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				in
 				(e_cond,e)
 			) cases in
+			(* If we rewrite an exhaustive switch that has no default value, treat the last case as the default case to satisfy control flow. *)
+			let cases,def = if is_exhaustive && def = None then (match List.rev cases with (_,e) :: cases -> List.rev cases,Some e | _ -> assert false) else cases,def in
 			let e = List.fold_left (fun e_else (e_cond,e_then) -> Some (mk (TIf(e_cond,e_then,e_else)) e_then.etype e_then.epos)) def el in
 			self#texpr ret (Option.get e)
 		end
