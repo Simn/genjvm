@@ -52,6 +52,14 @@ class Jvm {
 
 	// casts
 
+	static public function dynamicToNullFloat<T>(d:T):Null<Float> {
+		if (instanceof(d, java.lang.Integer.IntegerClass)) {
+			return nullIntToNullFloat(cast d);
+		}
+		// TODO: need a better strategy to avoid infinite recursion here
+		return cast d;
+	}
+
 	static public function nullIntToNullFloat(i:Null<Int>):Null<Float> {
 		if (i == null) {
 			return null;
