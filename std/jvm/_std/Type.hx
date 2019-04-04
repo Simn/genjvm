@@ -133,14 +133,14 @@ class Type {
 		// 1. attempt: direct constructor lookup
 		try {
 			var ctor = MethodHandles.lookup().findConstructor(cl, methodType);
-            return ctor.invokeWithArguments(@:privateAccess args.__a);
+            return ctor.invokeWithArguments(@:privateAccess args.getNative());
 		} catch(_:NoSuchMethodException) { }
 
 		// 2. attempt direct new lookup
 		try {
 			var ctor = MethodHandles.lookup().findVirtual(cl, "new", methodType);
 			var obj = cl.getConstructor(emptyClass).newInstance(emptyArg);
-			ctor.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
+			ctor.bindTo(obj).invokeWithArguments(@:privateAccess args.getNative());
 			return obj;
 		} catch (_:NoSuchMethodException) { }
 
@@ -159,7 +159,7 @@ class Type {
 		// 3. attempt: unify actual constructor
 		for (ctor in cl.getDeclaredConstructors()) {
 			if (unify(ctor.getParameterTypes())) {
-				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(@:privateAccess args.__a);
+				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(@:privateAccess args.getNative());
 			}
 		}
 
@@ -169,7 +169,7 @@ class Type {
 				continue;
 			}
 			if (unify(ctor.getParameterTypes())) {
-				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(@:privateAccess args.__a);
+				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(@:privateAccess args.getNative());
 			}
 		}
 
@@ -195,7 +195,7 @@ class Type {
 		// 	}
 		// }
 		// if (ctor2 != null) {
-		// 	ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
+		// 	ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.getNative());
 		// 	return obj;
 		// }
 		return null;

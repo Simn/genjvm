@@ -52,6 +52,14 @@ import java.NativeArray;
 		return null;
 	}
 
+	#if jvm
+	function getNative():NativeArray<T> {
+		var a = new NativeArray(length);
+		System.arraycopy(__a, 0, a, 0, length);
+		return a;
+	}
+	#end
+
 	public function new():Void {
 		this.length = 0;
 		this.__a = new NativeArray(0);
