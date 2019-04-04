@@ -32,7 +32,7 @@
 	function toUpperCase() : String;
 	function toLowerCase() : String;
 
-	inline function charAt( index : Int) : String {
+	@:runtime inline function charAt( index : Int) : String {
 		return jvm.StringExt.charAt(this, index);
 	}
 
@@ -48,13 +48,15 @@
 
 	function lastIndexOf( str : String, ?startIndex : Int ) : Int;
 
-	inline function split( delimiter : String ) : Array<String> {
+	@:runtime inline function split( delimiter : String ) : Array<String> {
 		return jvm.StringExt.split(this, delimiter);
 	}
 
 	function substr( pos : Int, ?len : Int ) : String;
 
-	function substring( startIndex : Int, ?endIndex : Int ) : String;
+	@:runtime inline function substring( startIndex : Int, ?endIndex : Int ) : String {
+		return jvm.StringExt.substring(this, startIndex, endIndex);
+	}
 
 	function toString() : String;
 

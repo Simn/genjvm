@@ -35,4 +35,25 @@ class StringExt {
 		}
 		return ret;
 	}
+
+	public static function substring(me:String, startIndex:Int, ?endIndex:Int):String {
+		var endIndex:Int = endIndex == null ? me.length : endIndex;
+		if (endIndex < 0) {
+			endIndex = 0;
+		} else if (endIndex > me.length) {
+			endIndex = me.length;
+		}
+		if (startIndex < 0) {
+			startIndex = 0;
+		} else if (startIndex > me.length) {
+			startIndex = me.length;
+		}
+
+		if (startIndex > endIndex) {
+			var tmp = startIndex;
+			startIndex = endIndex;
+			endIndex = tmp;
+		}
+		return (cast me : java.lang.JavaString.String).substring(startIndex, endIndex);
+	}
 }
