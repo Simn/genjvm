@@ -835,7 +835,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		self#close_jumps ((jm#is_terminated,if def = None then offset_def else r_def) :: rl)
 
 	method switch ret e1 cases def =
-		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 in
+		(* TODO: hack because something loses the exhaustiveness marker before we get here *)
+		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 || (ExtType.is_bool (follow e1.etype) && List.length cases > 1) in
 		if cases = [] then
 			self#texpr ret e1
 		else if List.for_all is_const_int_pattern cases then

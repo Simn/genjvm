@@ -2853,6 +2853,10 @@ module ExtType = struct
 		| TInst({cl_path=[],"String"},_) -> true
 		| _ -> false
 
+	let is_bool t = match t with
+		| TAbstract({a_path=[],"Bool"},_) -> true
+		| _ -> false
+
 	type semantics =
 		| VariableSemantics
 		| ReferenceSemantics
