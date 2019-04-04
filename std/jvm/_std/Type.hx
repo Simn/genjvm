@@ -121,7 +121,6 @@ class Type {
 	}
 
 	public static function createInstance<T>(cl:Class<T>, args:Array<Dynamic>):T {
-		var obj = cl.native().getConstructor(emptyClass).newInstance(emptyArg);
 		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
 		var cl = cl.native();
 		for (i in 0...args.length) {
@@ -131,34 +130,74 @@ class Type {
 		}
 		var methodType = MethodType.methodType(cast Void, argTypes);
 
-		var ctor2 = try {
-			MethodHandles.lookup().findVirtual(cl, "new", methodType);
-		} catch (_:NoSuchMethodException) {
-			null;
-		}
-		if (ctor2 == null) {
-			for (ctor in cl.getDeclaredMethods()) {
-				var params = ctor.getParameterTypes();
-				if (params.length != args.length) {
-					continue;
-				}
-				var valid = true;
-				for (i in 0...params.length) {
-					if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
-						valid = false;
-						break;
-					}
-				}
-				if (valid) {
-					ctor2 = MethodHandles.lookup().unreflect(ctor);
-					break;
+		// 1. attempt: direct constructor lookup
+		try {
+			var ctor = MethodHandles.lookup().findConstructor(cl, methodType);
+            return ctor.invokeWithArguments(@:privateAccess args.__a);
+		} catch(_:NoSuchMethodException) { }
+
+		// 2. attempt direct new lookup
+		try {
+			var ctor = MethodHandles.lookup().findVirtual(cl, "new", methodType);
+			var obj = cl.getConstructor(emptyClass).newInstance(emptyArg);
+			ctor.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
+			return obj;
+		} catch (_:NoSuchMethodException) { }
+
+		function unify(params:java.NativeArray<java.lang.Class<Dynamic>>) {
+			if (params.length != args.length) {
+				return false;
+			}
+			for (i in 0...params.length) {
+				if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
+					return false;
 				}
 			}
+			return true;
 		}
-		if (ctor2 != null) {
-			ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
-			return obj;
+
+		// 3. attempt: unify actual constructor
+		for (ctor in cl.getDeclaredConstructors()) {
+			if (unify(ctor.getParameterTypes())) {
+				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(@:privateAccess args.__a);
+			}
 		}
+
+		// 4. attempt: unify new
+		for (ctor in cl.getDeclaredMethods()) {
+			if (ctor.getName() != "new") {
+				continue;
+			}
+			if (unify(ctor.getParameterTypes())) {
+				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(@:privateAccess args.__a);
+			}
+		}
+
+		return null;
+
+		// if (ctor2 == null) {
+		// 	for (ctor in cl.getDeclaredMethods()) {
+		// 		var params = ctor.getParameterTypes();
+		// 		if (params.length != args.length) {
+		// 			continue;
+		// 		}
+		// 		var valid = true;
+		// 		for (i in 0...params.length) {
+		// 			if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
+		// 				valid = false;
+		// 				break;
+		// 			}
+		// 		}
+		// 		if (valid) {
+		// 			ctor2 = MethodHandles.lookup().unreflect(ctor);
+		// 			break;
+		// 		}
+		// 	}
+		// }
+		// if (ctor2 != null) {
+		// 	ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.__a);
+		// 	return obj;
+		// }
 		return null;
 	}
 

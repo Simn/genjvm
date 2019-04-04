@@ -32,6 +32,36 @@ class Child extends Base implements ChildInterface {
 	}
 }
 
+class HxGenBase {
+	public var value:String;
+
+	@:hxGen function new() {
+		value = "HxGenBase.new()V";
+	}
+}
+
+class HxGenChild extends HxGenBase {
+	public function new() {
+		super();
+		value += "HxGenChild.new()V";
+	}
+}
+
+class ThisBeforeSuperBase {
+	public var value:String;
+
+	@:hxGen function new() {
+		value += "ThisBeforeSuperBase.new()V";
+	}
+}
+
+class ThisBeforeSuperChild extends ThisBeforeSuperBase {
+	public function new() {
+		value = "ThisBeforeSuperChild.new()V";
+		super();
+	}
+}
+
 typedef TestStructure = {
 	function test(value:String):String;
 }
@@ -58,5 +88,15 @@ class TestOop extends BaseTest {
 		}
 		child.field = "FieldValue";
 		eq("FieldValue", subtype(child));
+
+		testSpecialtors();
+	}
+
+	function testSpecialtors() {
+		var c = new HxGenChild();
+		eq("HxGenBase.new()VHxGenChild.new()V", c.value);
+
+		var c = new ThisBeforeSuperChild();
+		eq("ThisBeforeSuperChild.new()VThisBeforeSuperBase.new()V", c.value);
 	}
 }

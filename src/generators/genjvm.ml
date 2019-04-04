@@ -61,8 +61,10 @@ let find_overload_rec is_ctor map_type c cf el =
 	else Some(c,cf)
 
 let get_construction_mode c cf =
-	if c.cl_extern || Meta.has Meta.NativeGen cf.cf_meta then ConstructInit
-	else ConstructInitPlusNew
+	if Meta.has Meta.HxGen cf.cf_meta then ConstructInitPlusNew
+	else ConstructInit
+	(* if c.cl_extern || Meta.has Meta.NativeGen cf.cf_meta then ConstructInit *)
+	(* else ConstructInitPlusNew *)
 
 (* Haxe *)
 
@@ -1946,7 +1948,7 @@ let generate_method gctx jc c mtype cf =
 	let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
 	let name,is_top,flags = match mtype with
 		| MConstructor ->
-			if Meta.has Meta.NativeGen cf.cf_meta then "<init>",c.cl_super = None,flags
+			if get_construction_mode c cf = ConstructInit then "<init>",c.cl_super = None,flags
 			else cf.cf_name,false,MSynthetic :: flags
 		| _ -> cf.cf_name,false,flags
 	in
@@ -2304,7 +2306,7 @@ module Preprocessor = struct
 			| None -> jerror "Something went wrong"
 			| Some info ->
 				if not info.has_this_before_super then begin
-					(* print_endline (Printf.sprintf "promoted this_before_super to %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type)); *)
+					print_endline (Printf.sprintf "promoted this_before_super to %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type));
 					info.has_this_before_super <- true;
 					List.iter (fun (c,cf) -> promote_this_before_super c cf) info.super_call_fields
 				end
@@ -2321,7 +2323,7 @@ module Preprocessor = struct
 				List.iter loop el;
 				if !used_this then begin
 					this_before_super := true;
-					(* print_endline (Printf.sprintf "inferred this_before_super on %s.new : %s" (s_type_path (Option.get gctx.curclass).cl_path) (s_type (print_context()) (Option.get gctx.curfield).cf_type)); *)
+					print_endline (Printf.sprintf "inferred this_before_super on %s.new : %s" (s_type_path (Option.get gctx.curclass).cl_path) (s_type (print_context()) (Option.get gctx.curfield).cf_type));
 				end;
 				let c,cf = find_super_ctor el in
 				if !this_before_super then promote_this_before_super c cf;
@@ -2363,16 +2365,31 @@ module Preprocessor = struct
 			preprocess_field gctx cf mtype
 		in
 		let field mtype cf =
+			List.iter (field mtype) (cf :: cf.cf_overloads);
 			if mtype = MConstructor then begin
-				if not (Meta.has Meta.NativeGen cf.cf_meta) then begin
-					let rec loop c =
-						if c.cl_extern then cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
-						else match c.cl_super with Some(c,_) -> loop c | None -> ()
+				let make_native cf =
+					cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
+				in
+				let make_haxe cf =
+					cf.cf_meta <- (Meta.HxGen,[],null_pos) :: cf.cf_meta
+				in
+				if not (Meta.has Meta.HxGen cf.cf_meta) then begin
+					let rec loop next c =
+						if c.cl_extern then make_native cf
+						else match c.cl_constructor with
+							| Some cf' when Meta.has Meta.HxGen cf'.cf_meta -> make_haxe cf
+							| Some cf' when Meta.has Meta.NativeGen cf'.cf_meta -> make_native cf
+							| _ -> next c
 					in
-					loop c
+					let rec up c = match c.cl_super with
+						| None -> ()
+						| Some(c,_) -> loop up c
+					in
+					let rec down c = List.iter (fun c -> loop down c) c.cl_descendants in
+					loop up c;
+					loop down c
 				end;
 			end;
-			List.iter (field mtype) (cf :: cf.cf_overloads)
 		in
 		List.iter (field MStatic) c.cl_ordered_statics;
 		List.iter (field MStatic) c.cl_ordered_fields;
@@ -2406,7 +2423,7 @@ let generate com =
 		field_infos = DynArray.create();
 		current_field_info = None;
 	} in
-	Preprocessor.preprocess gctx;
+	Std.finally (Timer.timer ["generate";"java";"preprocess"]) Preprocessor.preprocess gctx;
 	let manifest_content =
 		"Manifest-Version: 1.0\n" ^
 		"Created-By: Haxe (Haxe Foundation)" ^
@@ -2433,7 +2450,7 @@ let generate com =
 			let string_map_sig = object_path_sig string_map_path in
 			let jm_fields = jc#spawn_method "_hx_getKnownFields" (method_sig [] (Some string_map_sig)) [MProtected] in
 			let _,load,save = jm_fields#add_local "tmp" string_map_sig VarWillInit in
-			jm_fields#construct ConstructInitPlusNew string_map_path (fun () -> []);
+			jm_fields#construct ConstructInit string_map_path (fun () -> []);
 			save();
 			List.iter (fun (name,jsig) ->
 				load();
