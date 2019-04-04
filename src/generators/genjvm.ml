@@ -915,10 +915,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let sig1 = jsignature_of_type e1.etype in
 		let sig2 = jsignature_of_type e2.etype in
 		match (Texpr.skip e1),(Texpr.skip e2) with
-		| {eexpr = TConst TNull},e1
-		| e1,{eexpr = TConst TNull} ->
+		| {eexpr = TConst TNull},_ when not (is_unboxed sig2) ->
+			self#texpr rvalue_any e2;
+			CmpSpecial ((if op = CmpEq then self#if_not_null else self#if_null) sig2)
+		| _,{eexpr = TConst TNull} when not (is_unboxed sig1) ->
 			self#texpr rvalue_any e1;
-			CmpSpecial ((if op = CmpEq then self#if_not_null else self#if_null) (self#vtype e1.etype))
+			CmpSpecial ((if op = CmpEq then self#if_not_null else self#if_null) sig1)
 		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 && is_unboxed sig2 ->
 			let op = match op with
 				| CmpGt | CmpGe | CmpLt | CmpLe -> op
