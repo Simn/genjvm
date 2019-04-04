@@ -1796,11 +1796,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TArray(e1,e2) ->
 			begin match follow e1.etype with
 			| TInst({cl_path = ([],"Array")} as c,[t]) ->
-				let cf_get = PMap.find "__get" c.cl_fields in
-				let t = self#mknull t in
-				let ef = mk (TField(e1,FInstance(c,[t],cf_get))) (apply_params c.cl_params [t] cf_get.cf_type) e.epos in
-				self#call rvalue_any t ef [e2];
-				self#cast e.etype;
+				self#texpr rvalue_any e1;
+				self#texpr (rvalue_sig TInt) e2;
+				jm#cast TInt;
+				jm#invokevirtual c.cl_path "__get" (object_path_sig c.cl_path) (method_sig [TInt] (Some object_sig));
+				self#cast e.etype
 			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
 				self#texpr rvalue_any e1;
 				let vt = self#vtype e1.etype in
