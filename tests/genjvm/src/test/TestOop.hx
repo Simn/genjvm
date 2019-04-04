@@ -62,6 +62,25 @@ class ThisBeforeSuperChild extends ThisBeforeSuperBase {
 	}
 }
 
+class PassThroughParent {
+	public var value:String;
+
+    public function new() {
+		value = "PassThroughParent.new()V";
+	}
+}
+
+class PassThroughCurrent extends PassThroughParent {
+
+}
+
+class PassThroughChild extends PassThroughCurrent {
+    public function new() {
+        super();
+		value += "PassThroughChild.new()V";
+    }
+}
+
 typedef TestStructure = {
 	function test(value:String):String;
 }
@@ -98,5 +117,8 @@ class TestOop extends BaseTest {
 
 		var c = new ThisBeforeSuperChild();
 		eq("ThisBeforeSuperChild.new()VThisBeforeSuperBase.new()V", c.value);
+
+		var c = new PassThroughChild();
+		eq("PassThroughParent.new()VPassThroughChild.new()V", c.value);
 	}
 }

@@ -2302,17 +2302,18 @@ module Preprocessor = struct
 		| _ ->
 			()
 
-	let check_tnew gctx c tl el p =
-		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" (List.map (fun e -> e.etype) el) with
-		| None -> Error.error "Could not find overload" p
-		| Some (c',cf) ->
-			if c != c' then begin
+	let add_implicit_ctor gctx c c' cf =
 				try
 					let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
 					Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) sm);
 				with Not_found ->
 					Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
-			end
+
+	let check_tnew gctx c tl el p =
+		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" (List.map (fun e -> e.etype) el) with
+		| None -> Error.error "Could not find overload" p
+		| Some (c',cf) ->
+			if c != c' then add_implicit_ctor gctx c c' cf;
 		end
 
 	let make_native cf =
@@ -2331,9 +2332,19 @@ module Preprocessor = struct
 				| Some(c,tl) -> c,apply_params c.cl_params tl
 				| _ -> assert false
 			in
-			let _,cf = get_constructor (fun cf -> map_type cf.cf_type) csup in
-			match find_overload_rec true map_type csup cf el with
-			| Some r -> r
+			match find_overload_rec' true map_type csup "new" (List.map (fun e -> e.etype) el) with
+			| Some(c,cf) ->
+				let rec loop csup =
+					if c != csup then begin
+						match csup.cl_super with
+						| Some(c',_) ->
+							add_implicit_ctor gctx csup c' cf;
+							loop c'
+						| None -> assert false
+					end
+				in
+				loop csup;
+				(c,cf)
 			| None -> Error.error "Could not find overload constructor" e.epos
 		in
 		let rec promote_this_before_super c cf = match get_field_info gctx cf.cf_meta with
