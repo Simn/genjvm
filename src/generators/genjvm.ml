@@ -1903,7 +1903,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jm#set_this_initialized
 end
 
-let generate_expr gctx jc jm e is_main is_method is_top mtype =
+type super_ctor_mode =
+	| SCNone
+	| SCJava
+	| SCHaxe
+
+let generate_expr gctx jc jm e is_main is_method scmode mtype =
 	let e,args,tr = match e.eexpr with
 		| TFunction tf when is_method ->
 			tf.tf_expr,tf.tf_args,tf.tf_type
@@ -1925,7 +1930,16 @@ let generate_expr gctx jc jm e is_main is_method is_top mtype =
 	begin match mtype with
 	| MConstructor ->
 		jm#get_code#inline jc#get_field_init_method#get_code;
-		if is_top then handler#object_constructor
+		begin match scmode with
+		| SCJava ->
+			handler#object_constructor
+		| SCHaxe ->
+			jm#load_this;
+			jm#get_code#aconst_null jc#get_jsig;
+			jm#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
+		| SCNone ->
+			()
+		end
 	| _ ->
 		()
 	end;
@@ -1948,17 +1962,22 @@ let generate_method gctx jc c mtype cf =
 	let flags = if c.cl_interface then MAbstract :: flags else flags in
 	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
 	let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
-	let name,is_top,flags = match mtype with
+	let name,scmode,flags = match mtype with
 		| MConstructor ->
-			if get_construction_mode c cf = ConstructInit then "<init>",c.cl_super = None,flags
-			else cf.cf_name,false,flags
-		| _ -> cf.cf_name,false,flags
+			let rec has_super_ctor c = match c.cl_super with
+				| None -> false
+				| Some(c,_) -> c.cl_constructor <> None || has_super_ctor c
+			in
+			let get_scmode () = if c.cl_super = None then SCJava else if not (has_super_ctor c) then SCHaxe else SCNone in
+			if get_construction_mode c cf = ConstructInit then "<init>",get_scmode(),flags
+			else cf.cf_name,SCNone,flags
+		| _ -> cf.cf_name,SCNone,flags
 	in
 	let jm = jc#spawn_method name jsig flags in
 	begin match cf.cf_expr with
 	| None -> ()
 	| Some e ->
-		generate_expr gctx jc jm e (cf.cf_name = "main") true is_top mtype;
+		generate_expr gctx jc jm e (cf.cf_name = "main") true scmode mtype;
 	end;
 	begin match cf.cf_params with
 		| [] when c.cl_params = [] ->
