@@ -899,7 +899,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let op = flip_cmp_op op in
 			CmpSpecial (fun () -> code#if_icmp_ref op)
 		| [TObject((["java";"lang"],"String"),[]);TObject((["java";"lang"],"String"),[])] ->
-			jm#invokestatic haxe_jvm_path "stringEquals" (method_sig [string_sig;string_sig] (Some TBool));
+			jm#invokestatic haxe_jvm_path "stringCompare" (method_sig [string_sig;string_sig] (Some TInt));
+			let op = flip_cmp_op op in
 			CmpNormal(op,TBool)
 		| [TObject((["java";"lang"],"Object"),[]) | TTypeParameter _;_]
 		| [_;TObject((["java";"lang"],"Object"),[]) | TTypeParameter _] ->

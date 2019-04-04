@@ -20,11 +20,11 @@ class Jvm {
 
 	extern static public function invokedynamic<T>(bootstrapMethod:Function, fieldName:String, staticArguments:Array<Dynamic>, rest:Rest<Dynamic>):T;
 
-	static public function stringEquals(v1:String, v2:String):Bool {
+	static public function stringCompare(v1:String, v2:String):Int {
 		if (v1 == null) {
-			return v2 == null;
+			return v2 == null ? 0 : 1;
 		}
-		return (cast v1 : java.lang.JavaString.String).equals(v2);
+		return (cast v1 : java.lang.JavaString.String).compareTo(v2);
 	}
 
 	static public function equals<T>(v1:T, v2:T):Bool {
