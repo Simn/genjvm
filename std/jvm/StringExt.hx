@@ -36,6 +36,28 @@ class StringExt {
 		return ret;
 	}
 
+	public static function substr(me:String, pos:Int, ?len:Int):String {
+		var len:Int = len == null ? me.length : len;
+		if (pos != 0 && len < 0) {
+			return "";
+		}
+		if (pos < 0) {
+			pos = me.length + pos;
+			if (pos < 0) {
+				pos = 0;
+			}
+		} else if (len < 0) {
+			len = me.length + len - pos;
+		}
+		if (pos + len > me.length) {
+			len = me.length - pos;
+		}
+		if (pos < 0 || len <= 0) {
+			return "";
+		}
+		return (cast me : java.lang.JavaString.String).substring(pos, pos + len);
+	}
+
 	public static function substring(me:String, startIndex:Int, ?endIndex:Int):String {
 		var endIndex:Int = endIndex == null ? me.length : endIndex;
 		if (endIndex < 0) {

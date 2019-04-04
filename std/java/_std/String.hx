@@ -52,7 +52,9 @@
 		return jvm.StringExt.split(this, delimiter);
 	}
 
-	function substr( pos : Int, ?len : Int ) : String;
+	@:runtime inline function substr( pos : Int, ?len : Int ) : String {
+		return jvm.StringExt.substr(this, pos, len);
+	}
 
 	@:runtime inline function substring( startIndex : Int, ?endIndex : Int ) : String {
 		return jvm.StringExt.substring(this, startIndex, endIndex);
