@@ -16,6 +16,7 @@ class builder path_this path_super = object(self)
 	val mutable interface_offsets = []
 	val fields = DynArray.create ()
 	val methods = DynArray.create ()
+	val method_sigs = Hashtbl.create 0
 	val inner_classes = DynArray.create ()
 	val mutable closure_count = 0
 	val mutable bootstrap_methods = []
@@ -28,9 +29,6 @@ class builder path_this path_super = object(self)
 
 	method add_field (f : jvm_field) =
 		DynArray.add fields f
-
-	method add_method (m : jvm_field) =
-		DynArray.add methods m
 
 	method get_bootstrap_method path name jsig (consts : jvm_constant_pool_index list) =
 		try
@@ -59,6 +57,9 @@ class builder path_this path_super = object(self)
 		closure_count <- closure_count + 1;
 		name
 
+	method has_method (name : string) (jsig : jsignature) =
+		Hashtbl.mem method_sigs (name,generate_method_signature false jsig)
+
 	method spawn_inner_class (jm : JvmMethod.builder option) (path_super : jpath) (name : string option) =
 		let path = match name with
 			| None -> (fst path_this,Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes))
@@ -84,6 +85,10 @@ class builder path_this path_super = object(self)
 
 	method spawn_method (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
 		let jm = new JvmMethod.builder self name jsig_method in
+		let ssig_method = generate_method_signature false jsig_method in
+		if Hashtbl.mem method_sigs (name,ssig_method) then
+			jerror (Printf.sprintf "Duplicate field on class %s: %s %s" (Globals.s_type_path path_this) name ssig_method);
+		Hashtbl.add method_sigs (name,ssig_method) jm;
 		List.iter (fun flag ->
 			jm#add_access_flag (MethodAccessFlags.to_int flag)
 		) flags;
@@ -136,7 +141,7 @@ class builder path_this path_super = object(self)
 			begin match pop_scope with
 			| Some pop_scope ->
 				pop_scope();
-				self#add_method jm#export_method;
+				DynArray.add methods jm#export_method;
 			| None ->
 				self#add_field jm#export_field
 			end;
