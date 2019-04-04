@@ -3,6 +3,12 @@ package jvm;
 import java.lang.JavaString.String as JavaString;
 
 class StringExt {
+	public static function fromCharCode(code:Int):String {
+		var a = new java.NativeArray(1);
+		a[0] = code;
+		return new String(a, 0, 1);
+	}
+
 	public static function charAt(me:String, index:Int):String {
 		if (index >= me.length || index < 0)
 			return "";

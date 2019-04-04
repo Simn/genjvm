@@ -27,6 +27,7 @@
 	@:overload(function(b:haxe.io.BytesData, offset:Int, length:Int, charsetName:String):Void { })
 	@:overload(function(b:haxe.io.BytesData, offset:Int, length:Int):Void { })
 	@:overload(function(b:java.NativeArray<java.StdTypes.Char16>):Void { })
+	@:overload(function(b:java.NativeArray<Int>, offset:Int, count:Int):Void { })
 	function new(string:String) : Void;
 
 	function toUpperCase() : String;
@@ -69,6 +70,8 @@
 	@:overload(function() : haxe.io.BytesData { })
 	private function getBytes(encoding:String) : haxe.io.BytesData;
 
-	static function fromCharCode( code : Int ) : String;
+	@:runtime static inline function fromCharCode( code : Int ) : String {
+		return jvm.StringExt.fromCharCode(code);
+	}
 
 }
