@@ -904,6 +904,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ -> code#dcmpl;
 			end;
 			CmpNormal(op,TDouble)
+		| [TFloat;TFloat] ->
+			let op = flip_cmp_op op in
+			begin match op with
+			| CmpGe | CmpGt -> code#fcmpg;
+			| _ -> code#fcmpl;
+			end;
+			CmpNormal(op,TFloat)
 		| [TLong;TLong] ->
 			let op = flip_cmp_op op in
 			code#lcmpl;

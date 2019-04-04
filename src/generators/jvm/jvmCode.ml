@@ -365,6 +365,9 @@ class builder pool = object(self)
 	method dcmpg = self#op OpDcmpg 1 [TDouble;TDouble] [TInt]
 	method dcmpl = self#op OpDcmpl 1 [TDouble;TDouble] [TInt]
 
+	method fcmpg = self#op OpFcmpg 1 [TFloat;TFloat] [TInt]
+	method fcmpl = self#op OpFcmpl 1 [TFloat;TFloat] [TInt]
+
 	method lcmpl = self#op OpLcmp 1 [TLong;TLong] [TInt]
 
 	(* ops *)
