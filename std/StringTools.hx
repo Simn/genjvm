@@ -194,7 +194,7 @@ class StringTools {
 	**/
 	public static #if (cs || java || python) inline #end function startsWith( s : String, start : String ) : Bool {
 		#if java
-		return untyped s.startsWith(start);
+		return (cast s : java.lang.JavaString.String).startsWith(start);
 		#elseif cs
 		return untyped s.StartsWith(start);
 		#elseif cpp
@@ -224,7 +224,7 @@ class StringTools {
 	**/
 	public static #if (cs || java || python) inline #end function endsWith( s : String, end : String ) : Bool {
 		#if java
-		return untyped s.endsWith(end);
+		return (cast s : java.lang.JavaString.String).endsWith(end);
 		#elseif cs
 		return untyped s.EndsWith(end);
 		#elseif cpp
@@ -396,7 +396,7 @@ class StringTools {
 		if (sub.length == 0)
 			return s.split(sub).join(by);
 		else
-			return untyped s.replace(sub, by);
+			return (cast s : java.lang.JavaString.String).replace(sub, by);
 		#elseif cs
 		if (sub.length == 0)
 			return s.split(sub).join(by);
