@@ -16,4 +16,23 @@ class StringExt {
 		else
 			return cast((cast me : JavaString).charAt(index), Int);
 	}
+
+	public static function split(me:String, delimiter:String):Array<String> {
+		var ret = [];
+		if (delimiter.length == 0) {
+			for (i in 0...me.length) {
+				ret.push(me.charAt(i));
+			}
+		} else {
+			var start = 0;
+			var pos = me.indexOf(delimiter, start);
+			while (pos >= 0) {
+				ret.push((cast me : java.lang.JavaString.String).substring(start, pos));
+				start = pos + delimiter.length;
+				pos = me.indexOf(delimiter, start);
+			}
+			ret.push((cast me : java.lang.JavaString.String).substring(start));
+		}
+		return ret;
+	}
 }

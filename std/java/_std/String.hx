@@ -48,7 +48,9 @@
 
 	function lastIndexOf( str : String, ?startIndex : Int ) : Int;
 
-	function split( delimiter : String ) : Array<String>;
+	inline function split( delimiter : String ) : Array<String> {
+		return jvm.StringExt.split(this, delimiter);
+	}
 
 	function substr( pos : Int, ?len : Int ) : String;
 

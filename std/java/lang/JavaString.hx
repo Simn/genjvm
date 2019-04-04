@@ -14,4 +14,6 @@ extern class String {
 
 	function replace(target:CharSequence, replacement:CharSequence):std.String;
 	function startsWith(prefix:std.String):Bool;
+	@:overload function substring(beginIndex:Int):std.String;
+	@:overload function substring(beginIndex:Int, endIndex:Int):std.String;
 }
