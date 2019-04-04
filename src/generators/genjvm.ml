@@ -57,15 +57,14 @@ let find_overload_rec' is_ctor map_type c name tl =
 	loop map_type c
 
 let find_overload_rec is_ctor map_type c cf el =
-	(* if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then *)
+	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then
 		find_overload_rec' is_ctor map_type c cf.cf_name (List.map (fun e -> e.etype) el)
-	(* else Some(c,cf) *)
+	else
+		Some(c,cf)
 
 let get_construction_mode c cf =
 	if Meta.has Meta.HxGen cf.cf_meta then ConstructInitPlusNew
 	else ConstructInit
-	(* if c.cl_extern || Meta.has Meta.NativeGen cf.cf_meta then ConstructInit *)
-	(* else ConstructInitPlusNew *)
 
 (* Haxe *)
 
@@ -2110,6 +2109,24 @@ class tclass_to_jvm gctx c = object(self)
 		end;
 		jm_empty_ctor#get_code#return_void;
 
+	(* TODO: this should respect the construction_kind too. We have to make sure it's properly marked - somehow *)
+	method private generate_implicit_ctors =
+		try
+			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
+			PMap.iter (fun _ (c,cf) ->
+				let jm = jc#spawn_method "<init>" (jsignature_of_type cf.cf_type) [MPublic] in
+				jm#load_this;
+				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
+				List.iter (fun (n,_,t) ->
+					let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
+					load();
+				) tl;
+				jm#invokespecial c.cl_path "<init>" (object_path_sig c.cl_path) jm#get_jsig;
+				jm#return
+			) sm
+		with Not_found ->
+			()
+
 	method private generate_fields =
 		let field mtype cf = match cf.cf_kind with
 			| Method (MethNormal | MethInline) ->
@@ -2165,6 +2182,7 @@ class tclass_to_jvm gctx c = object(self)
 	method generate =
 		self#set_access_flags;
 		self#generate_empty_ctor;
+		self#generate_implicit_ctors;
 		self#set_interfaces;
 		self#generate_fields;
 		self#generate_signature;
@@ -2287,8 +2305,7 @@ module Preprocessor = struct
 			()
 
 	let check_tnew gctx c tl el p =
-		let _,cf = get_constructor (fun cf -> cf.cf_type) c in
-		begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
+		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" (List.map (fun e -> e.etype) el) with
 		| None -> Error.error "Could not find overload" p
 		| Some (c',cf) ->
 			if c != c' then begin
