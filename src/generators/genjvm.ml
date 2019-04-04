@@ -57,8 +57,9 @@ let find_overload_rec' is_ctor map_type c name tl =
 	loop map_type c
 
 let find_overload_rec is_ctor map_type c cf el =
-	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then find_overload_rec' is_ctor map_type c cf.cf_name (List.map (fun e -> e.etype) el)
-	else Some(c,cf)
+	(* if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then *)
+		find_overload_rec' is_ctor map_type c cf.cf_name (List.map (fun e -> e.etype) el)
+	(* else Some(c,cf) *)
 
 let get_construction_mode c cf =
 	if Meta.has Meta.HxGen cf.cf_meta then ConstructInitPlusNew
@@ -86,6 +87,7 @@ type generation_context = {
 	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
 	anon_path_lut : (path,jpath) Hashtbl.t;
 	field_infos : field_generation_info DynArray.t;
+	implicit_ctors : (path,(path,tclass * tclass_field) PMap.t) Hashtbl.t;
 	mutable current_field_info : field_generation_info option;
 	mutable anon_num : int;
 	mutable curclass : tclass option;
@@ -1701,7 +1703,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
 		| TNew(c,tl,el) ->
 			begin match get_constructor (fun cf -> cf.cf_type) c with
-			| _,cf ->
+			|_,cf ->
 				begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
 				| None -> Error.error "Could not find overload" e.epos
 				| Some (c',cf) ->
@@ -2284,6 +2286,20 @@ module Preprocessor = struct
 		| _ ->
 			()
 
+	let check_tnew gctx c tl el p =
+		let _,cf = get_constructor (fun cf -> cf.cf_type) c in
+		begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
+		| None -> Error.error "Could not find overload" p
+		| Some (c',cf) ->
+			if c != c' then begin
+				try
+					let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
+					Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) sm);
+				with Not_found ->
+					Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
+			end
+		end
+
 	let preprocess_constructor_expr gctx e =
 		let used_this = ref false in
 		let this_before_super = ref false in
@@ -2314,6 +2330,9 @@ module Preprocessor = struct
 		let rec loop e =
 			check_anon gctx e;
 			begin match e.eexpr with
+			| TNew(c,tl,el) ->
+				List.iter loop el;
+				check_tnew gctx c tl el e.epos
 			| TBinop(OpAssign,{eexpr = TField({eexpr = TConst TThis},FInstance(_,_,cf))},e2) when is_on_current_class cf->
 				(* Assigning this.field = value is fine if field is declared on our current class *)
 				loop e2;
@@ -2341,7 +2360,12 @@ module Preprocessor = struct
 	let preprocess_expr gctx e =
 		let rec loop e =
 			check_anon gctx e;
-			Type.iter loop e
+			match e.eexpr with
+			| TNew(c,tl,el) ->
+				List.iter loop el;
+				check_tnew gctx c tl el e.epos
+			| _ ->
+				Type.iter loop e
 		in
 		loop e
 
@@ -2420,6 +2444,7 @@ let generate com =
 		anon_num = 0;
 		curclass = None;
 		curfield = None;
+		implicit_ctors = Hashtbl.create 0;
 		field_infos = DynArray.create();
 		current_field_info = None;
 	} in
