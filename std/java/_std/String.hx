@@ -30,14 +30,21 @@
 	function new(string:String) : Void;
 
 	function toUpperCase() : String;
-
 	function toLowerCase() : String;
 
-	function charAt( index : Int) : String;
+	inline function charAt( index : Int) : String {
+		return jvm.StringExt.charAt(this, index);
+	}
 
-	function charCodeAt( index : Int) : Null<Int>;
+	inline function charCodeAt( index : Int) : Null<Int> {
+		return jvm.StringExt.charCodeAt(this, index);
+	}
 
-	function indexOf( str : String, ?startIndex : Int ) : Int;
+	inline function indexOf( str : String, ?startIndex : Int ) : Int {
+		return
+			if (startIndex == null) (cast this : java.lang.JavaString.String).indexOf(str)
+			else (cast this : java.lang.JavaString.String).indexOf(str, startIndex);
+	}
 
 	function lastIndexOf( str : String, ?startIndex : Int ) : Int;
 
