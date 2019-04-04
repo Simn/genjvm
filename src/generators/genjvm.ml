@@ -936,7 +936,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| _,{eexpr = TConst TNull} when not (is_unboxed sig1) ->
 			self#texpr rvalue_any e1;
 			CmpSpecial ((if op = CmpEq then self#if_not_null else self#if_null) sig1)
-		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 && is_unboxed sig2 ->
+		| {eexpr = TConst (TInt i32);etype = t2},e1 when Int32.to_int i32 = 0 && sig2 = TInt ->
 			let op = match op with
 				| CmpGt | CmpGe | CmpLt | CmpLe -> op
 				| CmpEq | CmpNe -> flip_cmp_op op
@@ -944,7 +944,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			self#cast t2;
 			CmpNormal(op,TInt)
-		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 && is_unboxed sig1 ->
+		| e1,{eexpr = TConst (TInt i32); etype = t2;} when Int32.to_int i32 = 0 && sig1 = TInt->
 			let op = flip_cmp_op op in
 			self#texpr rvalue_any e1;
 			self#cast t2;
