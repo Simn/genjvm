@@ -594,7 +594,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
 			code#getfield offset vtobj vt
-		| FEnum(en,ef) ->
+		| FEnum(en,ef) when not (match follow ef.ef_type with TFun _ -> true | _ -> false) ->
 			let jsig = self#vtype ef.ef_type in
 			let offset = pool#add_field en.e_path ef.ef_name jsig FKField in
 			code#getstatic offset jsig
@@ -621,7 +621,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				default();
 			end
-		| FDynamic s | FInstance(_,_,{cf_name = s}) ->
+		| FDynamic s | FInstance(_,_,{cf_name = s}) | FEnum(_,{ef_name = s}) ->
 			self#texpr rvalue_any e1;
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
