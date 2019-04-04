@@ -89,8 +89,6 @@ type generation_context = {
 	implicit_ctors : (path,(path,tclass * tclass_field) PMap.t) Hashtbl.t;
 	mutable current_field_info : field_generation_info option;
 	mutable anon_num : int;
-	mutable curclass : tclass option;
-	mutable curfield : tclass_field option;
 }
 
 type ret =
@@ -2317,17 +2315,20 @@ module Preprocessor = struct
 			end
 		end
 
-	let preprocess_constructor_expr gctx e =
+	let make_native cf =
+		cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
+
+	let make_haxe cf =
+		cf.cf_meta <- (Meta.HxGen,[],null_pos) :: cf.cf_meta
+
+	let preprocess_constructor_expr gctx c cf e =
 		let used_this = ref false in
 		let this_before_super = ref false in
 		let super_call_fields = DynArray.create () in
-		let is_on_current_class cf = match gctx.curclass with
-			| None -> false
-			| Some c -> PMap.mem cf.cf_name c.cl_fields
-		in
+		let is_on_current_class cf = PMap.mem cf.cf_name c.cl_fields in
 		let find_super_ctor el =
-			let csup,map_type = match gctx.curclass with
-				| Some {cl_super = Some(c,tl)} -> c,apply_params c.cl_params tl
+			let csup,map_type = match c.cl_super with
+				| Some(c,tl) -> c,apply_params c.cl_params tl
 				| _ -> assert false
 			in
 			let _,cf = get_constructor (fun cf -> map_type cf.cf_type) csup in
@@ -2339,7 +2340,8 @@ module Preprocessor = struct
 			| None -> jerror "Something went wrong"
 			| Some info ->
 				if not info.has_this_before_super then begin
-					print_endline (Printf.sprintf "promoted this_before_super to %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type));
+					make_haxe cf;
+					(* print_endline (Printf.sprintf "promoted this_before_super to %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type)); *)
 					info.has_this_before_super <- true;
 					List.iter (fun (c,cf) -> promote_this_before_super c cf) info.super_call_fields
 				end
@@ -2359,7 +2361,8 @@ module Preprocessor = struct
 				List.iter loop el;
 				if !used_this then begin
 					this_before_super := true;
-					print_endline (Printf.sprintf "inferred this_before_super on %s.new : %s" (s_type_path (Option.get gctx.curclass).cl_path) (s_type (print_context()) (Option.get gctx.curfield).cf_type));
+					make_haxe cf;
+					(* print_endline (Printf.sprintf "inferred this_before_super on %s.new : %s" (s_type_path c.cl_path) (s_type (print_context()) cf.cf_type)); *)
 				end;
 				let c,cf = find_super_ctor el in
 				if !this_before_super then promote_this_before_super c cf;
@@ -2386,13 +2389,13 @@ module Preprocessor = struct
 		in
 		loop e
 
-	let preprocess_field gctx cf mtype =
+	let preprocess_field gctx c cf mtype =
 		match cf.cf_expr with
 		| None ->
 			()
 		| Some e ->
 			if mtype = MConstructor then begin
-				let info = preprocess_constructor_expr gctx e in
+				let info = preprocess_constructor_expr gctx c cf e in
 				let index = DynArray.length gctx.field_infos in
 				DynArray.add gctx.field_infos info;
 				cf.cf_meta <- (Meta.Custom ":jvm.fieldInfo",[(EConst (Int (string_of_int index)),null_pos)],null_pos) :: cf.cf_meta;
@@ -2400,20 +2403,13 @@ module Preprocessor = struct
 				preprocess_expr gctx e
 
 	let preprocess_class gctx c =
-		gctx.curclass <- Some c;
 		let field mtype cf =
-			gctx.curfield <- Some cf;
-			preprocess_field gctx cf mtype
+			preprocess_field gctx c cf mtype
 		in
 		let field mtype cf =
 			List.iter (field mtype) (cf :: cf.cf_overloads);
 			if mtype = MConstructor then begin
-				let make_native cf =
-					cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
-				in
-				let make_haxe cf =
-					cf.cf_meta <- (Meta.HxGen,[],null_pos) :: cf.cf_meta
-				in
+
 				if not (Meta.has Meta.HxGen cf.cf_meta) then begin
 					let rec loop next c =
 						if c.cl_extern then make_native cf
@@ -2459,8 +2455,6 @@ let generate com =
 		anon_lut = Hashtbl.create 0;
 		anon_path_lut = Hashtbl.create 0;
 		anon_num = 0;
-		curclass = None;
-		curfield = None;
 		implicit_ctors = Hashtbl.create 0;
 		field_infos = DynArray.create();
 		current_field_info = None;
