@@ -134,8 +134,6 @@ class TestOop extends BaseTest {
 		}
 		child.field = "FieldValue";
 		eq("FieldValue", subtype(child));
-
-		testSpecialtors();
 	}
 
 	function testSpecialtors() {

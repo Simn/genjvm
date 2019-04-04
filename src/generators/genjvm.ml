@@ -433,22 +433,22 @@ class closure_context (jsig : jsignature) = object(self)
 end
 
 let create_context_class gctx jc jm name vl = match vl with
-	| [v] ->
-		let jsig = get_boxed_type (jsignature_of_type v.v_type) in
+	| [(vid,vname,vsig)] ->
+		let jsig = get_boxed_type vsig in
 		let ctx_class = new closure_context jsig in
-		ctx_class#add v.v_id v.v_name jsig;
+		ctx_class#add vid vname jsig;
 		ctx_class
 	| _ ->
 		let jc = jc#spawn_inner_class (Some jm) object_path None in
 		let path = jc#get_this_path in
 		let ctx_class = new closure_context (object_path_sig path) in
-		let jsigs = List.map (fun v -> jsignature_of_type v.v_type) vl in
+		let jsigs = List.map (fun (_,_,vsig) -> vsig) vl in
 		let jm_ctor = jc#spawn_method "<init>" (method_sig jsigs None) [MPublic] in
 		jm_ctor#load_this;
 		jm_ctor#call_super_ctor ConstructInit (method_sig [] None);
-		List.iter2 (fun v jsig ->
-			jm_ctor#add_argument_and_field v.v_name jsig;
-			ctx_class#add v.v_id v.v_name jsig;
+		List.iter2 (fun (vid,vname,vtype) jsig ->
+			jm_ctor#add_argument_and_field vname jsig;
+			ctx_class#add vid vname jsig;
 		) vl jsigs;
 		jm_ctor#get_code#return_void;
 		write_class gctx.jar path jc#export_class;
@@ -488,7 +488,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		slot,load,store
 
 	method get_local_by_id (vid,vname) =
-		try
+		if vid = 0 then
+			(0,(fun () -> jm#load_this),(fun () -> assert false))
+		else try
 			Hashtbl.find local_lookup vid
 		with Not_found -> try
 			begin match env with
@@ -524,9 +526,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method tfunction e tf =
 		let name = jc#get_next_closure_name in
 		let outside = match Texpr.collect_captured_vars e with
-			| [] ->
+			| [],false ->
 				None
-			| vl ->
+			| vl,accesses_this ->
+				let vl = List.map (fun v -> v.v_id,v.v_name,jsignature_of_type v.v_type) vl in
+				let vl = if accesses_this then (0,"this",jc#get_jsig) :: vl else vl in
 				let ctx_class = create_context_class gctx jc jm name vl in
 				Some ctx_class
 		in
@@ -593,7 +597,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
 			code#arraylength vtobj
-		| FInstance(c,tl,cf) when not (is_interface_var_access c cf) ->
+		| FInstance(c,tl,cf) | FClosure(Some(c,tl),({cf_kind = Method MethDynamic} as cf)) when not (is_interface_var_access c cf) ->
 			let vt = self#vtype cf.cf_type in
 			let offset = add_field pool c cf in
 			self#texpr rvalue_any e1;
@@ -2153,7 +2157,6 @@ class tclass_to_jvm gctx c = object(self)
 		let jsig_empty = method_sig [haxe_empty_constructor_sig] None in
 		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
 		let _,load,_ = jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument in
-		jm_empty_ctor#get_code#inline jc#get_field_init_method#get_code;
 		jm_empty_ctor#load_this;
 		begin match c.cl_super with
 		| None ->
@@ -2171,7 +2174,8 @@ class tclass_to_jvm gctx c = object(self)
 		try
 			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
 			PMap.iter (fun _ (c,cf) ->
-				let jm = jc#spawn_method "<init>" (jsignature_of_type cf.cf_type) [MPublic] in
+				let cmode = get_construction_mode c cf in
+				let jm = jc#spawn_method (if cmode = ConstructInit then "<init>" else "new") (jsignature_of_type cf.cf_type) [MPublic] in
 				jm#get_code#inline jc#get_field_init_method#get_code;
 				jm#load_this;
 				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
@@ -2179,7 +2183,7 @@ class tclass_to_jvm gctx c = object(self)
 					let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
 					load();
 				) tl;
-				jm#invokespecial c.cl_path "<init>" (object_path_sig c.cl_path) jm#get_jsig;
+				jm#call_super_ctor cmode jm#get_jsig;
 				jm#return
 			) sm
 		with Not_found ->
@@ -2460,48 +2464,59 @@ module Preprocessor = struct
 		in
 		loop e
 
-	let preprocess_field gctx c cf mtype =
-		match cf.cf_expr with
-		| None ->
-			()
-		| Some e ->
-			if mtype = MConstructor then begin
-				let info = preprocess_constructor_expr gctx c cf e in
-				let index = DynArray.length gctx.field_infos in
-				DynArray.add gctx.field_infos info;
-				cf.cf_meta <- (Meta.Custom ":jvm.fieldInfo",[(EConst (Int (string_of_int index)),null_pos)],null_pos) :: cf.cf_meta;
-			end else
-				preprocess_expr gctx e
-
 	let preprocess_class gctx c =
-		let field mtype cf =
-			preprocess_field gctx c cf mtype
+		let field cf = match cf.cf_expr with
+			| None ->
+				()
+			| Some e ->
+				preprocess_expr gctx e
 		in
+		let has_dynamic_instance_method = ref false in
 		let field mtype cf =
-			List.iter (field mtype) (cf :: cf.cf_overloads);
-			if mtype = MConstructor then begin
-
-				if not (Meta.has Meta.HxGen cf.cf_meta) then begin
-					let rec loop next c =
-						if c.cl_extern then make_native cf
-						else match c.cl_constructor with
-							| Some cf' when Meta.has Meta.HxGen cf'.cf_meta -> make_haxe cf
-							| Some cf' when Meta.has Meta.NativeGen cf'.cf_meta -> make_native cf
-							| _ -> next c
-					in
-					let rec up c = match c.cl_super with
-						| None -> ()
-						| Some(c,_) -> loop up c
-					in
-					let rec down c = List.iter (fun c -> loop down c) c.cl_descendants in
-					loop up c;
-					loop down c
-				end;
-			end;
+			List.iter field (cf :: cf.cf_overloads);
+			match mtype with
+			| MConstructor ->
+				()
+			| MInstance ->
+				(match cf.cf_kind with Method MethDynamic -> has_dynamic_instance_method := true | _ -> ());
+			| MStatic ->
+				()
 		in
 		List.iter (field MStatic) c.cl_ordered_statics;
-		List.iter (field MStatic) c.cl_ordered_fields;
-		Option.may (field MConstructor) c.cl_constructor
+		List.iter (field MInstance) c.cl_ordered_fields;
+		match c.cl_constructor with
+		| None ->
+			()
+		| Some cf ->
+			let field cf =
+				if !has_dynamic_instance_method then make_haxe cf;
+				begin match cf.cf_expr with
+				| None ->
+					()
+				| Some e ->
+					let info = preprocess_constructor_expr gctx c cf e in
+					let index = DynArray.length gctx.field_infos in
+					DynArray.add gctx.field_infos info;
+					cf.cf_meta <- (Meta.Custom ":jvm.fieldInfo",[(EConst (Int (string_of_int index)),null_pos)],null_pos) :: cf.cf_meta;
+					if not (Meta.has Meta.HxGen cf.cf_meta) then begin
+						let rec loop next c =
+							if c.cl_extern then make_native cf
+							else match c.cl_constructor with
+								| Some cf' when Meta.has Meta.HxGen cf'.cf_meta -> make_haxe cf
+								| Some cf' when Meta.has Meta.NativeGen cf'.cf_meta -> make_native cf
+								| _ -> next c
+						in
+						let rec up c = match c.cl_super with
+							| None -> ()
+							| Some(c,_) -> loop up c
+						in
+						let rec down c = List.iter (fun c -> loop down c) c.cl_descendants in
+						loop up c;
+						loop down c
+					end;
+				end
+			in
+			List.iter field (cf :: cf.cf_overloads)
 
 	let preprocess gctx =
 		List.iter (function

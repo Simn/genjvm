@@ -504,11 +504,14 @@ let dump_with_pos tabs e =
 let collect_captured_vars e =
 	let known = Hashtbl.create 0 in
 	let unknown = ref [] in
+	let accesses_this = ref false in
 	let declare v = Hashtbl.add known v.v_id () in
 	let rec loop e = match e.eexpr with
 		| TLocal ({v_capture = true; v_id = id} as v) when not (Hashtbl.mem known id) ->
 			Hashtbl.add known id ();
 			unknown := v :: !unknown
+		| TConst (TThis | TSuper) ->
+			accesses_this := true;
 		| TVar(v,eo) ->
 			Option.may loop eo;
 			declare v
@@ -529,4 +532,4 @@ let collect_captured_vars e =
 			Type.iter loop e
 	in
 	loop e;
-	List.rev !unknown
+	List.rev !unknown,!accesses_this
