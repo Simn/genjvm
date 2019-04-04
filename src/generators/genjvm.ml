@@ -1772,10 +1772,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				let ef = mk (TField(e1,FInstance(c,[t],cf_get))) (apply_params c.cl_params [t] cf_get.cf_type) e.epos in
 				self#call rvalue_any t ef [e2];
 				self#cast e.etype;
-			| TInst({cl_path = (["java"],"NativeArray")},_) ->
+			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
 				self#texpr rvalue_any e1;
 				let vt = self#vtype e1.etype in
-				let vte = self#vtype e.etype in
+				let vte = self#vtype t in
 				self#texpr rvalue_any e2;
 				self#read_native_array vt vte
 			| t ->
