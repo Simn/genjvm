@@ -118,8 +118,7 @@ typedef FieldStructure = {
 }
 
 class TestOop extends BaseTest {
-	public function new() {
-		super();
+	function testBasic() {
 		var child = new Child();
 		eq("Base.test(MainValue)Main.test(MainValue)", child.test("MainValue"));
 		eq("Base.test(MainValue)Main.test(MainValue)", (child : BaseInterface).test("MainValue"));

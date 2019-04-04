@@ -20,11 +20,6 @@ class NativeExceptionOther extends java.lang.Exception {
 }
 
 class TestExceptions extends BaseTest {
-	public function new() {
-		super();
-		test();
-		testNested();
-	}
 
 	function test() {
 		eq("caught NativeExceptionChild: msg", raise(() -> throw new NativeExceptionChild("msg")));

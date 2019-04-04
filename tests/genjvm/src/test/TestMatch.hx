@@ -18,14 +18,6 @@ enum X<A> {
 }
 
 class TestMatch extends BaseTest {
-	public function new() {
-		super();
-		testBasic();
-		testTuple();
-		testGrouping();
-		testGadt();
-		testNullPattern();
-	}
 
 	static function switchNormal(e:Expr):String {
 		return switch(e.expr) {

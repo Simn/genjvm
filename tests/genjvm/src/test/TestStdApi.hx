@@ -24,12 +24,6 @@ class TestStdApi extends BaseTest {
 		"unit", "MySubClass", "Class", "Enum", "Dynamic", "unit", "MyInterface"
 	];
 
-	public function new() {
-		super();
-		testIs();
-		testParse();
-	}
-
 	function is(v:Dynamic, t1:Dynamic, ?t2:Dynamic, ?pos:haxe.PosInfos) {
 		for (i in 0...TYPES.length) {
 			var c:Dynamic = TYPES[i];

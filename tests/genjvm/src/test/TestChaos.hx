@@ -28,25 +28,6 @@ class TestChaos extends BaseTest {
 	static var trueValue = true;
 	static var falseValue = false;
 
-	public function new() {
-		super();
-		testAssignment();
-		testAssignmentDynamic();
-		testOps();
-		testNullOps();
-		testNadakoOps();
-		testDynamicOps();
-		testIntArray();
-		testDynamicArray();
-		testIntMap();
-		testStringMap();
-		testObjectDecl();
-		testStringConcat();
-		testBranchingCtorArgs();
-		testNaN();
-		testNativeArray();
-	}
-
 	function testAssignment() {
 		// var
 		var a = 1;

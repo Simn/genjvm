@@ -11,20 +11,6 @@ private class TestClass {
 }
 
 class TestReflectApi extends BaseTest {
-	public function new() {
-		super();
-		testHasField();
-		testField();
-		testSetField();
-		testGetProperty();
-		testSetProperty();
-		testFields();
-		testIsFunction();
-		testIsEnumValue();
-		testDeleteField();
-		testCopy();
-	}
-
 	function testHasField() {
 		var obj = {
 			x: 12,

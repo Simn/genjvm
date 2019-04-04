@@ -14,14 +14,6 @@ class SomeClass<T> {
 
 @:analyzer(ignore)
 class TestClosure extends BaseTest {
-	public function new() {
-		super();
-		testFieldClosure();
-		testLocalClosure();
-		testTestIFoundSomewhere();
-		testRecursive();
-		testIterative();
-	}
 
 	function testFieldClosure() {
 		// haxe

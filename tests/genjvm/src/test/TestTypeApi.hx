@@ -64,30 +64,6 @@ private class SomeClassWithStuff {
 }
 
 class TestTypeApi extends BaseTest {
-	public function new() {
-		super();
-		testGetClass();
-		testGetEnum();
-		testGetSuperClass();
-		testGetClassName();
-		testGetEnumName();
-		testResolveClass();
-		testResolveEnum();
-		testCreateInstance();
-		testCreateEmptyInstance();
-		testCreateEnum();
-		testCreateEnumIndex();
-		testGetInstanceFields();
-		testGetClassFields();
-		testEnumConstructs();
-		testTypeof();
-		testEnumIndex();
-		testEnumEq();
-		testEnumConstructor();
-		testEnumParameters();
-		testAllEnums();
-	}
-
 	function testGetClass() {
 		eq(null, Type.getClass(null));
 		eq(null, Type.getClass(TestTypeApi));

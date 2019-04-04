@@ -4,3 +4,4 @@
 -java export
 -D dump=pretty
 -dce no
+-lib utest
