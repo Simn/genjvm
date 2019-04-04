@@ -67,6 +67,9 @@ class Std {
 	};
 
 	public static function parseInt(x:String):Null<Int> {
+		if (x.length < 2) {
+			return integerFormatter.parse(x).intValue();
+		}
 		switch ((cast x : java.lang.JavaString.String).codePointAt(1)) {
 			case 'x'.code | 'X'.code:
 				return java.lang.Integer.decode(x).intValue();
