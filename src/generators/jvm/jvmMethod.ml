@@ -253,6 +253,8 @@ class builder jc name jsig = object(self)
 		| TObject((["java";"lang"],"Double"),_),TInt ->
 			code#i2d;
 			self#expect_reference_type;
+		| TObject((["java";"lang"],"Double"),_),TObject((["java";"lang"],"Integer"),_) ->
+			self#invokestatic (["haxe";"jvm"],"Jvm") "nullIntToNullFloat" (method_sig [integer_sig] (Some double_sig))
 		(* from double *)
 		| TFloat,TDouble ->
 			code#d2f

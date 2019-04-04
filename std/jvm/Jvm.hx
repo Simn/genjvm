@@ -52,6 +52,13 @@ class Jvm {
 
 	// casts
 
+	static public function nullIntToNullFloat(i:Null<Int>):Null<Float> {
+		if (i == null) {
+			return null;
+		}
+		return (cast i : java.lang.Number).intValue();
+	}
+
 	static public function toByte(d:Dynamic) {
 		return d == null ? 0 : (d : java.lang.Byte).byteValue();
 	}
