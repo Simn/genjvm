@@ -125,6 +125,10 @@ class builder jc name jsig = object(self)
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#putfield offset (object_path_sig path) jsigf
 
+	method getstatic (path : jpath) (name : string) (jsigf : jsignature) =
+		let offset = code#get_pool#add_field path name jsigf FKField in
+		code#getstatic offset jsigf
+
 	method putstatic (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#putstatic offset jsigf

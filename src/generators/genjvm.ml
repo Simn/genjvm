@@ -573,6 +573,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method read ret t e1 fa =
 		match fa with
+		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "NaN" | "POSITIVE_INFINITY" | "NEGATIVE_INFINITY"} as cf)) ->
+			jm#getstatic double_path cf.cf_name TDouble
+		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "isNaN"} as cf)) ->
+			self#read_closure true double_path cf.cf_name (jsignature_of_type cf.cf_type);
+			self#cast cf.cf_type;
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			self#read_closure true c.cl_path cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
@@ -1352,6 +1357,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| _ ->
 					Error.error "Bad invokedynamic call" e1.epos
 			end
+		| TField(_,FStatic({cl_path = (["java";"lang"],"Math")},{cf_name = "isNaN"})) ->
+			begin match el with
+			| [e1] ->
+				self#texpr rvalue_any e1;
+				jm#invokestatic (["java";"lang"],"Double") "isNaN" (method_sig [TDouble] (Some TBool));
+				Some TBool
+			| _ ->
+				assert false
+			end;
 		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let tl,tr = self#call_arguments cf.cf_type el in
 			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
