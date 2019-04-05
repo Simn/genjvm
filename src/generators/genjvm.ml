@@ -1801,7 +1801,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TCall(e1,el) ->
 			self#call ret e.etype e1 el
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
-			self#texpr rvalue_any e1;
+			self#texpr (match ret with RVoid -> RVoid | _ -> rvalue_any) e1;
 			(* Technically this could throw... but whatever *)
 			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
 		| TNew(c,tl,el) ->
