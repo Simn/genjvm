@@ -174,36 +174,15 @@ class Type {
 		}
 
 		return null;
-
-		// if (ctor2 == null) {
-		// 	for (ctor in cl.getDeclaredMethods()) {
-		// 		var params = ctor.getParameterTypes();
-		// 		if (params.length != args.length) {
-		// 			continue;
-		// 		}
-		// 		var valid = true;
-		// 		for (i in 0...params.length) {
-		// 			if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
-		// 				valid = false;
-		// 				break;
-		// 			}
-		// 		}
-		// 		if (valid) {
-		// 			ctor2 = MethodHandles.lookup().unreflect(ctor);
-		// 			break;
-		// 		}
-		// 	}
-		// }
-		// if (ctor2 != null) {
-		// 	ctor2.bindTo(obj).invokeWithArguments(@:privateAccess args.getNative());
-		// 	return obj;
-		// }
-		return null;
 	}
 
 	public static function createEmptyInstance<T>(cl:Class<T>):T {
-		// TODO: distinguish <init>().new(args) and <init>(args)
-		return cl.native().getConstructor(emptyClass).newInstance(emptyArg);
+		var annotation = hackGetAnnotation(cl.native(), (cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>));
+		if (annotation != null) {
+			return cl.native().getConstructor(emptyClass).newInstance(emptyArg);
+		} else {
+			return cl.native().newInstance();
+		}
 	}
 
 	public static function createEnum<T>(e:Enum<T>, constr:String, ?params:Array<Dynamic>):T {
@@ -278,6 +257,9 @@ class Type {
 		// TODO: native enums?
 		if (isEnumValueClass(c)) {
 			return TEnum(cast c.getSuperclass());
+		}
+		if (Jvm.instanceof(v, java.lang.Class)) {
+			return TObject;
 		}
 		return TClass(c);
 	}
