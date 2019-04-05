@@ -40,15 +40,18 @@ class Reflect {
 	}
 
 	public static function getProperty(o:Dynamic, field:String):Dynamic {
-		if (hasField(o, "get_" + field)) {
-			field = "get_" + field;
+		var f = Reflect.field(o, "get_" + field);
+		if (f != null) {
+			return f();
 		}
 		return Reflect.field(o, field);
 	}
 
 	public static function setProperty(o:Dynamic, field:String, value:Dynamic):Void {
-		if (hasField(o, "set_" + field)) {
-			field = "set_" + field;
+		var f = Reflect.field(o, "set_" + field);
+		if (f != null) {
+			f(value);
+			return;
 		}
 		Reflect.setField(o, field, value);
 	}
