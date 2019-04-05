@@ -1591,16 +1591,23 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| (_,v,e) :: excl ->
 					code#dup;
 					let path = match self#vtype (self#mknull v.v_type) with TObject(path,_) -> path | _ -> assert false in
-					code#instanceof path;
-					jm#if_then_else
-						(fun () -> code#if_ref CmpEq)
-						(fun () ->
-							restore();
-							self#cast v.v_type;
-							let term = run_catch_expr v e in
-							rl := (term,ref 0) :: !rl;
-						)
-						(fun () -> loop excl)
+					if path = object_path then begin
+						code#pop;
+						restore();
+						let term = run_catch_expr v e in
+						rl := (term,ref 0) :: !rl;
+					end else begin
+						code#instanceof path;
+						jm#if_then_else
+							(fun () -> code#if_ref CmpEq)
+							(fun () ->
+								restore();
+								self#cast v.v_type;
+								let term = run_catch_expr v e in
+								rl := (term,ref 0) :: !rl;
+							)
+							(fun () -> loop excl)
+					end
 			in
 			loop excl;
 			pop_scope();
