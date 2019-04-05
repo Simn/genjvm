@@ -20,6 +20,9 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+import haxe.iterators.StringIterator;
+import haxe.iterators.StringKeyValueIterator;
+
 @:coreApi extern class String implements java.lang.CharSequence {
 
 	var length(default,null) : Int;
@@ -64,6 +67,14 @@
 	}
 
 	function toString() : String;
+
+	@:pure @:runtime inline function iterator() : StringIterator {
+		return new StringIterator(this);
+	}
+
+	@:pure @:runtime inline function keyValueIterator() : StringKeyValueIterator {
+		return new StringKeyValueIterator(this);
+	}
 
 	private function compareTo( anotherString : String ) : Int;
 
