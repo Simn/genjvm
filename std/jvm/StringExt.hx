@@ -23,6 +23,13 @@ class StringExt {
 			return cast((cast me : JavaString).charAt(index), Int);
 	}
 
+	public static function lastIndexOf(me:String, str:String, ?startIndex:Int):Int {
+		if (startIndex == null || startIndex > me.length || startIndex < 0) {
+			startIndex = me.length - 1;
+		}
+		return (cast me : JavaString).lastIndexOf(str, startIndex);
+	}
+
 	public static function split(me:String, delimiter:String):Array<String> {
 		var ret = [];
 		if (delimiter.length == 0) {

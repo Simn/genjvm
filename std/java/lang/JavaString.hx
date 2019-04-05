@@ -12,6 +12,8 @@ extern class String {
 	@:overload function indexOf(str:std.String):Int;
 	@:overload function indexOf(str:std.String, fromIndex:Int):Int;
 
+	function lastIndexOf(str:std.String, fromIndex:Int):Int;
+
 	function replace(target:CharSequence, replacement:CharSequence):std.String;
 	function startsWith(prefix:std.String):Bool;
 	@:overload function substring(beginIndex:Int):std.String;

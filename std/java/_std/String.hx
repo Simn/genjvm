@@ -47,7 +47,9 @@
 			else (cast this : java.lang.JavaString.String).indexOf(str, startIndex);
 	}
 
-	function lastIndexOf( str : String, ?startIndex : Int ) : Int;
+	@:runtime inline function lastIndexOf( str : String, ?startIndex : Int ) : Int {
+		return jvm.StringExt.lastIndexOf(this, str, startIndex);
+	}
 
 	@:runtime inline function split( delimiter : String ) : Array<String> {
 		return jvm.StringExt.split(this, delimiter);
