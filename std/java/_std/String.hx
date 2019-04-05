@@ -45,9 +45,7 @@ import haxe.iterators.StringKeyValueIterator;
 	}
 
 	inline function indexOf( str : String, ?startIndex : Int ) : Int {
-		return
-			if (startIndex == null) (cast this : java.lang.JavaString.String).indexOf(str)
-			else (cast this : java.lang.JavaString.String).indexOf(str, startIndex);
+		return jvm.StringExt.indexOf(this, str, startIndex);
 	}
 
 	@:runtime inline function lastIndexOf( str : String, ?startIndex : Int ) : Int {

@@ -148,8 +148,17 @@ class Jvm {
 			field.setAccessible(true);
 			return field.get(obj);
 		} catch (_:java.lang.NoSuchFieldException) {
-			if (instanceof(obj, java.lang.JavaString.String) && name == "length") {
-				return (obj : String).length;
+			if (instanceof(obj, java.lang.JavaString.String)) {
+				switch (name) {
+					case "length": return (obj : String).length;
+					case "charAt": return (cast jvm.StringExt.charAt : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "charCodeAt": return (cast jvm.StringExt.charCodeAt : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "indexOf": return (cast jvm.StringExt.indexOf : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "lastIndexOf": return (cast jvm.StringExt.lastIndexOf : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "split": return (cast jvm.StringExt.split : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "substr": return (cast jvm.StringExt.substr : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "substring": return (cast jvm.StringExt.substring : java.lang.invoke.MethodHandle).bindTo(obj);
+				}
 			}
 			while (cl != null) {
 				var methods = cl.getMethods();

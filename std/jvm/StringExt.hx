@@ -23,6 +23,12 @@ class StringExt {
 			return cast((cast me : JavaString).charAt(index), Int);
 	}
 
+	public static function indexOf(me:String, str:String, startIndex:Null<Int>) {
+		return
+			if (startIndex == null) (cast me : java.lang.JavaString.String).indexOf(str)
+			else (cast me : java.lang.JavaString.String).indexOf(str, startIndex);
+	}
+
 	public static function lastIndexOf(me:String, str:String, ?startIndex:Int):Int {
 		if (startIndex == null || startIndex > me.length || startIndex < 0) {
 			startIndex = me.length - 1;
