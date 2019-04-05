@@ -249,13 +249,6 @@ class builder jc name jsig = object(self)
 	(** Casts the top of the stack to [jsig]. If [allow_to_string] is true, Jvm.toString is called. **)
 	method cast ?(not_null=false) ?(allow_to_string=false) jsig =
 		let jsig' = code#get_stack#top in
-		let was_probably_dynamic () = match jsig' with
-			| TObject((["java";"lang"],"Object"),_)
-			| TTypeParameter _ ->
-				true
-			| _ ->
-				false
-		in
 		begin match jsig,jsig' with
 		| TObject((["java";"lang"],"Double"),_),TInt ->
 			code#i2d;
@@ -307,7 +300,7 @@ class builder jc name jsig = object(self)
 			code#get_stack#push jsig;
 		| TObject(path1,_),TObject(path2,_) when path1 = path2 ->
 			()
-		| TObject((["java";"lang"],"String"),_),_ when allow_to_string || was_probably_dynamic()  ->
+		| TObject((["java";"lang"],"String"),_),_ when allow_to_string ->
 			self#expect_reference_type;
 			self#invokestatic (["haxe";"jvm"],"Jvm") "toString" (method_sig [object_sig] (Some string_sig))
 		| TObject(path1,_),TObject(path2,_) ->
