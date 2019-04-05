@@ -1377,6 +1377,22 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				assert false
 			end;
+		| TField(_,FStatic({cl_path = (["java";"lang"],"Math")},{cf_name = ("floor" | "ceil" | "round") as name})) ->
+			begin match el with
+			| [e1] ->
+				self#texpr rvalue_any e1;
+				jm#cast TDouble;
+				let rsig = if name = "round" then TLong else TDouble in
+				jm#invokestatic (["java";"lang"],"Math") name (method_sig [TDouble] (Some rsig));
+				jm#cast TInt;
+				Some TInt
+			| _ ->
+				assert false
+			end;
+		| TField(_,FStatic({cl_path = (["java";"lang"],"Math")} as c,({cf_name = ("ffloor" | "fceil")} as cf))) ->
+			let tl,tr = self#call_arguments cf.cf_type el in
+			jm#invokestatic c.cl_path (String.sub cf.cf_name 1 (String.length cf.cf_name - 1)) (method_sig tl tr);
+			tr
 		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let tl,tr = self#call_arguments cf.cf_type el in
 			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
