@@ -1975,16 +1975,16 @@ class tclass_to_jvm gctx c = object(self)
 	method private handle_interface_type_params c_int tl_int =
 		let map_type_params t =
 			let has_type_param = ref false in
-			let rec loop arg t = match follow t with
+			let rec loop t = match follow t with
 				| TInst({cl_kind = KTypeParameter _},_) ->
-					if arg then has_type_param := true;
+					has_type_param := true;
 					t_dynamic
-				| _ -> Type.map (loop arg) t
+				| _ -> Type.map loop t
 			in
 			let t = match follow t with
 				| TFun(tl,tr) ->
-					let tl = List.map (fun (n,o,t) -> n,o,loop true t) tl in
-					let tr = loop false tr in
+					let tl = List.map (fun (n,o,t) -> n,o,loop t) tl in
+					let tr = loop tr in
 					TFun(tl,tr)
 				| _ ->
 					assert false
