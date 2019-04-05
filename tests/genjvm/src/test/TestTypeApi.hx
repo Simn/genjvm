@@ -85,7 +85,7 @@ class TestTypeApi extends BaseTest {
 
 	function testGetClassName() {
 		eq("test._TestTypeApi.SomeClass", Type.getClassName(SomeClass));
-		eq("java.lang.String", Type.getClassName(String));
+		eq("String", Type.getClassName(String));
 	}
 
 	function testGetEnumName() {
@@ -94,7 +94,7 @@ class TestTypeApi extends BaseTest {
 
 	function testResolveClass() {
 		eq(cast String, Type.resolveClass("java.lang.String"));
-		// eq(cast String, Type.resolveClass("String")); // TODO
+		eq(cast String, Type.resolveClass("String")); // TODO
 		eq(cast SomeClass, Type.resolveClass("test._TestTypeApi.SomeClass"));
 		eq(null, Type.resolveClass("i.dont.Exist"));
 		eq(null, Type.resolveClass("in valid %%#'#! String"));

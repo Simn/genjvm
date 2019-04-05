@@ -23,7 +23,7 @@ package haxe;
 
 @:coreApi class Resource {
 
-	@:keep static var content : Array<String> = [];
+	@:keep static var content : Array<String>;
 
 	public static inline function listNames() : Array<String> {
 		return content.copy();

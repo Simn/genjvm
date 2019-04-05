@@ -79,8 +79,11 @@ class Type {
 	}
 
 	public static function getClassName(c:Class<Dynamic>):String {
-		// TODO: java.lang.String has to become String somehow
-		return c.native().getName();
+		return switch (c.native().getName()) {
+			case "java.lang.String": "String";
+			case "java.lang.Math": "Math";
+			case s: s;
+		}
 	}
 
 	public static function getEnumName(e:Enum<Dynamic>):String {
@@ -88,6 +91,9 @@ class Type {
 	}
 
 	public static function resolveClass(name:String):Class<Dynamic> {
+		if (name == "String") {
+			return java.lang.JavaString.String;
+		}
 		return try {
 			java.lang.Class.forName(name);
 		} catch (e:java.lang.ClassNotFoundException) {
