@@ -1557,9 +1557,13 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let offset = pool#add_const_string s in
 		code#sconst (string_sig) offset
 
-	method const t ct = match ct with
+	method const ret t ct = match ct with
 		| Type.TInt i32 -> code#iconst i32
-		| TFloat f -> code#dconst (float_of_string f)
+		| TFloat f ->
+			begin match ret with
+			| RValue (Some (TFloat | TObject((["java";"lang"],"Float"),_))) -> code#fconst (float_of_string f)
+			| _ -> code#dconst (float_of_string f)
+			end
 		| TBool true -> code#bconst true
 		| TBool false -> code#bconst false
 		| TNull -> code#aconst_null (self#vtype t)
@@ -1579,7 +1583,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		jasig,jsig
 
 	method new_native_array jsig el =
-		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr rvalue_any e) el)
+		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr (rvalue_sig jsig) e) el)
 
 	method basic_type_path name =
 		let offset = pool#add_field (["java";"lang"],name) "TYPE" java_class_sig FKField in
@@ -1668,7 +1672,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#binop ret op e1 e2 e.etype
 			end
 		| TConst ct ->
-			self#const e.etype ct
+			self#const ret e.etype ct
 		| TIf(e1,e2,None) ->
 			jm#if_then
 				(self#apply_cmp (self#condition e1))

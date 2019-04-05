@@ -516,7 +516,7 @@ class builder pool = object(self)
 			| 2.0 -> OpFconst_2,1
 			| _ ->
 				let offset = pool#add (ConstFloat f) in
-				OpLdc2_w offset,3
+				OpLdc_w offset,3
 		in
 		self#op instr count [] [TFloat]
 
