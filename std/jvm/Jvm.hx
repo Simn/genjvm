@@ -148,6 +148,9 @@ class Jvm {
 			field.setAccessible(true);
 			return field.get(obj);
 		} catch (_:java.lang.NoSuchFieldException) {
+			if (instanceof(obj, java.lang.JavaString.String) && name == "length") {
+				return (obj : String).length;
+			}
 			while (cl != null) {
 				var methods = cl.getMethods();
 				for (m in methods) {
