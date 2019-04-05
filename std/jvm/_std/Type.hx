@@ -283,6 +283,12 @@ class Type {
 	}
 
 	public static function enumEq<T>(a:T, b:T):Bool {
+		if (a == null) {
+			return b == null;
+		}
+		if (b == null) {
+			return false;
+		}
 		var a:jvm.Enum = cast a;
 		var b:jvm.Enum = cast b;
 		if (a._hx_index != b._hx_index) {
