@@ -227,13 +227,13 @@ class Jvm {
 			return stringConcat(a, b);
 		}
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() + (cast b : java.lang.Number).doubleValue();
+			return toDouble(a) + toDouble(b);
 		}
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() + (cast b : java.lang.Number).longValue();
+			return toLong(a) + toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() + (cast b : java.lang.Number).intValue();
+			return toInt(a) + toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -241,13 +241,13 @@ class Jvm {
 	@:native("-")
 	static public function opSub<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() - (cast b : java.lang.Number).doubleValue();
+			return toDouble(a) - toDouble(b);
 		}
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() - (cast b : java.lang.Number).longValue();
+			return toLong(a) - toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() - (cast b : java.lang.Number).intValue();
+			return toInt(a) - toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -255,13 +255,13 @@ class Jvm {
 	@:native("*")
 	static public function opMul<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() * (cast b : java.lang.Number).doubleValue();
+			return toDouble(a) * toDouble(b);
 		}
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() * (cast b : java.lang.Number).longValue();
+			return toLong(a) * toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() * (cast b : java.lang.Number).intValue();
+			return toInt(a) * toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -269,13 +269,13 @@ class Jvm {
 	@:native("/")
 	static public function opDiv<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() / (cast b : java.lang.Number).doubleValue();
+			return toDouble(a) / toDouble(b);
 		}
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() / (cast b : java.lang.Number).longValue();
+			return toLong(a) / toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() / (cast b : java.lang.Number).intValue();
+			return toInt(a) / toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -283,13 +283,13 @@ class Jvm {
 	@:native("%")
 	static public function opMod<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() % (cast b : java.lang.Number).doubleValue();
+			return toDouble(a) % toDouble(b);
 		}
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() % (cast b : java.lang.Number).longValue();
+			return toLong(a) % toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() % (cast b : java.lang.Number).intValue();
+			return toInt(a) % toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -297,10 +297,10 @@ class Jvm {
 	@:native("&")
 	static public function opAnd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() & (cast b : java.lang.Number).longValue();
+			return toLong(a) & toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() & (cast b : java.lang.Number).intValue();
+			return toInt(a) & toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -308,10 +308,10 @@ class Jvm {
 	@:native("|")
 	static public function opOr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() | (cast b : java.lang.Number).longValue();
+			return toLong(a) | toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() | (cast b : java.lang.Number).intValue();
+			return toInt(a) | toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -319,10 +319,10 @@ class Jvm {
 	@:native("^")
 	static public function opXor<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() ^ (cast b : java.lang.Number).longValue();
+			return toLong(a) ^ toLong(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() ^ (cast b : java.lang.Number).intValue();
+			return toInt(a) ^ toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -330,10 +330,10 @@ class Jvm {
 	@:native("shl")
 	static public function opShl<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() << (cast b : java.lang.Number).intValue();
+			return toLong(a) << toInt(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() << (cast b : java.lang.Number).intValue();
+			return toInt(a) << toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -341,10 +341,10 @@ class Jvm {
 	@:native(">>")
 	static public function opShr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() >> (cast b : java.lang.Number).intValue();
+			return toLong(a) >> toInt(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() >> (cast b : java.lang.Number).intValue();
+			return toInt(a) >> toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -352,10 +352,10 @@ class Jvm {
 	@:native(">>>")
 	static public function opUshr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() >>> (cast b : java.lang.Number).intValue();
+			return toLong(a) >>> toInt(b);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass) || instanceof(b, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() >>> (cast b : java.lang.Number).intValue();
+			return toInt(a) >>> toInt(b);
 		}
 		throw "Invalid operation";
 	}
@@ -363,13 +363,13 @@ class Jvm {
 	@:native("++")
 	static public function opIncrement<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() + 1.;
+			return toDouble(a) + 1.;
 		}
 		if (instanceof(a, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() + 1.;
+			return toLong(a) + 1.;
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() + 1;
+			return toInt(a) + 1;
 		}
 		throw "Invalid operation";
 	}
@@ -377,13 +377,13 @@ class Jvm {
 	@:native("--")
 	static public function opDecrement<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
-			return (cast a : java.lang.Number).doubleValue() - 1.;
+			return toDouble(a) - 1.;
 		}
 		if (instanceof(a, java.lang.Long.LongClass)) {
-			return (cast a : java.lang.Number).longValue() - 1.;
+			return toLong(a) - 1.;
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass)) {
-			return (cast a : java.lang.Number).intValue() - 1;
+			return toInt(a) - 1;
 		}
 		throw "Invalid operation";
 	}
@@ -391,13 +391,13 @@ class Jvm {
 	@:native("neg")
 	static public function opNeg<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
-			return -(cast a : java.lang.Number).doubleValue();
+			return -toDouble(a);
 		}
 		if (instanceof(a, java.lang.Long.LongClass)) {
-			return -(cast a : java.lang.Number).longValue();
+			return -toLong(a);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass)) {
-			return -(cast a : java.lang.Number).intValue();
+			return -toInt(a);
 		}
 		throw "Invalid operation";
 	}
@@ -405,10 +405,10 @@ class Jvm {
 	@:native("~")
 	static public function opNegBits<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass)) {
-			return ~(cast a : java.lang.Number).longValue();
+			return ~toLong(a);
 		}
 		if (instanceof(a, java.lang.Integer.IntegerClass)) {
-			return ~(cast a : java.lang.Number).intValue();
+			return ~toInt(a);
 		}
 		throw "Invalid operation";
 	}
