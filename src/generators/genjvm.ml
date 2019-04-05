@@ -1938,138 +1938,15 @@ type super_ctor_mode =
 	| SCJava
 	| SCHaxe
 
-let generate_expr gctx jc jm e is_main is_method scmode mtype =
-	let e,args,tr = match e.eexpr with
-		| TFunction tf when is_method ->
-			tf.tf_expr,tf.tf_args,tf.tf_type
-		| _ ->
-			e,[],t_dynamic
-	in
-	let handler = new texpr_to_jvm gctx jc jm tr in
-	if is_main then begin
-		let _,load,_ = jm#add_local "args" (TArray(string_sig,None)) VarArgument in
-		if has_feature gctx.com "Sys.args" then begin
-			load();
-			jm#putstatic ([],"Sys") "_args" (TArray(string_sig,None))
-		end
-	end;
-	List.iter (fun (v,_) ->
-		ignore(handler#add_local v VarArgument);
-	) args;
-	jm#finalize_arguments;
-	begin match mtype with
-	| MConstructor ->
-		jm#get_code#inline jc#get_field_init_method#get_code;
-		begin match scmode with
-		| SCJava ->
-			handler#object_constructor
-		| SCHaxe ->
-			jm#load_this;
-			jm#get_code#aconst_null jc#get_jsig;
-			jm#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
-		| SCNone ->
-			()
-		end
-	| _ ->
-		()
-	end;
-	handler#texpr RReturn e
-
 let failsafe p f =
 	try
 		f ()
 	with Failure s | HarderFailure s ->
 		Error.error s p
 
-let generate_method gctx jc c mtype cf =
-	gctx.current_field_info <- get_field_info gctx cf.cf_meta;
-	let jsig = if cf.cf_name = "main" then
-		method_sig [array_sig string_sig] None
-	else
-		jsignature_of_type cf.cf_type
-	in
-	let flags = [MPublic] in
-	let flags = if c.cl_interface then MAbstract :: flags else flags in
-	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
-	let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
-	let name,scmode,flags = match mtype with
-		| MConstructor ->
-			let rec has_super_ctor c = match c.cl_super with
-				| None -> false
-				| Some(c,_) -> c.cl_constructor <> None || has_super_ctor c
-			in
-			let get_scmode () = if c.cl_super = None then SCJava else if not (has_super_ctor c) then SCHaxe else SCNone in
-			if get_construction_mode c cf = ConstructInit then "<init>",get_scmode(),flags
-			else cf.cf_name,SCNone,flags
-		| _ -> cf.cf_name,SCNone,flags
-	in
-	let jm = jc#spawn_method name jsig flags in
-	begin match cf.cf_expr with
-	| None -> ()
-	| Some e ->
-		generate_expr gctx jc jm e (cf.cf_name = "main") true scmode mtype;
-	end;
-	begin match cf.cf_params with
-		| [] when c.cl_params = [] ->
-			()
-		| _ ->
-			let stl = String.concat "" (List.map (fun (n,_) ->
-				Printf.sprintf "%s:Ljava/lang/Object;" n
-			) cf.cf_params) in
-			let ssig = generate_method_signature true (jsignature_of_type cf.cf_type) in
-			let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
-			let offset = jc#get_pool#add_string s in
-			jm#add_attribute (AttributeSignature offset);
-	end
-
-let generate_field gctx jc c mtype cf =
-	let jsig = jsignature_of_type cf.cf_type in
-	let flags = [MPublic] in
-	let flags = if c.cl_interface then MAbstract :: flags else flags in
-	let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
-	let jm = jc#spawn_field cf.cf_name jsig flags in
-	begin match cf.cf_expr with
-		| None ->
-			()
-		| Some e when mtype <> MStatic ->
-			let jm = jc#get_field_init_method in
-			let handler = new texpr_to_jvm gctx jc jm gctx.com.basic.tvoid in
-			let tl = List.map snd c.cl_params in
-			let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
-			let efield = mk (TField(ethis,FInstance(c,tl,cf))) cf.cf_type null_pos in
-			let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type null_pos in
-			handler#texpr RVoid eop;
-		| Some e ->
-			let default () =
-				let p = null_pos in
-				let efield = Texpr.Builder.make_static_field c cf p in
-				let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type p in
-				begin match c.cl_init with
-				| None -> c.cl_init <- Some eop
-				| Some e -> c.cl_init <- Some (concat e eop)
-				end
-			in
-			match e.eexpr with
-			| TConst ct ->
-				begin match ct with
-				| TInt i32 when not (is_nullable cf.cf_type) ->
-					let offset = jc#get_pool#add (ConstInt i32) in
-					jm#add_attribute (AttributeConstantValue offset);
-				| TString s ->
-					let offset = jc#get_pool#add_const_string s in
-					jm#add_attribute (AttributeConstantValue offset);
-				| _ ->
-					default();
-				end
-			| _ ->
-				default();
-	end;
-	let ssig = generate_signature true (jsignature_of_type cf.cf_type) in
-	let offset = jc#get_pool#add_string ssig in
-	jm#add_attribute (AttributeSignature offset)
-
 class tclass_to_jvm gctx c = object(self)
 	val is_annotation = Meta.has Meta.Annotation c.cl_meta
+	val field_inits = DynArray.create ()
 
 	val jc = new JvmClass.builder c.cl_path (Option.map_default (fun (c,_) -> c.cl_path) object_path c.cl_super)
 
@@ -2177,7 +2054,10 @@ class tclass_to_jvm gctx c = object(self)
 			PMap.iter (fun _ (c,cf) ->
 				let cmode = get_construction_mode c cf in
 				let jm = jc#spawn_method (if cmode = ConstructInit then "<init>" else "new") (jsignature_of_type cf.cf_type) [MPublic] in
-				jm#get_code#inline jc#get_field_init_method#get_code;
+				let handler = new texpr_to_jvm gctx jc jm gctx.com.basic.tvoid in
+				DynArray.iter (fun e ->
+					handler#texpr RVoid e;
+				) field_inits;
 				jm#load_this;
 				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
 				List.iter (fun (n,_,t) ->
@@ -2190,37 +2070,161 @@ class tclass_to_jvm gctx c = object(self)
 		with Not_found ->
 			()
 
-	method private generate_fields =
-		let field mtype cf = match cf.cf_kind with
-			| Method (MethNormal | MethInline) ->
-				List.iter (fun cf ->
-					failsafe cf.cf_pos (fun () -> generate_method gctx jc c mtype cf)
-				) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
+	method generate_expr gctx jc jm e is_main is_method scmode mtype =
+		let e,args,tr = match e.eexpr with
+			| TFunction tf when is_method ->
+				tf.tf_expr,tf.tf_args,tf.tf_type
 			| _ ->
-				if not c.cl_interface then failsafe cf.cf_pos (fun () -> generate_field gctx jc c mtype cf)
+				e,[],t_dynamic
 		in
-		List.iter (field MStatic) c.cl_ordered_statics;
-		List.iter (field MInstance) c.cl_ordered_fields;
-		begin match c.cl_constructor,c.cl_super with
-			| Some cf,Some _ -> field MConstructor cf
-			| Some cf,None -> field MConstructor cf
-			| None,_ -> ()
+		let handler = new texpr_to_jvm gctx jc jm tr in
+		if is_main then begin
+			let _,load,_ = jm#add_local "args" (TArray(string_sig,None)) VarArgument in
+			if has_feature gctx.com "Sys.args" then begin
+				load();
+				jm#putstatic ([],"Sys") "_args" (TArray(string_sig,None))
+			end
 		end;
-		begin match c.cl_init with
+		List.iter (fun (v,_) ->
+			ignore(handler#add_local v VarArgument);
+		) args;
+		jm#finalize_arguments;
+		begin match mtype with
+		| MConstructor ->
+			DynArray.iter (fun e ->
+				handler#texpr RVoid e;
+			) field_inits;
+			begin match scmode with
+			| SCJava ->
+				handler#object_constructor
+			| SCHaxe ->
+				jm#load_this;
+				jm#get_code#aconst_null jc#get_jsig;
+				jm#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
+			| SCNone ->
+				()
+			end
+		| _ ->
+			()
+		end;
+		handler#texpr RReturn e
+
+	method generate_method gctx jc c mtype cf =
+		gctx.current_field_info <- get_field_info gctx cf.cf_meta;
+		let jsig = if cf.cf_name = "main" then
+			method_sig [array_sig string_sig] None
+		else
+			jsignature_of_type cf.cf_type
+		in
+		let flags = [MPublic] in
+		let flags = if c.cl_interface then MAbstract :: flags else flags in
+		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+		let flags = if has_class_field_flag cf CfFinal then MFinal :: flags else flags in
+		let name,scmode,flags = match mtype with
+			| MConstructor ->
+				let rec has_super_ctor c = match c.cl_super with
+					| None -> false
+					| Some(c,_) -> c.cl_constructor <> None || has_super_ctor c
+				in
+				let get_scmode () = if c.cl_super = None then SCJava else if not (has_super_ctor c) then SCHaxe else SCNone in
+				if get_construction_mode c cf = ConstructInit then "<init>",get_scmode(),flags
+				else cf.cf_name,SCNone,flags
+			| _ -> cf.cf_name,SCNone,flags
+		in
+		let jm = jc#spawn_method name jsig flags in
+		begin match cf.cf_expr with
+		| None -> ()
+		| Some e ->
+			self#generate_expr gctx jc jm e (cf.cf_name = "main") true scmode mtype;
+		end;
+		begin match cf.cf_params with
+			| [] when c.cl_params = [] ->
+				()
+			| _ ->
+				let stl = String.concat "" (List.map (fun (n,_) ->
+					Printf.sprintf "%s:Ljava/lang/Object;" n
+				) cf.cf_params) in
+				let ssig = generate_method_signature true (jsignature_of_type cf.cf_type) in
+				let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
+				let offset = jc#get_pool#add_string s in
+				jm#add_attribute (AttributeSignature offset);
+		end
+
+	method generate_field gctx (jc : JvmClass.builder) c mtype cf =
+		let jsig = jsignature_of_type cf.cf_type in
+		let flags = [MPublic] in
+		let flags = if c.cl_interface then MAbstract :: flags else flags in
+		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+		let jm = jc#spawn_field cf.cf_name jsig flags in
+		begin match cf.cf_expr with
 			| None ->
 				()
+			| Some e when mtype <> MStatic ->
+				let tl = List.map snd c.cl_params in
+				let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
+				let efield = mk (TField(ethis,FInstance(c,tl,cf))) cf.cf_type null_pos in
+				let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type null_pos in
+				DynArray.add field_inits eop;
 			| Some e ->
-				let cf = mk_field "<clinit>" (tfun [] gctx.com.basic.tvoid) null_pos null_pos in
-				cf.cf_kind <- Method MethNormal;
-				let tf = {
-					tf_args = [];
-					tf_type = gctx.com.basic.tvoid;
-					tf_expr = mk_block e;
-				} in
-				let e = mk (TFunction tf) cf.cf_type null_pos in
-				cf.cf_expr <- Some e;
-				field MStatic cf
+				let default () =
+					let p = null_pos in
+					let efield = Texpr.Builder.make_static_field c cf p in
+					let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type p in
+					begin match c.cl_init with
+					| None -> c.cl_init <- Some eop
+					| Some e -> c.cl_init <- Some (concat e eop)
+					end
+				in
+				match e.eexpr with
+				| TConst ct ->
+					begin match ct with
+					| TInt i32 when not (is_nullable cf.cf_type) ->
+						let offset = jc#get_pool#add (ConstInt i32) in
+						jm#add_attribute (AttributeConstantValue offset);
+					| TString s ->
+						let offset = jc#get_pool#add_const_string s in
+						jm#add_attribute (AttributeConstantValue offset);
+					| _ ->
+						default();
+					end
+				| _ ->
+					default();
 		end;
+		let ssig = generate_signature true (jsignature_of_type cf.cf_type) in
+		let offset = jc#get_pool#add_string ssig in
+		jm#add_attribute (AttributeSignature offset)
+
+		method private generate_fields =
+			let field mtype cf = match cf.cf_kind with
+				| Method (MethNormal | MethInline) ->
+					List.iter (fun cf ->
+						failsafe cf.cf_pos (fun () -> self#generate_method gctx jc c mtype cf)
+					) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
+				| _ ->
+					if not c.cl_interface then failsafe cf.cf_pos (fun () -> self#generate_field gctx jc c mtype cf)
+			in
+			List.iter (field MStatic) c.cl_ordered_statics;
+			List.iter (field MInstance) c.cl_ordered_fields;
+			begin match c.cl_constructor,c.cl_super with
+				| Some cf,Some _ -> field MConstructor cf
+				| Some cf,None -> field MConstructor cf
+				| None,_ -> ()
+			end;
+			begin match c.cl_init with
+				| None ->
+					()
+				| Some e ->
+					let cf = mk_field "<clinit>" (tfun [] gctx.com.basic.tvoid) null_pos null_pos in
+					cf.cf_kind <- Method MethNormal;
+					let tf = {
+						tf_args = [];
+						tf_type = gctx.com.basic.tvoid;
+						tf_expr = mk_block e;
+					} in
+					let e = mk (TFunction tf) cf.cf_type null_pos in
+					cf.cf_expr <- Some e;
+					field MStatic cf
+			end
 
 	method private generate_signature =
 		begin match c.cl_params with

@@ -105,14 +105,6 @@ class builder path_this path_super = object(self)
 		spawned_methods <- (jm,None) :: spawned_methods;
 		jm
 
-	method get_field_init_method = match field_init_method with
-		| Some jm -> jm
-		| None ->
-			let jm = new JvmMethod.builder self "_hx_field_init" (method_sig [] None) in
-			jm#add_access_flag (MethodAccessFlags.to_int MProtected);
-			field_init_method <- Some jm;
-			jm
-
 	method private commit_inner_classes =
 		if DynArray.length inner_classes > 0 then begin
 			let open JvmAttribute in

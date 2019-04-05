@@ -130,14 +130,6 @@ class builder pool = object(self)
 		List.iter stack#push (List.rev return);
 		DynArray.add stack_debug (opcode,cur,stack#get_stack,current_line);
 
-	method inline (code : builder) =
-		let iops = code#get_ops in
-		DynArray.iter (fun op ->
-			DynArray.add ops op;
-		) iops;
-		fp <- fp + code#get_fp;
-		stack#set_max_stack_size (max stack#get_max_stack_size code#get_stack#get_max_stack_size)
-
 	method op_maybe_wide op opw i tl tr = match get_numeric_range_unsigned i with
 		| Int8Range -> self#op op 2 tl tr
 		| Int16Range -> self#op (OpWide opw) 4 tl tr
