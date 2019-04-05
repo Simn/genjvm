@@ -2053,6 +2053,12 @@ class tclass_to_jvm gctx c = object(self)
 			load();
 			jm_empty_ctor#call_super_ctor ConstructInit jsig_empty
 		end;
+		if c.cl_constructor = None then begin
+			let handler = new texpr_to_jvm gctx jc jm_empty_ctor gctx.com.basic.tvoid in
+			DynArray.iter (fun e ->
+				handler#texpr RVoid e;
+			) field_inits;
+		end;
 		jm_empty_ctor#get_code#return_void;
 
 	(* TODO: this should respect the construction_kind too. We have to make sure it's properly marked - somehow *)
