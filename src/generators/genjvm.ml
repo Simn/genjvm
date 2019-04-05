@@ -2189,9 +2189,24 @@ class tclass_to_jvm gctx c = object(self)
 		let flags = if c.cl_interface then MAbstract :: flags else flags in
 		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
 		let jm = jc#spawn_field cf.cf_name jsig flags in
+		let default e =
+			let p = null_pos in
+			let efield = Texpr.Builder.make_static_field c cf p in
+			let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type p in
+			begin match c.cl_init with
+			| None -> c.cl_init <- Some eop
+			| Some e -> c.cl_init <- Some (concat e eop)
+			end
+		in
 		begin match cf.cf_expr with
 			| None ->
-				()
+				if c.cl_path = (["haxe"],"Resource") && cf.cf_name = "content" then begin
+					let el = Hashtbl.fold (fun name _ acc ->
+						Texpr.Builder.make_string gctx.com.basic name null_pos :: acc
+					) gctx.com.resources [] in
+					let e = mk (TArrayDecl el) (gctx.com.basic.tarray gctx.com.basic.tstring) null_pos in
+					default e;
+				end;
 			| Some e when mtype <> MStatic ->
 				let tl = List.map snd c.cl_params in
 				let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
@@ -2199,15 +2214,6 @@ class tclass_to_jvm gctx c = object(self)
 				let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type null_pos in
 				DynArray.add field_inits eop;
 			| Some e ->
-				let default () =
-					let p = null_pos in
-					let efield = Texpr.Builder.make_static_field c cf p in
-					let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type p in
-					begin match c.cl_init with
-					| None -> c.cl_init <- Some eop
-					| Some e -> c.cl_init <- Some (concat e eop)
-					end
-				in
 				match e.eexpr with
 				| TConst ct ->
 					begin match ct with
@@ -2218,10 +2224,10 @@ class tclass_to_jvm gctx c = object(self)
 						let offset = jc#get_pool#add_const_string s in
 						jm#add_attribute (AttributeConstantValue offset);
 					| _ ->
-						default();
+						default e;
 					end
 				| _ ->
-					default();
+					default e;
 		end;
 		let ssig = generate_signature true (jsignature_of_type cf.cf_type) in
 		let offset = jc#get_pool#add_string ssig in
@@ -2596,6 +2602,10 @@ let generate com =
 		"\n\n"
 	in
 	Zip.add_entry manifest_content gctx.jar "META-INF/MANIFEST.MF";
+	Hashtbl.iter (fun name v ->
+		let filename = Codegen.escape_res_name name true in
+		Zip.add_entry v gctx.jar filename;
+	) com.resources;
 	List.iter (generate_module_type gctx) com.types;
 	Hashtbl.iter (fun fields path ->
 		let jc = new JvmClass.builder path haxe_dynamic_object_path in
