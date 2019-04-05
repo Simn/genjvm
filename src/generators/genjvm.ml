@@ -565,7 +565,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					load();
 					let jsig = self#vtype v.v_type in
 					jm#if_then
-						(fun () -> jm#get_code#if_null_ref jsig)
+						(fun () -> jm#get_code#if_nonnull_ref jsig)
 						(fun () ->
 							handler#texpr (rvalue_sig jsig) e;
 							jm#cast jsig;
@@ -1321,10 +1321,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ -> (List.map (fun _ -> "",false,t_dynamic) el),t_dynamic
 		in
 		let rec loop acc tl el = match tl,el with
-			| (_,_,t) :: tl,e :: el ->
+			| (_,o,t) :: tl,e :: el ->
 				self#texpr (rvalue_type t) e;
-				self#cast t;
-				loop (self#vtype t :: acc) tl el
+				let jsig = self#vtype (if o then self#mknull t else t) in
+				jm#cast jsig;
+				loop (jsig :: acc) tl el
 			| _,[] -> List.rev acc
 			| [],e :: el ->
 				(* TODO: this sucks *)
