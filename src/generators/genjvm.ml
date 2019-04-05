@@ -2495,7 +2495,12 @@ module Preprocessor = struct
 		List.iter (field MInstance) c.cl_ordered_fields;
 		match c.cl_constructor with
 		| None ->
-			()
+			begin match c.cl_super with
+			| Some({cl_constructor = Some cf} as csup,_) ->
+				List.iter (fun cf -> add_implicit_ctor gctx c csup cf) (cf :: cf.cf_overloads)
+			| _ ->
+				()
+			end
 		| Some cf ->
 			let field cf =
 				if !has_dynamic_instance_method then make_haxe cf;
