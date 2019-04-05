@@ -134,6 +134,9 @@ class Reflect {
 
 	@:overload(function(f:Array<Dynamic>->Void):Dynamic {})
 	public static function makeVarArgs(f:Array<Dynamic>->Dynamic):Dynamic {
-		return null;
+		var fAdapt = function(args:java.NativeArray<Dynamic>) {
+			return f(@:privateAccess Array.ofNative(args));
+		}
+		return (cast fAdapt : java.lang.invoke.MethodHandle).asVarargsCollector(cast java.NativeArray);
 	}
 }
