@@ -86,7 +86,25 @@ class Reflect {
 	}
 
 	public static function compareMethods(f1:Dynamic, f2:Dynamic):Bool {
-		return false;
+		if (f1 == f2) {
+			return true;
+		}
+		if (f1 == null || f2 == null) {
+			return false;
+		}
+		var c1 = (f1 : java.lang.Object).getClass();
+		if (c1 != (f2 : java.lang.Object).getClass()) {
+			return false;
+		}
+		try {
+			var arg0 = c1.getDeclaredField("argL0");
+			arg0.setAccessible(true);
+			var arg1 = c1.getDeclaredField("argL1");
+			arg1.setAccessible(true);
+			return arg0.get(f1) == arg0.get(f2) && arg1.get(f1) == arg1.get(f2);
+		} catch(_:Dynamic) {
+			return false;
+		}
 	}
 
 	public static function isObject(v:Dynamic):Bool {
