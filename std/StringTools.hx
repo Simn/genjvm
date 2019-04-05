@@ -113,11 +113,9 @@ class StringTools {
 			return untyped decodeURIComponent(s.split("+").join(" "));
 		#elseif cpp
 			return untyped s.__URLDecode();
-		#elseif jvm
-			return null; // JVMTODO
 		#elseif java
 			try
-				return untyped __java__("java.net.URLDecoder.decode(s, \"UTF-8\")")
+				return java.net.URLDecoder.decode(s, "UTF-8")
 			catch (e:Dynamic) throw e;
 		#elseif cs
 			return untyped cs.system.Uri.UnescapeDataString(s);
