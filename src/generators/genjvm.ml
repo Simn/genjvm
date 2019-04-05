@@ -535,7 +535,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				Some ctx_class
 		in
 		let jsig =
-			let args = List.map (fun (v,_) -> self#vtype v.v_type) tf.tf_args in
+			let args = List.map (fun (v,cto) ->
+				if cto <> None then v.v_type <- self#mknull v.v_type;
+				self#vtype v.v_type
+			) tf.tf_args in
 			let args = match outside with
 				| None -> args
 				| Some ctx_class -> ctx_class#get_jsig :: args
@@ -554,10 +557,30 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			ignore(handler#add_named_local name ctx_class#get_jsig)
 		end;
-		List.iter (fun (v,_) ->
-			ignore(handler#add_local v VarArgument);
-		) tf.tf_args;
+		let inits = List.map (fun (v,cto) ->
+			let _,load,save = handler#add_local v VarArgument in
+			match cto with
+			| Some e when (match e.eexpr with TConst TNull -> false | _ -> true) ->
+				let f () =
+					load();
+					let jsig = self#vtype v.v_type in
+					jm#if_then
+						(fun () -> jm#get_code#if_null_ref jsig)
+						(fun () ->
+							handler#texpr (rvalue_sig jsig) e;
+							jm#cast jsig;
+							save();
+						)
+				in
+				Some f
+			| _ ->
+				None
+		) tf.tf_args in
 		jm#finalize_arguments;
+		List.iter (function
+			| None -> ()
+			| Some f -> f()
+		) inits;
 		handler#texpr RReturn tf.tf_expr;
 		self#read_closure true jc#get_this_path name jsig;
 		outside
