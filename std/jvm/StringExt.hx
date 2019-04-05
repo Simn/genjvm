@@ -2,6 +2,7 @@ package jvm;
 
 import java.lang.JavaString.String as JavaString;
 
+@:native("haxe.jvm.StringExt")
 class StringExt {
 	public static function fromCharCode(code:Int):String {
 		var a = new java.NativeArray(1);

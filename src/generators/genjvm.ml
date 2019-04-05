@@ -582,6 +582,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "isNaN" | "isFinite"} as cf)) ->
 			self#read_closure true double_path cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
+		| FStatic({cl_path = ([],"String")},({cf_name = "fromCharCode"} as cf)) ->
+			self#read_closure true (["haxe";"jvm"],"StringExt") cf.cf_name (jsignature_of_type cf.cf_type);
+			self#cast cf.cf_type;
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			self#read_closure true c.cl_path cf.cf_name (jsignature_of_type cf.cf_type);
 			self#cast cf.cf_type;
