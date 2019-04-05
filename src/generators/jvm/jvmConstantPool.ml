@@ -69,10 +69,10 @@ class constant_pool = object(self)
 		String.iter (fun c ->
 			let c = Char.code c in
 			if c = 0 then begin
-			write_byte ch 0xC0;
-			write_byte ch 0x80
+				write_byte ch 0xC0;
+				write_byte ch 0x80
 			end else
-			write_byte ch c
+				write_byte ch c
 		) s
 
 	method private write_i64 ch i64 =
@@ -84,8 +84,11 @@ class constant_pool = object(self)
 		DynArray.iter (function
 			| ConstUtf8 s ->
 				write_byte ch 1;
-				write_ui16 ch (String.length s);
-				self#write_utf8 ch s;
+				let chs = IO.output_bytes () in
+				self#write_utf8 chs s;
+				let b = IO.close_out chs in
+				write_ui16 ch (Bytes.length b);
+				nwrite ch b
 			| ConstInt i32 ->
 				write_byte ch 3;
 				write_real_i32 ch i32;
