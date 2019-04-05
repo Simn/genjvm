@@ -815,14 +815,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			code#lookupswitch offset_def a;
 		end;
 		let restore = jm#start_branch in
-		let r_def = match def with
+		let def_term,r_def = match def with
 			| None ->
-				ref 0
+				true,ref 0
 			| Some e ->
 				offset_def := code#get_fp - !offset_def;
 				jm#add_stack_frame;
 				self#texpr ret e;
-				self#maybe_make_jump
+				jm#is_terminated,self#maybe_make_jump
 		in
 
 		let rec loop acc cases = match cases with
@@ -836,7 +836,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			List.rev acc
 		in
 		let rl = loop [] cases in
-		self#close_jumps ((jm#is_terminated,if def = None then offset_def else r_def) :: rl)
+		self#close_jumps ((def_term,if def = None then offset_def else r_def) :: rl)
 
 	method switch ret e1 cases def =
 		(* TODO: hack because something loses the exhaustiveness marker before we get here *)
