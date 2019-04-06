@@ -1736,7 +1736,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let string_builder_sig = object_path_sig string_builder_path in
 			jm#construct ConstructInit string_builder_path (fun () -> []);
 			let rec loop e = match e.eexpr with
-				| TBinop(OpAdd,e1,e2) ->
+				| TBinop(OpAdd,e1,e2) when ExtType.is_string (follow e.etype) ->
 					loop e1;
 					loop e2;
 				| _ ->
