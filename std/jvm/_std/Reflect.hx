@@ -26,7 +26,13 @@ import jvm.Jvm;
 class Reflect {
 	public static function hasField(o:Dynamic, field:String):Bool {
 		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
-			return false;
+			var c:java.lang.Class <Dynamic>= Jvm.instanceof(o, java.lang.Class) ? cast o : (cast o : java.lang.Object).getClass();
+			try {
+				c.getField(field);
+				return true;
+			} catch(e:Dynamic) {
+				return false;
+			}
 		}
 		return (cast o : jvm.DynamicObject)._hx_hasField(field);
 	}
@@ -62,6 +68,9 @@ class Reflect {
 
 	public static function fields(o:Dynamic):Array<String> {
 		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
+			if (Jvm.instanceof(o, java.lang.Class)) {
+				return Type.getClassFields(o);
+			}
 			var c = (o : java.lang.Object).getClass();
 			var ret = [];
 			for (f in c.getDeclaredFields()) {
