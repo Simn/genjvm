@@ -225,7 +225,12 @@ class Type {
 	}
 
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
-		return getFields(c.native(), false);
+		var fields = [];
+		while (c != null) {
+			fields = fields.concat(getFields(c.native(), false));
+			c = getSuperClass(c);
+		};
+		return fields;
 	}
 
 	public static function getClassFields(c:Class<Dynamic>):Array<String> {
