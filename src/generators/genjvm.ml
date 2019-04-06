@@ -682,22 +682,20 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			apply (fun () -> code#dup);
 			store();
 		| TField(_,FStatic(c,cf)) ->
-			let vt = self#vtype t in
-			let offset = add_field pool c cf in
-			if ak <> AKNone then code#getstatic offset vt;
+			let jsig_cf = self#vtype cf.cf_type in
+			if ak <> AKNone then jm#getstatic c.cl_path cf.cf_name jsig_cf;
 			apply (fun () -> code#dup);
-			code#putstatic offset vt
+			jm#putstatic c.cl_path cf.cf_name jsig_cf;
 		| TField(e1,FInstance(c,tl,cf)) when not (is_interface_var_access c cf) ->
-			let vt = self#vtype t in
-			let offset = add_field pool c cf in
-			let vtobj = self#vtype e1.etype in
 			self#texpr rvalue_any e1;
+			let jsig_cf = self#vtype cf.cf_type in
 			if ak <> AKNone then begin
 				code#dup;
-				code#getfield offset vtobj vt;
+				jm#getfield c.cl_path cf.cf_name jsig_cf
 			end;
 			apply (fun () -> code#dup_x1);
-			code#putfield offset vtobj vt
+			self#cast cf.cf_type;
+			jm#putfield c.cl_path cf.cf_name jsig_cf
 		| TField(e1,(FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}))) ->
 			self#texpr rvalue_any e1;
 			if ak <> AKNone then code#dup;
