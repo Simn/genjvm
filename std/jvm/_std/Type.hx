@@ -17,17 +17,6 @@ enum ValueType {
 
 @:coreApi
 class Type {
-	static function hackGetAnnotation<T:java.lang.annotation.Annotation>(c:java.lang.Class<Dynamic>, cAnnotation:java.lang.Class<T>):T {
-		// TODO: We should use e.getAnnotation(clInfo) here, but our type system has some issues with that
-		var annotations = c.getAnnotations();
-		for (annotation in annotations) {
-			if (cAnnotation == cast annotation.annotationType()) {
-				return cast annotation;
-			}
-		}
-		return null;
-	}
-
 	static function isEnumClass<T>(c:java.lang.Class<T>):Bool {
 		// TODO: have to be careful if we ever decide to omit EnumReflectionInformation
 		// Maybe a separate HaxeEnum annotation would be better here
@@ -71,7 +60,7 @@ class Type {
 		if (cSuper == null) {
 			return null;
 		}
-		var annotation = hackGetAnnotation(c, (cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>));
+		var annotation = c.getAnnotation((cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>));
 		if (annotation != null && annotation.hasSuperClass() == false) {
 			return null;
 		}
@@ -185,7 +174,7 @@ class Type {
 	}
 
 	public static function createEmptyInstance<T>(cl:Class<T>):T {
-		var annotation = hackGetAnnotation(cl.native(), (cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>));
+		var annotation = (cl.native().getAnnotation((cast ClassReflectionInformation : java.lang.Class<ClassReflectionInformation>)));
 		if (annotation != null) {
 			return cl.native().getConstructor(emptyClass).newInstance(emptyArg);
 		} else {
@@ -207,7 +196,7 @@ class Type {
 
 	public static function createEnumIndex<T>(e:Enum<T>, index:Int, ?params:Array<Dynamic>):T {
 		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
-		var annotation = hackGetAnnotation(e.native(), clInfo);
+		var annotation = e.native().getAnnotation(clInfo);
 		if (params == null || params.length == 0) {
 			return Jvm.readField(e, annotation.constructorNames()[index]);
 		} else {
@@ -249,7 +238,7 @@ class Type {
 
 	public static function getEnumConstructs(e:Enum<Dynamic>):Array<String> {
 		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
-		var annotation = hackGetAnnotation(e.native(), clInfo);
+		var annotation = e.native().getAnnotation(clInfo);
 		return @:privateAccess Array.ofNative(annotation.constructorNames());
 	}
 
@@ -318,7 +307,7 @@ class Type {
 
 	public static function enumConstructor(e:EnumValue):String {
 		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
-		var annotation = hackGetAnnotation(getEnum(e).native(), clInfo);
+		var annotation = getEnum(e).native().getAnnotation(clInfo);
 		if (annotation == null) {
 			return null;
 		}
@@ -327,7 +316,7 @@ class Type {
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
 		var clInfo:java.lang.Class<EnumValueReflectionInformation> = cast EnumValueReflectionInformation;
-		var annotation = hackGetAnnotation((cast e : java.lang.Object).getClass(), clInfo);
+		var annotation = (cast e : java.lang.Object).getClass().getAnnotation(clInfo);
 		var ret = [];
 		if (annotation == null) {
 			return ret;

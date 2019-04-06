@@ -18,9 +18,9 @@ class Exception<T> extends java.lang.Exception {
 		return value;
 	}
 
-	static public function wrap<T:java.lang.Exception>(t:Null<T>) {
+	static public function wrap<T>(t:Null<T>) {
 		if (Jvm.instanceof(t, java.lang.Exception)) {
-			return (t : java.lang.Exception);
+			return (cast t : java.lang.Exception);
 		} else {
 			return new Exception(t);
 		}
