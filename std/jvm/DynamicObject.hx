@@ -13,6 +13,9 @@ class DynamicObject implements java.lang.Cloneable {
 
 	public function toString() {
 		_hx_initReflection();
+		if (_hx_hasField("toString")) {
+			return _hx_getField("toString")();
+		}
 		var buf = new StringBuf();
 		buf.addChar("{".code);
 		var first = true;
