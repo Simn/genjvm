@@ -219,7 +219,7 @@ class Jvm {
 
 	// string
 
-	static public function toString<T:java.lang.Object>(obj:T) {
+	static public function toString<T:java.lang.Object>(obj:T):String {
 		if (obj == null) {
 			return "null";
 		} else if (instanceof(obj, java.lang.Double.DoubleClass)) {
