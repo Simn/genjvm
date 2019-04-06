@@ -195,6 +195,8 @@ let rec jsignature_of_type depth t =
 				object_sig
 			| [],("Class" | "Enum") ->
 				java_class_sig
+			| [],"EnumValue" ->
+				object_path_sig (["haxe";"jvm"],"Enum")
 			| _ ->
 				if Meta.has Meta.CoreType a.a_meta then
 					TObject(a.a_path,List.map jtype_argument_of_type tl)
@@ -2612,6 +2614,42 @@ module Preprocessor = struct
 		in
 		loop e
 
+	let check_overrides c = match c.cl_overrides with
+		| []->
+			()
+		| fields ->
+			let csup,map_type = match c.cl_super with
+				| Some(c,tl) -> c,apply_params c.cl_params tl
+				| None -> assert false
+			in
+			let fix_covariant_return cf =
+				let tl = match follow cf.cf_type with
+					| TFun(tl,_) -> tl
+					| _ -> assert false
+				in
+				match find_overload_rec' false map_type csup cf.cf_name (List.map (fun (_,_,t) -> t) tl) with
+				| Some(_,cf') ->
+					let tr = match follow cf'.cf_type with
+						| TFun(_,tr) -> tr
+						| _ -> assert false
+					in
+					cf.cf_type <- TFun(tl,tr);
+					cf.cf_expr <- begin match cf.cf_expr with
+						| Some ({eexpr = TFunction tf} as e) ->
+							Some {e with eexpr = TFunction {tf with tf_type = tr}}
+						| e ->
+							e
+					end;
+				| None ->
+					()
+					(* TODO: this should never happen if we get the unification right *)
+					(* Error.error "Could not find overload" cf.cf_pos *)
+			in
+			List.iter (fun cf ->
+				fix_covariant_return cf;
+				List.iter fix_covariant_return cf.cf_overloads
+			) fields
+
 	let preprocess_class gctx c =
 		let field cf = match cf.cf_expr with
 			| None ->
@@ -2630,6 +2668,7 @@ module Preprocessor = struct
 			| MStatic ->
 				()
 		in
+		check_overrides c;
 		List.iter (field MStatic) c.cl_ordered_statics;
 		List.iter (field MInstance) c.cl_ordered_fields;
 		match c.cl_constructor with

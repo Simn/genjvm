@@ -27,5 +27,4 @@
 	@see https://haxe.org/manual/types-enum-instance.html
 **/
 @:coreType
-@:native("haxe.jvm.Enum")
 extern abstract EnumValue {}
