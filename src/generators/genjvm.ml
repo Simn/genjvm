@@ -2094,26 +2094,27 @@ class tclass_to_jvm gctx c = object(self)
 				| Some t ->
 					let jsig = jsignature_of_type t in
 					if not (jc#has_method cf.cf_name jsig) then begin
-						let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
-						jm#load_this;
 						begin match follow t with
 						| TFun(tl,tr) ->
-							let c_impl,cf_impl = begin
-								let tl = List.map (fun (_,_,t) -> t) tl in
-								match find_overload_rec' false map_type c cf.cf_name tl with
-								| None -> Error.error (Printf.sprintf "Could not find overload for %s on %s" cf.cf_name (s_type_path c.cl_path)) c.cl_name_pos
-								| Some(c,cf) -> c,cf
-							end in
-							let jsig_impl = jsignature_of_type cf_impl.cf_type in
-							let jsigs,_ = match jsig_impl with TMethod(jsigs,jsig) -> jsigs,jsig | _ -> assert false in
-							List.iter2 (fun (n,_,t) jsig ->
-								let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
-								load();
-								jm#cast jsig;
-							) tl jsigs;
-							jm#invokevirtual c_impl.cl_path cf.cf_name (object_path_sig c_impl.cl_path) jsig_impl;
-							if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
-							jm#return;
+							begin
+								let tl' = List.map (fun (_,_,t) -> t) tl in
+								match find_overload_rec' false map_type c cf.cf_name tl' with
+								| None ->
+									()
+								| Some(c_impl,cf_impl) ->
+									let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
+									jm#load_this;
+									let jsig_impl = jsignature_of_type cf_impl.cf_type in
+									let jsigs,_ = match jsig_impl with TMethod(jsigs,jsig) -> jsigs,jsig | _ -> assert false in
+									List.iter2 (fun (n,_,t) jsig ->
+										let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
+										load();
+										jm#cast jsig;
+									) tl jsigs;
+									jm#invokevirtual c_impl.cl_path cf.cf_name (object_path_sig c_impl.cl_path) jsig_impl;
+									if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
+									jm#return;
+							end
 						| _ ->
 							assert false
 						end
@@ -2722,7 +2723,7 @@ module Preprocessor = struct
 
 	let preprocess gctx =
 		List.iter (function
-			| TClassDecl c -> preprocess_class gctx c
+			| TClassDecl c when debug_path c.cl_path -> preprocess_class gctx c
 			| _ -> ()
 		) gctx.com.types
 end

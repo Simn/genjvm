@@ -290,7 +290,8 @@ class builder pool = object(self)
 		self#op (OpInvokevirtual offset) 3 (List.rev (t1 :: tl)) tr
 
 	method invokeinterface offset t1 tl tr =
-		self#op (OpInvokeinterface(offset,List.length tl + 1)) 5 (List.rev (t1 :: tl)) tr
+		let count = List.fold_left (fun count jsig -> count + signature_size jsig) 1 tl in
+		self#op (OpInvokeinterface(offset,count)) 5 (List.rev (t1 :: tl)) tr
 
 	method invokespecial offset t1 tl tr =
 		self#op (OpInvokespecial offset) 3 (List.rev (t1 :: tl)) tr
