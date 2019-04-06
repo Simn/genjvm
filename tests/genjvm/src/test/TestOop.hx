@@ -109,6 +109,67 @@ class HxGenFieldInitChild extends HxGenFieldInitCurrent {
     }
 }
 
+interface TPInterface0<T> {
+	public function get(t:T):T;
+}
+
+class TPClass0 implements TPInterface0<String> {
+	public function new() { }
+
+	public function get(s:String) {
+		return s;
+	}
+}
+
+interface TPInterface1<T> extends TPInterface0<T> { }
+
+class TPClass1 implements TPInterface1<String> {
+	public function new() { }
+
+	public function get(s:String) {
+		return s;
+	}
+}
+
+interface TPInterface2 extends TPInterface0<String> { }
+
+class TPClass2 implements TPInterface2 {
+	public function new() { }
+
+	public function get(s:String) {
+		return s;
+	}
+}
+
+class TPBaseClass0<T> {
+	public function new() { }
+	public function get(t:T) {
+		return "TPBaseClass.get(T): " + t;
+	}
+}
+
+class TPChildClass0 extends TPBaseClass0<String> {
+	override function get(t:String) {
+		return super.get(t) + "TPChildClass.get(String): " + t;
+	}
+}
+
+class TPChildClass1 extends TPBaseClass0<Int> { }
+
+class TPChildClass2 extends TPChildClass1 {
+	override function get(t:Int) {
+		return super.get(t) + "TPChildClass.get(Int): " + t;
+	}
+}
+
+class TPChildClass3<T> extends TPBaseClass0<T> { }
+
+class TPChildClass4 extends TPChildClass3<Int> {
+	override function get(t:Int) {
+		return super.get(t) + "TPChildClass.get(Int): " + t;
+	}
+}
+
 typedef TestStructure = {
 	function test(value:String):String;
 }
@@ -151,5 +212,25 @@ class TestOop extends BaseTest {
 
 		var c = new HxGenFieldInitChild();
 		t(c.hasInit);
+	}
+
+	function testTypeParams() {
+		var i:TPInterface0<String> = new TPClass0();
+		eq("foo", i.get("foo"));
+
+		var i:TPInterface1<String> = new TPClass1();
+		eq("foo", i.get("foo"));
+
+		var i:TPInterface2 = new TPClass2();
+		eq("foo", i.get("foo"));
+
+		var base:TPBaseClass0<String> = new TPChildClass0();
+		eq("TPBaseClass.get(T): fooTPChildClass.get(String): foo", base.get("foo"));
+
+		var base:TPBaseClass0<Int> = new TPChildClass2();
+		eq("TPBaseClass.get(T): 12TPChildClass.get(Int): 12", base.get(12));
+
+		var base:TPBaseClass0<Int> = new TPChildClass4();
+		eq("TPBaseClass.get(T): 12TPChildClass.get(Int): 12", base.get(12));
 	}
 }
