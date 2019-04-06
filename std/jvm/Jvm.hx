@@ -197,6 +197,9 @@ class Jvm {
 			} catch (_:java.lang.IllegalArgumentException) {
 				if (value == null) {
 					field.setByte(obj, 0); // rely on widening
+				} else if (field.getType() == (cast Int) && instanceof(value, java.lang.Number)) {
+					// Can happen with ++ on Dynamic because that defaults to Float
+					field.setInt(obj, (cast value : java.lang.Number).intValue());
 				}
 			}
 		} catch (_:java.lang.NoSuchFieldException) {
