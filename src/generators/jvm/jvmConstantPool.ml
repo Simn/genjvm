@@ -5,6 +5,32 @@ open JvmSignature
 
 (* High-level constant pool *)
 
+let utf8jvm (input : string) : bytes =
+	let channel = IO.output_bytes () in
+	UTF8.iter (fun c ->
+		let code = UChar.code c in
+		match code with
+			| b when (b > 0 && b <= 0x7F) ->
+			IO.write_byte channel b
+			(* includes null byte: *)
+			| b when (b <= 0x7FF) ->
+			IO.write_byte channel (0xC0 lor ((b lsr  6)          ));
+			IO.write_byte channel (0x80 lor ((b       ) land 0x3F))
+			| b when (b <= 0xFFFF) ->
+			IO.write_byte channel (0xE0 lor ((b lsr 12)          ));
+			IO.write_byte channel (0x80 lor ((b lsr  6) land 0x3F));
+			IO.write_byte channel (0x80 lor ((b       ) land 0x3F))
+			| b ->
+			IO.write_byte channel 0xED;
+			IO.write_byte channel (0xA0 lor ((b lsr 16) - 1      ));
+			IO.write_byte channel (0x80 lor ((b lsr 10) land 0x3F));
+			IO.write_byte channel 0xED;
+			IO.write_byte channel (0xB0 lor ((b lsr  6) land 0x0F));
+			IO.write_byte channel (0x80 lor ((b       ) land 0x3F))
+	) input;
+	IO.close_out channel
+;;
+
 class constant_pool = object(self)
 	val pool = DynArray.create ();
 	val lut = Hashtbl.create 0;
@@ -65,16 +91,6 @@ class constant_pool = object(self)
 		in
 		self#add const
 
-	method private write_utf8 ch s =
-		String.iter (fun c ->
-			let c = Char.code c in
-			if c = 0 then begin
-				write_byte ch 0xC0;
-				write_byte ch 0x80
-			end else
-				write_byte ch c
-		) s
-
 	method private write_i64 ch i64 =
 		write_real_i32 ch (Int64.to_int32 i64);
 		write_real_i32 ch (Int64.to_int32 (Int64.shift_right_logical i64 32))
@@ -84,9 +100,7 @@ class constant_pool = object(self)
 		DynArray.iter (function
 			| ConstUtf8 s ->
 				write_byte ch 1;
-				let chs = IO.output_bytes () in
-				self#write_utf8 chs s;
-				let b = IO.close_out chs in
+				let b = utf8jvm s in
 				write_ui16 ch (Bytes.length b);
 				nwrite ch b
 			| ConstInt i32 ->
