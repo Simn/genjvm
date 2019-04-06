@@ -873,8 +873,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#int_switch ret is_exhaustive e1 cases def
 		else begin
 			(* TODO: rewriting this is stupid *)
+			let pop_scope = jm#push_scope in
+			self#texpr rvalue_any e1;
+			let v = alloc_var VGenerated "tmp" e1.etype null_pos in
+			let _,_,store = self#add_local v VarWillInit in
+			self#cast v.v_type;
+			store();
+			let ev = mk (TLocal v) v.v_type null_pos in
 			let el = List.rev_map (fun (el,e) ->
-				let f e' = mk (TBinop(OpEq,e1,e')) com.basic.tbool e'.epos in
+				let f e' = mk (TBinop(OpEq,ev,e')) com.basic.tbool e'.epos in
 				let e_cond = match el with
 					| [] -> assert false
 					| [e] -> f e
@@ -888,7 +895,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			(* If we rewrite an exhaustive switch that has no default value, treat the last case as the default case to satisfy control flow. *)
 			let cases,def = if is_exhaustive && def = None then (match List.rev cases with (_,e) :: cases -> List.rev cases,Some e | _ -> assert false) else cases,def in
 			let e = List.fold_left (fun e_else (e_cond,e_then) -> Some (mk (TIf(e_cond,e_then,e_else)) e_then.etype e_then.epos)) def el in
-			self#texpr ret (Option.get e)
+			self#texpr ret (Option.get e);
+			pop_scope()
 		end
 
 	(* binops *)
