@@ -164,10 +164,10 @@ end
 
 open NativeSignatures
 
-let rec jsignature_of_type depth t =
-	if depth > 100 then failwith "Recursive signature?";
-	let jsignature_of_type = jsignature_of_type (depth + 1) in
-	let jtype_argument_of_type t = jtype_argument_of_type (depth + 1) t in
+let rec jsignature_of_type stack t =
+	if List.exists (fast_eq t) stack then object_sig else
+	let jsignature_of_type = jsignature_of_type (t :: stack) in
+	let jtype_argument_of_type t = jtype_argument_of_type (t :: stack) t in
 	match t with
 	| TAbstract(a,tl) ->
 		begin match a.a_path with
@@ -226,11 +226,11 @@ let rec jsignature_of_type depth t =
 	| TType(td,tl) -> jsignature_of_type (apply_params td.t_params tl td.t_type)
 	| TLazy f -> jsignature_of_type (lazy_type f)
 
-and jtype_argument_of_type depth t =
-	TType(WNone,jsignature_of_type (depth + 1) t)
+and jtype_argument_of_type stack t =
+	TType(WNone,jsignature_of_type (t :: stack) t)
 
 let jsignature_of_type t =
-	jsignature_of_type 0 t
+	jsignature_of_type [] t
 
 module TAnonIdentifiaction = struct
 	let convert_fields fields =
