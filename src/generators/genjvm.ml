@@ -1277,7 +1277,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let f () =
 				begin match jm#get_code#get_stack#top with
 				| TLong ->
-					code#lconst Int64.zero;
+					code#lconst Int64.one;
 					if op = Increment then code#ladd else code#lsub
 				| TDouble ->
 					code#dconst 1.;
