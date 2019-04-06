@@ -233,7 +233,11 @@ class Type {
 	public static function getInstanceFields(c:Class<Dynamic>):Array<String> {
 		var fields = [];
 		while (c != null) {
-			fields = fields.concat(getFields(c.native(), false));
+			for (field in fields.concat(getFields(c.native(), false))) {
+				if (fields.indexOf(field) == -1) {
+					fields.push(field);
+				}
+			}
 			c = getSuperClass(c);
 		};
 		return fields;
