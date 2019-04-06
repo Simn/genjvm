@@ -1962,7 +1962,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| TObjectDecl fl ->
 			begin match follow e.etype with
-			| TAnon an ->
+			(* The guard is here because in the case of quoted fields like `"a-b"`, the field is not part of the
+			   type. In this case we have to do full dynamic construction. *)
+			| TAnon an when List.for_all (fun ((name,_,_),_) -> PMap.mem name an.a_fields) fl ->
 				let path,fl' = TAnonIdentifiaction.identify gctx an.a_fields in
 				jm#construct ConstructInit path (fun () ->
 					(* We have to respect declaration order, so let's temp var where necessary *)
