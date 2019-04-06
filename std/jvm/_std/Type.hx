@@ -304,7 +304,13 @@ class Type {
 		}
 		for (i in 0...params1.length) {
 			if (params1[i] != params2[i]) {
-				return false;
+				if (Jvm.instanceof(params1[i], jvm.Enum)) {
+					if (!enumEq(params1[i], params2[i])) {
+						return false;
+					}
+				} else {
+					return false;
+				}
 			}
 		}
 		return true;
