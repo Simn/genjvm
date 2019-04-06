@@ -1742,7 +1742,17 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| _ ->
 					self#texpr rvalue_any e;
 					let jsig = jm#get_code#get_stack#top in
-					let jsig = if is_unboxed jsig then jsig else object_sig in
+					let jsig = match jsig with
+						| TByte | TBool | TChar | TShort | TInt | TLong ->
+							jsig
+						| TFloat | TDouble ->
+							(* Haxe mandates 2.0 be printed as 2, so we have to wrap here... *)
+							jm#expect_reference_type;
+							jm#invokestatic haxe_jvm_path "toString" (method_sig [object_sig] (Some string_sig));
+							string_sig
+						| _ ->
+							object_sig
+					in
 					jm#invokevirtual string_builder_path "append" string_builder_sig (method_sig [jsig] (Some string_builder_sig));
 			in
 			loop e1;

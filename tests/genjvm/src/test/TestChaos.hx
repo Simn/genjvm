@@ -566,8 +566,8 @@ class TestChaos extends BaseTest {
 		eq("1a", 1 + "a");
 		eq("atrue", "a" + true);
 		eq("truea", true + "a");
-		eq("a1.0", "a" + 1.0);
-		eq("1.0a", 1.0 + "a");
+		eq("a1", "a" + 1.0);
+		eq("1a", 1.0 + "a");
 	}
 
 	function testBranchingCtorArgs() {

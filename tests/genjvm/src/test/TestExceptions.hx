@@ -27,7 +27,7 @@ class TestExceptions extends BaseTest {
 		eq("caught String: msg", raise(() -> throw "msg"));
 		eq("caught NativeExceptionOther: msg", raise(() -> throw new NativeExceptionOther("msg")));
 		eq("caught Int: 12", raise(() -> throw 12));
-		eq("caught Dynamic: 12.0", raise(() -> throw 12.));
+		eq("caught Dynamic: 12", raise(() -> throw 12.));
 		eq("caught Dynamic: false", raise(() -> throw false));
 		eq("caught Throwable: msg", raise(() -> throw new java.lang.Exception("msg")));
 	}
