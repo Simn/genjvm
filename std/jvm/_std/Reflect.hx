@@ -62,7 +62,14 @@ class Reflect {
 
 	public static function fields(o:Dynamic):Array<String> {
 		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
-			return [];
+			var c = (o : java.lang.Object).getClass();
+			var ret = [];
+			for (f in c.getDeclaredFields()) {
+				if (java.lang.reflect.Modifier.isStatic(f.getModifiers()) == false && !f.isSynthetic()) {
+					ret.push(f.getName());
+				}
+			}
+			return ret;
 		}
 		return (cast o : jvm.DynamicObject)._hx_getFields();
 	}
