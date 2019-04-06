@@ -2474,6 +2474,16 @@ let generate_enum gctx en =
 			jm_clinit#construct ConstructInit jc_ctor#get_this_path (fun () -> []);
 			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
 		) inits;
+		(* Add __meta__ TODO: do this via annotations instead? *)
+		begin match Texpr.build_metadata gctx.com.basic (TEnumDecl en) with
+		| None ->
+			()
+		| Some e ->
+			ignore(jc_enum#spawn_field "__meta__" object_sig [MStatic;MPublic]);
+			let handler = new texpr_to_jvm gctx jc_enum jm_clinit (gctx.com.basic.tvoid) in
+			handler#texpr rvalue_any e;
+			jm_clinit#putstatic jc_enum#get_this_path "__meta__" object_sig
+		end;
 		jm_clinit#get_code#return_void;
 	end;
 	jc_enum#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
