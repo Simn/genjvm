@@ -2056,7 +2056,7 @@ class tclass_to_jvm gctx c = object(self)
 			jc#add_annotation retention_path ["value",(AEnum(retention_policy_sig,"RUNTIME"))];
 		end;
 
-	method private handle_interface_type_params c_int tl_int =
+	method private handle_relation_type_params =
 		let map_type_params t =
 			let has_type_param = ref false in
 			let rec loop t = match follow t with
@@ -2075,7 +2075,7 @@ class tclass_to_jvm gctx c = object(self)
 			in
 			if !has_type_param then Some t else None
 		in
-		List.iter (fun cf ->
+		let check cf map_type =
 			match cf.cf_kind with
 			| Method (MethNormal | MethInline) ->
 				begin match map_type_params cf.cf_type with
@@ -2088,7 +2088,7 @@ class tclass_to_jvm gctx c = object(self)
 						| TFun(tl,tr) ->
 							let c_impl,cf_impl = begin
 								let tl = List.map (fun (_,_,t) -> t) tl in
-								match find_overload_rec' false (apply_params c_int.cl_params tl_int) c cf.cf_name tl with
+								match find_overload_rec' false map_type c cf.cf_name tl with
 								| None -> Error.error (Printf.sprintf "Could not find overload for %s on %s" cf.cf_name (s_type_path c.cl_path)) c.cl_name_pos
 								| Some(c,cf) -> c,cf
 							end in
@@ -2111,17 +2111,46 @@ class tclass_to_jvm gctx c = object(self)
 				end
 			| _ ->
 				()
-		) c_int.cl_ordered_fields
+		in
+		let check cf map_type =
+			check cf map_type;
+			List.iter (fun cf -> check cf map_type) cf.cf_overloads
+		in
+		let rec loop map_type c =
+			List.iter (fun (c,tl) ->
+				let map_type t = apply_params c.cl_params tl (map_type t) in
+				List.iter (fun cf ->
+					check cf map_type
+				) c.cl_ordered_fields;
+				loop map_type c
+			) c.cl_implements
+		in
+		loop (fun t -> t) c;
+		begin match c.cl_overrides,c.cl_super with
+		| [],_ ->
+			()
+		| fields,Some(c_sup,tl) ->
+			List.iter (fun cf ->
+				let c,_,cf = raw_class_field (fun cf -> apply_params c_sup.cl_params tl cf.cf_type) c_sup tl cf.cf_name in
+				begin match c with
+				| Some(c,tl) ->
+					check cf (apply_params c.cl_params tl)
+				| None ->
+					assert false
+				end
+			) fields
+		| _ ->
+			assert false
+		end
 
 	method private set_interfaces =
 		List.iter (fun (c_int,tl) ->
 			if is_annotation && c_int.cl_path = (["java";"lang";"annotation"],"Annotation") then
 				()
 			else begin
-				if not c.cl_interface && tl <> [] then self#handle_interface_type_params c_int tl;
 				jc#add_interface c_int.cl_path
 			end
-		) c.cl_implements;
+		) c.cl_implements
 
 	method private generate_empty_ctor =
 		let jsig_empty = method_sig [haxe_empty_constructor_sig] None in
@@ -2145,7 +2174,6 @@ class tclass_to_jvm gctx c = object(self)
 		end;
 		jm_empty_ctor#get_code#return_void;
 
-	(* TODO: this should respect the construction_kind too. We have to make sure it's properly marked - somehow *)
 	method private generate_implicit_ctors =
 		try
 			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
@@ -2356,6 +2384,7 @@ class tclass_to_jvm gctx c = object(self)
 		self#generate_empty_ctor;
 		self#generate_implicit_ctors;
 		self#set_interfaces;
+		if not c.cl_interface then self#handle_relation_type_params;
 		self#generate_signature;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
