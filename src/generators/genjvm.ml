@@ -600,23 +600,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let offset = pool#add (ConstMethodHandle((if is_static then 6 else 5), offset)) in
 		code#ldc offset jsig_method
 
-	method read ret t e1 fa =
+	method read cast e1 fa =
 		match fa with
 		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "NaN" | "POSITIVE_INFINITY" | "NEGATIVE_INFINITY"} as cf)) ->
 			jm#getstatic double_path cf.cf_name TDouble
 		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "isNaN" | "isFinite"} as cf)) ->
 			self#read_closure true double_path cf.cf_name (jsignature_of_type cf.cf_type);
-			self#cast cf.cf_type;
 		| FStatic({cl_path = ([],"String")},({cf_name = "fromCharCode"} as cf)) ->
 			self#read_closure true (["haxe";"jvm"],"StringExt") cf.cf_name (jsignature_of_type cf.cf_type);
-			self#cast cf.cf_type;
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			self#read_closure true c.cl_path cf.cf_name (jsignature_of_type cf.cf_type);
-			self#cast cf.cf_type;
 		| FStatic(c,cf) ->
-			let offset = add_field pool c cf in
-			let t = self#vtype cf.cf_type in
-			code#getstatic offset t
+			jm#getstatic c.cl_path cf.cf_name (self#vtype cf.cf_type);
+			cast();
 		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
@@ -624,23 +620,25 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| FInstance({cl_path = (["java"],"NativeArray")},_,{cf_name = "length"}) ->
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
-			code#arraylength vtobj
+			code#arraylength vtobj;
 		| FInstance(c,tl,cf) | FClosure(Some(c,tl),({cf_kind = Method MethDynamic} as cf)) when not (is_interface_var_access c cf) ->
 			let vt = self#vtype cf.cf_type in
 			let offset = add_field pool c cf in
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
-			code#getfield offset vtobj vt
+			code#getfield offset vtobj vt;
+			cast();
 		| FEnum(en,ef) when not (match follow ef.ef_type with TFun _ -> true | _ -> false) ->
 			let jsig = self#vtype ef.ef_type in
 			let offset = pool#add_field en.e_path ef.ef_name jsig FKField in
-			code#getstatic offset jsig
-		| FAnon {cf_name = s} ->
+			code#getstatic offset jsig;
+			cast();
+		| FAnon ({cf_name = s} as cf) ->
 			self#texpr rvalue_any e1;
 			let default () =
 				self#string s;
 				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
-				self#cast_expect ret t;
+				cast();
 			in
 			begin match follow e1.etype with
 			| TAnon an ->
@@ -651,8 +649,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					(fun () -> code#if_ref CmpEq)
 					(fun () ->
 						jm#cast (object_path_sig path);
-						jm#getfield path s (self#vtype t);
-						self#cast_expect ret t;
+						jm#getfield path s (self#vtype cf.cf_type);
+						cast();
 					)
 					(fun () -> default());
 			| _ ->
@@ -662,7 +660,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			self#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
-			self#cast_expect ret t;
+			cast();
 		| FClosure((Some(c,_)),cf) ->
 			let jsig = self#vtype cf.cf_type in
 			self#read_closure false c.cl_path cf.cf_name jsig;
@@ -1825,7 +1823,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#try_catch ret e1 catches
 		| TField(e1,fa) ->
 			if ret = RVoid then self#texpr ret e1
-			else self#read ret e.etype e1 fa;
+			else self#read (fun () -> self#cast_expect ret e.etype) e1 fa;
 		| TCall(e1,el) ->
 			self#call ret e.etype e1 el
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
