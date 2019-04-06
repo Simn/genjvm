@@ -17,6 +17,6 @@ class Enum {
 		if (parameters.length == 0) {
 			return baseName;
 		}
-		return '$baseName(${@:privateAccess parameters.join(", ")})';
+		return '$baseName(${@:privateAccess parameters.join(",")})';
 	}
 }
