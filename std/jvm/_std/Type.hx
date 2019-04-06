@@ -93,6 +93,8 @@ class Type {
 	public static function resolveClass(name:String):Class<Dynamic> {
 		if (name == "String") {
 			return java.lang.JavaString.String;
+		} else if (name == "Math") {
+			return java.lang.Math;
 		}
 		return try {
 			java.lang.Class.forName(name);
