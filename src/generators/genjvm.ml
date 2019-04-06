@@ -1332,10 +1332,10 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		in
 		let rec loop acc tl el = match tl,el with
 			| (_,o,t) :: tl,e :: el ->
-				self#texpr (rvalue_type t) e;
-				let jsig = self#vtype (if o then self#mknull t else t) in
-				jm#cast jsig;
-				loop (jsig :: acc) tl el
+					self#texpr (rvalue_type t) e;
+					let jsig = self#vtype (if o then self#mknull t else t) in
+					jm#cast jsig;
+					loop (jsig :: acc) tl el
 			| _,[] -> List.rev acc
 			| [],e :: el ->
 				(* TODO: this sucks *)
@@ -1454,7 +1454,16 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| _ ->
 				assert false
 			end
-		| TField(_,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
+		| TIdent "__array__" | TField(_,FStatic({cl_path = (["java"],"NativeArray")},{cf_name = "make"})) ->
+			begin match follow tr with
+			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
+				code#iconst (Int32.of_int (List.length el));
+				let jasig,_ = self#new_native_array (self#vtype t) el in
+				Some jasig
+			| _ ->
+				Error.error (Printf.sprintf "Bad __array__ type: %s" (s_type (print_context()) tr)) e1.epos;
+			end
+		| TField(e1,FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf))) ->
 			let tl,tr = self#call_arguments cf.cf_type el in
 			jm#invokestatic c.cl_path cf.cf_name (method_sig tl tr);
 			tr
@@ -1498,15 +1507,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let tl,_ = self#call_arguments cf.cf_type el in
 			jm#call_super_ctor kind (method_sig tl None);
 			None
-		| TIdent "__array__" ->
-			begin match follow tr with
-			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
-				code#iconst (Int32.of_int (List.length el));
-				let jasig,_ = self#new_native_array (self#vtype t) el in
-				Some jasig
-			| _ ->
-				Error.error (Printf.sprintf "Bad __array__ type: %s" (s_type (print_context()) tr)) e1.epos;
-			end
 		| _ ->
 			self#texpr rvalue_any e1;
 			jm#cast method_handle_sig;
