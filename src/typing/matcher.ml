@@ -1205,14 +1205,22 @@ module TexprConverter = struct
 
 	exception Not_exhaustive
 
-	let s_subject s e =
+	let s_subject v_lookup s e =
 		let rec loop s e = match e.eexpr with
+			| TField(_,FEnum(en,ef)) ->
+				s
 			| TField(e1,fa) ->
 				loop (Printf.sprintf "{ %s: %s }" (field_name fa) s) e1
 			| TEnumParameter(e1,ef,i) ->
 				let arity = match follow ef.ef_type with TFun(args,_) -> List.length args | _ -> assert false in
 				let l = make_offset_list i (arity - i - 1) s "_" in
 				loop (Printf.sprintf "%s(%s)" ef.ef_name (String.concat ", " l)) e1
+			| TLocal v ->
+				begin try
+					loop s (IntMap.find v.v_id v_lookup)
+				with Not_found ->
+					s
+				end
 			| _ ->
 				s
 		in
@@ -1329,7 +1337,7 @@ module TexprConverter = struct
 		let unmatched = ConTable.fold (fun con _ acc -> con :: acc) h [] in
 		e,unmatched,kind,finiteness
 
-	let report_not_exhaustive e_subject unmatched =
+	let report_not_exhaustive v_lookup e_subject unmatched =
 		let sl = match follow e_subject.etype with
 			| TAbstract({a_impl = Some c} as a,tl) when Meta.has Meta.Enum a.a_meta ->
 				List.map (fun (con,_) -> match fst con with
@@ -1350,9 +1358,10 @@ module TexprConverter = struct
 			| [] -> "_"
 			| _ -> String.concat " | " (List.sort Pervasives.compare sl)
 		in
-		error (Printf.sprintf "Unmatched patterns: %s" (s_subject s e_subject)) e_subject.epos
+		error (Printf.sprintf "Unmatched patterns: %s" (s_subject v_lookup s e_subject)) e_subject.epos
 
 	let to_texpr ctx t_switch match_debug with_type dt =
+		let v_lookup = ref IntMap.empty in
 		let com = ctx.com in
 		let p = dt.dt_pos in
 		let c_type = match follow (Typeload.load_instance ctx ({ tpackage = ["std"]; tname="Type"; tparams=[]; tsub = None},p) true) with TInst(c,_) -> c | t -> assert false in
@@ -1392,7 +1401,7 @@ module TexprConverter = struct
 								| WithType.NoValue,Infinite when toplevel -> None
 								| _,CompileTimeFinite when unmatched = [] -> None
 								| _ when ctx.com.display.DisplayMode.dms_error_policy = DisplayMode.EPIgnore -> None
-								| _ -> report_not_exhaustive e_subject unmatched
+								| _ -> report_not_exhaustive !v_lookup e_subject unmatched
 						in
 						let cases = ExtList.List.filter_map (fun (con,_,dt) -> match unify_constructor ctx params e_subject.etype con with
 							| Some(_,params) -> Some (con,dt,params)
@@ -1481,11 +1490,12 @@ module TexprConverter = struct
 						with Not_exhaustive ->
 							if toplevel then (fun () -> loop toplevel params dt2)
 							else if ctx.com.display.DisplayMode.dms_error_policy = DisplayMode.EPIgnore then (fun () -> mk (TConst TNull) (mk_mono()) dt2.dt_pos)
-							else report_not_exhaustive e [(ConConst TNull,dt.dt_pos),dt.dt_pos]
+							else report_not_exhaustive !v_lookup e [(ConConst TNull,dt.dt_pos),dt.dt_pos]
 						in
 						f()
 					| Bind(bl,dt) ->
 						let el = List.rev_map (fun (v,p,e) ->
+							v_lookup := IntMap.add v.v_id e !v_lookup;
 							mk (TVar(v,Some e)) com.basic.tvoid p
 						) bl in
 						let e = loop toplevel params dt in
