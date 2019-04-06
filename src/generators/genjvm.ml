@@ -2343,7 +2343,7 @@ class tclass_to_jvm gctx c = object(self)
 						failsafe cf.cf_pos (fun () -> self#generate_method gctx jc c mtype cf)
 					) (cf :: List.filter (fun cf -> Meta.has Meta.Overload cf.cf_meta) cf.cf_overloads)
 				| _ ->
-					if not c.cl_interface then failsafe cf.cf_pos (fun () -> self#generate_field gctx jc c mtype cf)
+					if not c.cl_interface && is_physical_field cf then failsafe cf.cf_pos (fun () -> self#generate_field gctx jc c mtype cf)
 			in
 			List.iter (field MStatic) c.cl_ordered_statics;
 			List.iter (field MInstance) c.cl_ordered_fields;
