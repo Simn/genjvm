@@ -1840,7 +1840,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						let tl,_ = self#call_arguments  cf.cf_type el in
 						tl
 					in
-					jm#construct ~no_value:(if ret = RVoid then true else false) (get_construction_mode c cf) c.cl_path f
+					jm#construct ~no_value:(if ret = RVoid then true else false) (get_construction_mode c' cf) c.cl_path f
 				end
 			end
 		| TReturn None ->
