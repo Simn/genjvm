@@ -146,8 +146,13 @@ class Type {
 				return false;
 			}
 			for (i in 0...params.length) {
-				if (!Jvm.getWrapperClass(params[i]).isAssignableFrom(argTypes[i])) {
-					return false;
+				var arg = Jvm.getWrapperClass(params[i]);
+				if (!arg.isAssignableFrom(argTypes[i])) {
+					if (arg == (cast java.lang.Double.DoubleClass) && argTypes[i] == cast java.lang.Integer.IntegerClass) {
+						args[i] = Jvm.nullIntToNullFloat(args[i]);
+					} else {
+						return false;
+					}
 				}
 			}
 			return true;
