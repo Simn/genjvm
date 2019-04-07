@@ -1935,8 +1935,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TCast(e1,Some mt) ->
 			self#texpr rvalue_any e1;
 			let jsig = jsignature_of_type (type_of_module_type mt) in
-			(* TODO: I think this needs some instanceof checking for basic types *)
-			if NativeSignatures.is_unboxed jsig then jm#cast jsig
+			if is_unboxed jsig || is_unboxed jm#get_code#get_stack#top then jm#cast jsig
 			else code#checkcast (path_map (t_infos mt).mt_path);
 			if ret = RVoid then code#pop;
 		| TParenthesis e1 | TMeta(_,e1) ->
