@@ -1574,6 +1574,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		in
 		let add_catch (exc,v,e) =
 			start_exception_block exc#get_native_exception_path exc#get_native_exception_type;
+			jm#get_code#dup;
+			jm#invokestatic haxe_exception_path "setException" (method_sig [throwable_sig] None);
 			if not exc#is_native_exception then begin
 				unwrap();
 				self#cast v.v_type

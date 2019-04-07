@@ -3,6 +3,16 @@ package jvm;
 @:keep
 @:native('haxe.jvm.Exception')
 class Exception<T> extends java.lang.Exception {
+	static public var exception = new java.lang.ThreadLocal<java.lang.Throwable>();
+
+	static public function setException(exc:java.lang.Throwable) {
+		exception.set(exc);
+	}
+
+	static public function currentException() {
+		return exception.get();
+	}
+
 	public var value:T;
 
 	public function new(value:T) {
