@@ -37,6 +37,7 @@ class constant_pool = object(self)
 	val luti = Hashtbl.create 0;
 	val mutable next_index = 1;
 	val mutable closed = false
+	val inner_classes = Hashtbl.create 0
 
 	method add const =
 		try
@@ -67,7 +68,12 @@ class constant_pool = object(self)
 	method add_path path =
 		let path = path_map path in
 		let s = self#s_type_path path in
-		self#add_type s
+		let offset = self#add_type s in
+		if String.contains (snd path) '$' then begin
+			let name1,name2 = ExtString.String.split (snd path) "$" in
+			Hashtbl.replace inner_classes ((fst path,name1),name2) offset;
+		end;
+		offset
 
 	method add_string s =
 		self#add (ConstUtf8 s)
@@ -90,6 +96,8 @@ class constant_pool = object(self)
 			| FKInterfaceMethod -> ConstInterfaceMethodref(offset_class,offset_info)
 		in
 		self#add const
+
+	method get_inner_classes = inner_classes
 
 	method private write_i64 ch i64 =
 		write_real_i32 ch (Int64.to_int32 i64);

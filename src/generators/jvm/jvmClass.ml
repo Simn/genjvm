@@ -78,9 +78,8 @@ class builder path_this path_super = object(self)
 			let offset_info = pool#add (ConstNameAndType(offset_name,offset_desc)) in
 			jc#add_attribute (JvmAttribute.AttributeEnclosingMethod(offset_class,offset_info));
 		end;
-		let offset_name = pool#add_string (snd path) in
-		let offset_class = pool#add_path path in
-		DynArray.add inner_classes (jc,offset_name,offset_class);
+		ignore(pool#add_path path);
+		DynArray.add inner_classes jc;
 		jc
 
 	method spawn_method (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
@@ -106,15 +105,22 @@ class builder path_this path_super = object(self)
 		jm
 
 	method private commit_inner_classes =
-		if DynArray.length inner_classes > 0 then begin
+		if Hashtbl.length pool#get_inner_classes > 0 then begin
 			let open JvmAttribute in
-			let a = DynArray.to_array inner_classes in
-			let a = Array.map (fun (jc,offset_name,offset_class) -> {
-				ic_inner_class_info_index = offset_class;
-				ic_outer_class_info_index = self#get_offset_this;
-				ic_inner_name_index = offset_name;
-				ic_inner_class_access_flags = jc#get_access_flags;
-			}) a in
+			let l = Hashtbl.fold (fun (path,name) offset_class acc ->
+				(path,name,offset_class) :: acc
+			) pool#get_inner_classes [] in
+			let l = List.map (fun (path,name,offset_class) ->
+				let offset_name = pool#add_string name in
+				let offset_outer = pool#add_path path in
+				{
+					ic_inner_class_info_index = offset_class;
+					ic_outer_class_info_index = offset_outer;
+					ic_inner_name_index = offset_name;
+					ic_inner_class_access_flags = 9;
+				}
+			) l in
+			let a = Array.of_list l in
 			self#add_attribute (AttributeInnerClasses a)
 		end
 
@@ -133,7 +139,7 @@ class builder path_this path_super = object(self)
 			begin match pop_scope with
 			| Some pop_scope ->
 				pop_scope();
-				DynArray.add methods jm#export_method;
+				DynArray.add methods (jm#export_method config);
 			| None ->
 				self#add_field jm#export_field
 			end;
