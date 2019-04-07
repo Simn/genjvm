@@ -154,6 +154,8 @@ class Jvm {
 					case "charAt": return (cast jvm.StringExt.charAt : java.lang.invoke.MethodHandle).bindTo(obj);
 					case "charCodeAt": return (cast jvm.StringExt.charCodeAt : java.lang.invoke.MethodHandle).bindTo(obj);
 					case "indexOf": return (cast jvm.StringExt.indexOf : java.lang.invoke.MethodHandle).bindTo(obj);
+					case "iterator": return function() return new haxe.iterators.StringIterator(obj);
+					case "keyValueIterator": return function() return new haxe.iterators.StringKeyValueIterator(obj);
 					case "lastIndexOf": return (cast jvm.StringExt.lastIndexOf : java.lang.invoke.MethodHandle).bindTo(obj);
 					case "split": return (cast jvm.StringExt.split : java.lang.invoke.MethodHandle).bindTo(obj);
 					case "substr": return (cast jvm.StringExt.substr : java.lang.invoke.MethodHandle).bindTo(obj);
