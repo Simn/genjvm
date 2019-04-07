@@ -67,19 +67,29 @@ class Std {
 	};
 
 	public static function parseInt(x:String):Null<Int> {
-		if (x.length < 2) {
-			return integerFormatter.parse(x).intValue();
-		}
-		switch ((cast x : java.lang.JavaString.String).codePointAt(1)) {
-			case 'x'.code | 'X'.code:
-				return java.lang.Integer.decode(x).intValue();
-			case _:
+		try {
+			x = StringTools.trim(x);
+			if (x.length < 2) {
 				return integerFormatter.parse(x).intValue();
+			}
+			switch ((cast x : java.lang.JavaString.String).codePointAt(1)) {
+				case 'x'.code | 'X'.code:
+					return java.lang.Integer.decode(x).intValue();
+				case _:
+					return integerFormatter.parse(x).intValue();
+			}
+		} catch(_:Dynamic) {
+			return null;
 		}
 	}
 
 	public static function parseFloat(x:String):Float {
-		return doubleFormatter.parse(x.toUpperCase()).doubleValue();
+		try {
+			x = StringTools.trim(x);
+			return doubleFormatter.parse(x.toUpperCase()).doubleValue();
+		} catch(_:Dynamic) {
+			return Math.NaN;
+		}
 	}
 
 	inline public static function instance<T:{}, S:T>(value:T, c:Class<S>):S {
