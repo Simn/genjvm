@@ -2660,6 +2660,12 @@ module Preprocessor = struct
 				List.iter fix_covariant_return cf.cf_overloads
 			) fields
 
+	let rec get_constructor c =
+		match c.cl_constructor, c.cl_super with
+		| Some cf, _ -> c,cf
+		| None, None -> raise Not_found
+		| None, Some (csup,cparams) -> get_constructor csup
+
 	let preprocess_class gctx c =
 		let field cf = match cf.cf_expr with
 			| None ->
@@ -2690,12 +2696,12 @@ module Preprocessor = struct
 		List.iter (field MInstance) c.cl_ordered_fields;
 		match c.cl_constructor with
 		| None ->
-			begin match c.cl_super with
-			| Some({cl_constructor = Some cf} as csup,_) ->
+			begin try
+				let csup,cf = get_constructor c in
 				List.iter (fun cf -> add_implicit_ctor gctx c csup cf) (cf :: cf.cf_overloads)
-			| _ ->
+			with Not_found ->
 				()
-			end
+			end;
 		| Some cf ->
 			let field cf =
 				if !has_dynamic_instance_method then make_haxe cf;
