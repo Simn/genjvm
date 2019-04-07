@@ -2668,13 +2668,20 @@ module Preprocessor = struct
 				preprocess_expr gctx e
 		in
 		let has_dynamic_instance_method = ref false in
+		let has_field_init = ref false in
 		let field mtype cf =
 			List.iter field (cf :: cf.cf_overloads);
 			match mtype with
 			| MConstructor ->
 				()
 			| MInstance ->
-				(match cf.cf_kind with Method MethDynamic -> has_dynamic_instance_method := true | _ -> ());
+				begin match cf.cf_kind with
+					| Method MethDynamic -> has_dynamic_instance_method := true
+					| Var _ when cf.cf_expr <> None && not !has_field_init && c.cl_constructor = None && c.cl_super = None ->
+						has_field_init := true;
+						add_implicit_ctor gctx c c (mk_field "new" (tfun [] gctx.com.basic.tvoid) null_pos null_pos)
+					| _ -> ()
+				end;
 			| MStatic ->
 				()
 		in
