@@ -2098,9 +2098,7 @@ class tclass_to_jvm gctx c = object(self)
 							begin
 								let tl' = List.map (fun (_,_,t) -> t) tl in
 								match find_overload_rec' false map_type c cf.cf_name tl' with
-								| None ->
-									()
-								| Some(c_impl,cf_impl) ->
+								| Some(c_impl,cf_impl) when c_impl == c ->
 									let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
 									jm#load_this;
 									let jsig_impl = jsignature_of_type cf_impl.cf_type in
@@ -2113,6 +2111,8 @@ class tclass_to_jvm gctx c = object(self)
 									jm#invokevirtual c_impl.cl_path cf.cf_name (object_path_sig c_impl.cl_path) jsig_impl;
 									if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
 									jm#return;
+								| _ ->
+									()
 							end
 						| _ ->
 							assert false
