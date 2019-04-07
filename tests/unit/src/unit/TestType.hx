@@ -364,10 +364,8 @@ class TestType extends Test {
 		eq(c.b, true);
 		eq(c.t, String);
 
-		#if !jvm // not specified to work according to createInstance
 		var c = Type.createInstance(InitWithoutCtor, []);
 		eq(c.i, 2);
-		#end
 
 		var c = new InitProperties();
 		eq(c.accNull, 3);
