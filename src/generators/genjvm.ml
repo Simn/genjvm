@@ -2191,9 +2191,6 @@ class tclass_to_jvm gctx c = object(self)
 				let cmode = get_construction_mode c cf in
 				let jm = jc#spawn_method (if cmode = ConstructInit then "<init>" else "new") (jsignature_of_type cf.cf_type) [MPublic] in
 				let handler = new texpr_to_jvm gctx jc jm gctx.com.basic.tvoid in
-				DynArray.iter (fun e ->
-					handler#texpr RVoid e;
-				) field_inits;
 				jm#load_this;
 				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
 				List.iter (fun (n,_,t) ->
@@ -2201,6 +2198,9 @@ class tclass_to_jvm gctx c = object(self)
 					load();
 				) tl;
 				jm#call_super_ctor cmode jm#get_jsig;
+				DynArray.iter (fun e ->
+					handler#texpr RVoid e;
+				) field_inits;
 				jm#return
 			) sm
 		with Not_found ->
@@ -2243,7 +2243,7 @@ class tclass_to_jvm gctx c = object(self)
 		| _ ->
 			()
 		end;
-		handler#texpr RReturn e
+			handler#texpr RReturn e
 
 	method generate_method gctx jc c mtype cf =
 		gctx.current_field_info <- get_field_info gctx cf.cf_meta;
