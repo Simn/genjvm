@@ -87,6 +87,7 @@ type generation_context = {
 	anon_path_lut : (path,jpath) Hashtbl.t;
 	field_infos : field_generation_info DynArray.t;
 	implicit_ctors : (path,(path,tclass * tclass_field) PMap.t) Hashtbl.t;
+	default_export_config : export_config;
 	mutable current_field_info : field_generation_info option;
 	mutable anon_num : int;
 }
@@ -454,7 +455,7 @@ let create_context_class gctx jc jm name vl = match vl with
 			ctx_class#add vid vname jsig;
 		) vl jsigs;
 		jm_ctor#get_code#return_void;
-		write_class gctx.jar path jc#export_class;
+		write_class gctx.jar path (jc#export_class gctx.default_export_config);
 		ctx_class
 
 let rvalue_any = RValue None
@@ -2398,7 +2399,7 @@ class tclass_to_jvm gctx c = object(self)
 		self#generate_signature;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
-		let jc = jc#export_class in
+		let jc = jc#export_class gctx.default_export_config in
 		write_class gctx.jar (path_map c.cl_path) jc
 end
 
@@ -2444,7 +2445,7 @@ let generate_enum gctx en =
 			jc_ctor#add_annotation (["haxe";"jvm";"annotation"],"EnumValueReflectionInformation") (["argumentNames",AArray (List.map (fun (name,_) -> AString name) args)]);
 			jc_ctor
 		end in
-		write_class gctx.jar jc_ctor#get_this_path jc_ctor#export_class;
+		write_class gctx.jar jc_ctor#get_this_path (jc_ctor#export_class gctx.default_export_config);
 		begin match args with
 			| [] ->
 				(* Create static field for ctor without args *)
@@ -2485,13 +2486,13 @@ let generate_enum gctx en =
 		jm_clinit#get_code#return_void;
 	end;
 	jc_enum#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
-	write_class gctx.jar en.e_path jc_enum#export_class
+	write_class gctx.jar en.e_path (jc_enum#export_class gctx.default_export_config)
 
 let generate_abstract gctx a =
 	let super_path = object_path in
 	let jc = new JvmClass.builder a.a_path super_path in
 	jc#add_access_flag 1; (* public *)
-	let jc = jc#export_class in
+	let jc = jc#export_class gctx.default_export_config in
 	write_class gctx.jar a.a_path jc
 
 let debug_path path = match path with
@@ -2744,6 +2745,9 @@ let generate com =
 		implicit_ctors = Hashtbl.create 0;
 		field_infos = DynArray.create();
 		current_field_info = None;
+		default_export_config = {
+			export_debug = com.debug;
+		}
 	} in
 	Std.finally (Timer.timer ["generate";"java";"preprocess"]) Preprocessor.preprocess gctx;
 	let manifest_content =
@@ -2790,6 +2794,6 @@ let generate com =
 			load();
 			jm_fields#get_code#return_value string_map_sig
 		end;
-		write_class gctx.jar path jc#export_class
+		write_class gctx.jar path (jc#export_class gctx.default_export_config)
 	) gctx.anon_lut;
 	Zip.close_out gctx.jar

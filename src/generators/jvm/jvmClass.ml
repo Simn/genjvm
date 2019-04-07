@@ -126,7 +126,7 @@ class builder path_this path_super = object(self)
 			let l = List.fold_left (fun acc (_,(_,bm)) -> bm :: acc) [] bootstrap_methods in
 			self#add_attribute (AttributeBootstrapMethods (Array.of_list l))
 
-	method export_class =
+	method export_class (config : export_config) =
 		assert (not was_exported);
 		was_exported <- true;
 		List.iter (fun (jm,pop_scope) ->

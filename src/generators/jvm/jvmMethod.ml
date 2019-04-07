@@ -526,10 +526,10 @@ class builder jc name jsig = object(self)
 	method get_jsig = jsig
 	method set_terminated b = terminated <- b
 
-	method private get_jcode =
+	method private get_jcode (config : export_config) =
 		let attributes = DynArray.create () in
 		let lines = code#get_lines in
-		if DynArray.length lines > 0 then
+		if config.export_debug && DynArray.length lines > 0 then
 			DynArray.add attributes (AttributeLineNumberTable (DynArray.to_array lines));
 		let stack_map_table = self#get_stack_map_table in
 		if Array.length stack_map_table > 0 then
@@ -545,17 +545,17 @@ class builder jc name jsig = object(self)
 		}
 
 	(** Exports the method as a [jvm_field]. No other functions should be called on this object afterwards. *)
-	method export_method =
+	method export_method (config : export_config) =
 		assert (not was_exported);
 		was_exported <- true;
 		self#commit_annotations jc#get_pool;
 		if code#get_fp > 0 then begin
-			let code = self#get_jcode in
+			let code = self#get_jcode config in
 			self#add_attribute (AttributeCode code);
 		end;
 		if Hashtbl.length thrown_exceptions > 0 then
 			self#add_attribute (AttributeExceptions (Array.of_list (Hashtbl.fold (fun k _ c -> k :: c) thrown_exceptions [])));
-		begin match debug_locals with
+		if config.export_debug then begin match debug_locals with
 		| [] ->
 			()
 		| _ ->

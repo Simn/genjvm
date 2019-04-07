@@ -11,6 +11,10 @@ type annotation_kind =
 
 and annotation = (string * annotation_kind) list
 
+type export_config = {
+	export_debug : bool;
+}
+
 class base_builder = object(self)
 	val mutable access_flags = 0
 	val attributes = DynArray.create ()
