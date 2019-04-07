@@ -2726,6 +2726,11 @@ module Preprocessor = struct
 		) gctx.com.types
 end
 
+let file_name_and_extension file =
+	match List.rev (ExtString.String.nsplit file "/") with
+	| e1 :: _ -> e1
+	| _ -> assert false
+
 let generate com =
 	mkdir_from_path com.file;
 	let jar_name,manifest_suffix = match com.main_class with
@@ -2733,7 +2738,8 @@ let generate com =
 		| None -> "jar",""
 	in
 	let jar_name = if com.debug then jar_name ^ "-debug" else jar_name in
-	let jar_path = Printf.sprintf "%s%s.jar" (add_trailing_slash com.file) jar_name in
+	let jar_dir = add_trailing_slash com.file in
+	let jar_path = Printf.sprintf "%s%s.jar" jar_dir jar_name in
 	let gctx = {
 		com = com;
 		jar = Zip.open_out jar_path;
@@ -2750,8 +2756,24 @@ let generate com =
 		}
 	} in
 	Std.finally (Timer.timer ["generate";"java";"preprocess"]) Preprocessor.preprocess gctx;
+	let class_paths = ExtList.List.filter_map (fun (file,std,_,_,_) ->
+		if std then None
+		else begin
+			let dir = Printf.sprintf "%slib/" jar_dir in
+			Path.mkdir_from_path dir;
+			let name = file_name_and_extension file in
+			let ch_in = open_in_bin file in
+			let ch_out = open_out_bin (Printf.sprintf "%s%s" dir name) in
+			let b = IO.read_all (IO.input_channel ch_in) in
+			output_string ch_out b;
+			close_in ch_in;
+			close_out ch_out;
+			Some (Printf.sprintf "lib/%s" name)
+		end
+	) com.java_libs in
 	let manifest_content =
 		"Manifest-Version: 1.0\n" ^
+		(match class_paths with [] -> "" | _ -> "Class-Path: " ^ (String.concat " " class_paths ^ "\n")) ^
 		"Created-By: Haxe (Haxe Foundation)" ^
 		manifest_suffix ^
 		"\n\n"
