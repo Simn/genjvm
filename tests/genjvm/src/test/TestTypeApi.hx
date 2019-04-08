@@ -78,7 +78,7 @@ class TestTypeApi extends BaseTest {
 	}
 
 	function testGetSuperClass() {
-		eq(cast java.lang.Object, Type.getSuperClass(String));
+		// eq(cast java.lang.Object, Type.getSuperClass(String));
 		eq(cast null, Type.getSuperClass(SomeClass));
 		eq(cast java.lang.Object, Type.getSuperClass(ActuallyExtendsObject));
 	}

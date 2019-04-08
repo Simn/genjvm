@@ -896,7 +896,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| Some e ->
 				offset_def := code#get_fp - !offset_def;
 				jm#add_stack_frame;
+				let pop_scope = jm#push_scope in
 				self#texpr ret e;
+				pop_scope();
 				jm#is_terminated,self#maybe_make_jump
 		in
 
@@ -905,7 +907,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			restore();
 			jm#add_stack_frame;
 			List.iter (fun r -> r := code#get_fp - !r) rl;
+			let pop_scope = jm#push_scope in
 			self#texpr ret e;
+			pop_scope();
 			loop ((jm#is_terminated,self#maybe_make_jump) :: acc) cases
 		| [] ->
 			List.rev acc
