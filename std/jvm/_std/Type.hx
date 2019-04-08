@@ -40,6 +40,9 @@ class Type {
 		if (isEnumValueClass(c)) {
 			return null;
 		}
+		if (c == cast jvm.DynamicObject) {
+			return null;
+		}
 		return c;
 	}
 
@@ -55,6 +58,9 @@ class Type {
 	}
 
 	public static function getSuperClass(c:Class<Dynamic>):Class<Dynamic> {
+		if (c == String) {
+			return null;
+		}
 		var c = c.native();
 		var cSuper = c.getSuperclass();
 		if (cSuper == null) {
