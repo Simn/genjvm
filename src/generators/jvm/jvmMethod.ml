@@ -274,7 +274,8 @@ class builder jc name jsig = object(self)
 			code#f2l;
 		(* from int *)
 		| TBool,TInt ->
-			code#i2b TBool
+			ignore(code#get_stack#pop);
+			code#get_stack#push TBool;
 		| TByte,TInt ->
 			code#i2b TByte
 		| TChar,TInt ->
