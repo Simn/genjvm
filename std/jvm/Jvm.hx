@@ -27,27 +27,8 @@ class Jvm {
 		return (cast v1 : java.lang.JavaString.String).compareTo(v2);
 	}
 
-	static public function equals<T>(v1:T, v2:T):Bool {
-		if (referenceEquals(v1, v2))
-			return true;
-		if (v1 == null || v2 == null)
-			return false;
-
-		if (instanceof(v1, java.lang.Number)) {
-			if (!(instanceof(v2, java.lang.Number)))
-				return false;
-
-			var v1c = (cast v1 : java.lang.Number);
-			var v2c = (cast v2 : java.lang.Number);
-			if (instanceof(v1, java.lang.Long) || instanceof(v2, java.lang.Long)) {
-				return v1c.longValue() == v2c.longValue();
-			}
-			return v1c.doubleValue() == v2c.doubleValue();
-		} else if (instanceof(v1, java.lang.JavaString.String)) {
-			return (cast v1 : java.lang.JavaString.String).equals(v2);
-		}
-
-		return false;
+	static public function compare<T>(v1:T, v2:T):Int {
+		return Reflect.compare(v1, v2);
 	}
 
 	// casts

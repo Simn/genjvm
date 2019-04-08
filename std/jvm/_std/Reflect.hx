@@ -88,8 +88,7 @@ class Reflect {
 	}
 
 	public static function compare<T>(a:T, b:T):Int {
-		// TODO: this is incomplete/bad
-		if (a == b) {
+		if (Jvm.referenceEquals(a, b)) {
 			return 0;
 		}
 		if (a == null) {
@@ -98,10 +97,16 @@ class Reflect {
 		if (b == null) {
 			return 1;
 		}
-		if (Jvm.instanceof(a, java.lang.Number) && Jvm.instanceof(a, java.lang.Number)) {
+		if (Jvm.instanceof(a, java.lang.Number) && Jvm.instanceof(b, java.lang.Number)) {
 			return java.lang.Long.compare((cast a : java.lang.Number).longValue(), (cast b : java.lang.Number).longValue());
 		}
-		return (cast a : java.lang.JavaString.String).compareTo(cast b);
+		if (Jvm.instanceof(a, java.lang.JavaString.String)) {
+			if (!Jvm.instanceof(b, java.lang.JavaString.String)) {
+				return -1;
+			}
+			return (cast a : java.lang.JavaString.String).compareTo(cast b);
+		}
+		return -1;
 	}
 
 	public static function compareMethods(f1:Dynamic, f2:Dynamic):Bool {
