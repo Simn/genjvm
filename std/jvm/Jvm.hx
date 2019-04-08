@@ -24,6 +24,9 @@ class Jvm {
 		if (v1 == null) {
 			return v2 == null ? 0 : 1;
 		}
+		if (v2 == null) {
+			return -1;
+		}
 		return (cast v1 : java.lang.JavaString.String).compareTo(v2);
 	}
 
