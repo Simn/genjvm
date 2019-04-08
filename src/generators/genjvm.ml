@@ -796,6 +796,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#texpr rvalue_any e1;
 					if ak <> AKNone then code#dup;
 					self#texpr rvalue_any e2;
+					jm#cast TInt;
 					if ak <> AKNone then begin
 						code#dup_x1;
 						jm#invokestatic haxe_jvm_path "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
@@ -1959,6 +1960,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| t ->
 				self#texpr rvalue_any e1;
 				self#texpr rvalue_any e2;
+				jm#cast TInt;
 				jm#invokestatic (["haxe";"jvm"],"Jvm") "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
 				self#cast e.etype;
 			end
