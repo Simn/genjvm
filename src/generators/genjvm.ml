@@ -264,6 +264,54 @@ module TAnonIdentifiaction = struct
 
 end
 
+module AnnotationHandler = struct
+	let generate_annotations builder meta =
+		let parse_path e =
+			let sl = try string_list_of_expr_path_raise e with Exit -> Error.error "Field expression expected" (pos e) in
+			let path = match sl with
+				| s :: sl -> List.rev sl,s
+				| _ -> Error.error "Field expression expected" (pos e)
+			in
+			path
+		in
+		let rec parse_value e = match fst e with
+			| EConst (Int s) -> AInt (Int32.of_string s)
+			| EConst (Float s) -> ADouble (float_of_string s)
+			| EConst (String s) -> AString s
+			| EConst (Ident "true") -> ABool true
+			| EConst (Ident "false") -> ABool false
+			| EArrayDecl el -> AArray (List.map parse_value el)
+			| EField(e1,s) ->
+				let path = parse_path e1 in
+				AEnum(object_path_sig path,s)
+			| _ -> Error.error "Expected value expression" (pos e)
+		in
+		let parse_value_pair e = match fst e with
+			| EBinop(OpAssign,(EConst(Ident s),_),e1) ->
+				s,parse_value e1
+			| _ ->
+				Error.error "Assignment expression expected" (pos e)
+		in
+		let parse_expr e = match fst e with
+			| ECall(e1,el) ->
+				let path = parse_path e1 in
+				(* TODO: this is not robust... *)
+				let _,name = ExtString.String.replace (snd path) "." "$" in
+				let path = (fst path,name) in
+				let values = List.map parse_value_pair el in
+				path,values
+			| _ ->
+				Error.error "Call expression expected" (pos e)
+		in
+		List.iter (fun (m,el,_) -> match m,el with
+			| Meta.Meta,[e] ->
+				let path,annotation = parse_expr e in
+				builder#add_annotation path annotation;
+			| _ ->
+				()
+		) meta
+end
+
 let enum_ctor_sig =
 	let ta = TArray(object_sig,None) in
 	method_sig [TInt;ta] None
@@ -2286,7 +2334,8 @@ class tclass_to_jvm gctx c = object(self)
 				let s = if cf.cf_params = [] then ssig else Printf.sprintf "<%s>%s" stl ssig in
 				let offset = jc#get_pool#add_string s in
 				jm#add_attribute (AttributeSignature offset);
-		end
+		end;
+		AnnotationHandler.generate_annotations (jm :> JvmBuilder.base_builder) cf.cf_meta;
 
 	method generate_field gctx (jc : JvmClass.builder) c mtype cf =
 		let jsig = jsignature_of_type cf.cf_type in
@@ -2390,6 +2439,10 @@ class tclass_to_jvm gctx c = object(self)
 				jc#add_attribute (AttributeSignature offset)
 		end;
 
+	method generate_annotations =
+		AnnotationHandler.generate_annotations (jc :> JvmBuilder.base_builder) c.cl_meta;
+		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))])
+
 	method generate =
 		self#set_access_flags;
 		self#generate_fields;
@@ -2398,8 +2451,8 @@ class tclass_to_jvm gctx c = object(self)
 		self#set_interfaces;
 		if not c.cl_interface then self#handle_relation_type_params;
 		self#generate_signature;
+		self#generate_annotations;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
-		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))]);
 		let jc = jc#export_class gctx.default_export_config in
 		write_class gctx.jar (path_map c.cl_path) jc
 end
@@ -2486,6 +2539,7 @@ let generate_enum gctx en =
 		end;
 		jm_clinit#get_code#return_void;
 	end;
+	AnnotationHandler.generate_annotations (jc_enum :> JvmBuilder.base_builder) en.e_meta;
 	jc_enum#add_annotation (["haxe";"jvm";"annotation"],"EnumReflectionInformation") (["constructorNames",AArray names]);
 	write_class gctx.jar en.e_path (jc_enum#export_class gctx.default_export_config)
 

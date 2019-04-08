@@ -5,7 +5,7 @@ open JvmWriter
 
 type j_annotation = {
 	ann_type : int;
-	ann_elements : (int * j_annotation_element_value) array;
+	ann_elements : (jvm_constant_pool_index * j_annotation_element_value) array;
 }
 
 and j_annotation_element_value = char * j_annotation_value

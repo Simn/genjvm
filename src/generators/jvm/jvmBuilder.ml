@@ -4,6 +4,8 @@ open JvmSignature
 open JvmAttribute
 
 type annotation_kind =
+	| AInt of Int32.t
+	| ADouble of float
 	| AString of string
 	| ABool of bool
 	| AEnum of jsignature * string
@@ -39,6 +41,10 @@ class base_builder = object(self)
 				let l = List.map (fun (name,ak) ->
 					let offset = pool#add_string name in
 					let rec loop ak = match ak with
+						| AInt i32 ->
+							'I',ValConst(pool#add (ConstInt i32))
+						| ADouble f ->
+							'D',ValConst(pool#add (ConstDouble f))
 						| AString s ->
 							's',ValConst(pool#add_string s)
 						| ABool b ->
