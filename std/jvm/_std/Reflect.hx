@@ -132,7 +132,22 @@ class Reflect {
 	}
 
 	public static function isObject(v:Dynamic):Bool {
-		return false;
+		if (v == null) {
+			return false;
+		}
+		if (Jvm.instanceof(v, jvm.Enum)) {
+			return false;
+		}
+		if (Jvm.instanceof(v, java.lang.Number)) {
+			return false;
+		}
+		if (Jvm.instanceof(v, java.lang.Boolean.BooleanClass)) {
+			return false;
+		}
+		if (Jvm.instanceof(v, java.lang.invoke.MethodHandle)) {
+			return false;
+		}
+		return true;
 	}
 
 	public static function isEnumValue(v:Dynamic):Bool {
