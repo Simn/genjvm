@@ -1985,7 +1985,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			pop_scope();
 		| TCast(e1,None) ->
 			self#texpr ret e1;
-			self#cast e.etype
+			if ret <> RVoid then self#cast e.etype
 		| TCast(e1,Some mt) ->
 			self#texpr rvalue_any e1;
 			let jsig = jsignature_of_type (type_of_module_type mt) in
