@@ -2098,6 +2098,7 @@ let failsafe p f =
 class tclass_to_jvm gctx c = object(self)
 	val is_annotation = Meta.has Meta.Annotation c.cl_meta
 	val field_inits = DynArray.create ()
+	val delayed_field_inits = DynArray.create ()
 
 	val jc = new JvmClass.builder c.cl_path (Option.map_default (fun (c,_) -> c.cl_path) object_path c.cl_super)
 
@@ -2217,6 +2218,12 @@ class tclass_to_jvm gctx c = object(self)
 		let jm_empty_ctor = jc#spawn_method "<init>" jsig_empty [MPublic] in
 		let _,load,_ = jm_empty_ctor#add_local "_" haxe_empty_constructor_sig VarArgument in
 		jm_empty_ctor#load_this;
+		if c.cl_constructor = None then begin
+			let handler = new texpr_to_jvm gctx jc jm_empty_ctor gctx.com.basic.tvoid in
+			DynArray.iter (fun e ->
+				handler#texpr RVoid e;
+			) field_inits;
+		end;
 		begin match c.cl_super with
 		| None ->
 			(* Haxe type with no parent class, call Object.<init>() *)
@@ -2230,7 +2237,7 @@ class tclass_to_jvm gctx c = object(self)
 			let handler = new texpr_to_jvm gctx jc jm_empty_ctor gctx.com.basic.tvoid in
 			DynArray.iter (fun e ->
 				handler#texpr RVoid e;
-			) field_inits;
+			) delayed_field_inits;
 		end;
 		jm_empty_ctor#get_code#return_void;
 
@@ -2242,6 +2249,9 @@ class tclass_to_jvm gctx c = object(self)
 				let jm = jc#spawn_method (if cmode = ConstructInit then "<init>" else "new") (jsignature_of_type cf.cf_type) [MPublic] in
 				let handler = new texpr_to_jvm gctx jc jm gctx.com.basic.tvoid in
 				jm#load_this;
+				DynArray.iter (fun e ->
+					handler#texpr RVoid e;
+				) field_inits;
 				let tl = match follow cf.cf_type with TFun(tl,_) -> tl | _ -> assert false in
 				List.iter (fun (n,_,t) ->
 					let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
@@ -2250,7 +2260,7 @@ class tclass_to_jvm gctx c = object(self)
 				jm#call_super_ctor cmode jm#get_jsig;
 				DynArray.iter (fun e ->
 					handler#texpr RVoid e;
-				) field_inits;
+				) delayed_field_inits;
 				jm#return
 			) sm
 		with Not_found ->
@@ -2289,7 +2299,10 @@ class tclass_to_jvm gctx c = object(self)
 				jm#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
 			| SCNone ->
 				()
-			end
+			end;
+			DynArray.iter (fun e ->
+				handler#texpr RVoid e;
+			) delayed_field_inits;
 		| _ ->
 			()
 		end;
@@ -2366,7 +2379,7 @@ class tclass_to_jvm gctx c = object(self)
 				let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
 				let efield = mk (TField(ethis,FInstance(c,tl,cf))) cf.cf_type null_pos in
 				let eop = mk (TBinop(OpAssign,efield,e)) cf.cf_type null_pos in
-				DynArray.add field_inits eop;
+				DynArray.add (match cf.cf_kind with Method MethDynamic -> delayed_field_inits | _ -> field_inits) eop;
 			| Some e ->
 				match e.eexpr with
 				| TConst ct ->
