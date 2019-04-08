@@ -1264,14 +1264,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jerror (Printf.sprintf "Unsupported operation %s on %s" (s_binop op) (generate_signature false cast_type))
 		end;
 
-	method boolop cmp = match cmp with
-		| CmpNormal(CmpEq,TBool) ->
-			()
-		| _ ->
-			jm#if_then_else
-				(self#apply_cmp cmp)
-				(fun () -> code#bconst true)
-				(fun () -> code#bconst false)
+	method boolop cmp =
+		jm#if_then_else
+			(self#apply_cmp cmp)
+			(fun () -> code#bconst true)
+			(fun () -> code#bconst false)
 
 	method var_slot_is_in_int8_range v =
 		let slot,_,_ = self#get_local v in
