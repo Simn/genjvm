@@ -15,13 +15,28 @@ open JvmBuilder
 
 let find_overload map_type c cf el =
 	let matches = ref [] in
+	let map_dynamic t =
+		let rec loop t = match t with
+			| TInst({cl_kind = KTypeParameter _},_) -> t_dynamic
+			| TMono m ->
+				begin match !m with
+				| None -> t_dynamic
+				| Some t -> loop t
+				end
+			| TLazy f ->
+				loop (lazy_type f)
+			| TType (t,tl) ->
+				loop (apply_params t.t_params tl t.t_type)
+			| _ -> Type.map loop t
+		in
+		loop t
+	in
 	let rec loop cfl = match cfl with
 		| cf :: cfl ->
-			begin match follow (map_type cf.cf_type) with
+			begin match follow (map_dynamic (map_type cf.cf_type)) with
 				| TFun(tl'',_) as tf ->
 					let rec loop2 acc el tl = match el,tl with
 						| e :: el,(n,o,t) :: tl ->
-							let t = monomorphs cf.cf_params t in
 							begin try
 								Type.unify e.etype t;
 								loop2 ((e,o) :: acc) el tl
@@ -45,6 +60,12 @@ let find_overload map_type c cf el =
 
 let find_overload_rec' is_ctor map_type c name el =
 	let candidates = ref [] in
+	let has_function t1 (_,t2,_) =
+		begin match follow t1,t2 with
+		| TFun(tl1,_),TFun(tl2,_) -> type_iseq (TFun(tl1,t_dynamic)) (TFun(tl2,t_dynamic))
+		| _ -> false
+		end
+	in
 	let rec loop map_type c =
 		begin try
 			let cf = if is_ctor then
@@ -54,18 +75,29 @@ let find_overload_rec' is_ctor map_type c name el =
 			in
 			begin match find_overload map_type c cf el with
 			| [] -> raise Not_found
-			| l -> candidates := !candidates @ l;
-			end
+			| l ->
+				List.iter (fun ((_,t,_) as ca) ->
+					if not (List.exists (has_function t) !candidates) then candidates := ca :: !candidates
+				) l
+			end;
+			if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then raise Not_found
 		with Not_found ->
 			match c.cl_super with
 			| None -> ()
 			| Some(c,tl) -> loop (fun t -> apply_params c.cl_params (List.map map_type tl) t) c
-		end
+		end;
 	in
 	loop map_type c;
 	match Overloads.Resolution.reduce_compatible (List.rev !candidates) with
-	| (_,_,(c,cf)) :: _ -> Some(c,cf)
+	| [_,_,(c,cf)] -> Some(c,cf)
 	| [] -> None
+	| ((_,_,(c,cf)) :: _) (* as resolved *) ->
+		(* let st = s_type (print_context()) in
+		print_endline (Printf.sprintf "Ambiguous overload for %s(%s)" name (String.concat ", " (List.map (fun e -> st e.etype) el)));
+		List.iter (fun (_,t,(c,cf)) ->
+			print_endline (Printf.sprintf "\tCandidate: %s.%s(%s)" (s_type_path c.cl_path) cf.cf_name (st t));
+		) resolved; *)
+		Some(c,cf)
 
 let find_overload_rec is_ctor map_type c cf el =
 	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then
