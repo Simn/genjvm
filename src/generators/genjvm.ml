@@ -13,52 +13,63 @@ open JvmBuilder
 
 (* hacks *)
 
-let find_overload map_type cf tl =
+let find_overload map_type c cf el =
+	let matches = ref [] in
 	let rec loop cfl = match cfl with
 		| cf :: cfl ->
-			begin match follow cf.cf_type with
-				| TFun(tl'',_) ->
-					let rec loop2 tl' tl = match tl',tl with
-						| t' :: tl',(_,_,t) :: tl ->
-							let t = (map_type (monomorphs cf.cf_params t)) in
-							(try Type.unify t' t; loop2 tl' tl with _ -> loop cfl)
+			begin match follow (map_type cf.cf_type) with
+				| TFun(tl'',_) as tf ->
+					let rec loop2 acc el tl = match el,tl with
+						| e :: el,(n,o,t) :: tl ->
+							let t = monomorphs cf.cf_params t in
+							begin try
+								Type.unify e.etype t;
+								loop2 ((e,o) :: acc) el tl
+							with _ ->
+								loop cfl
+							end
 						| [],[] ->
-							Some cf
+							matches := ((List.rev acc),tf,(c,cf)) :: !matches;
+							loop cfl
 						| _ ->
 							loop cfl
 					in
-					loop2 tl tl''
-				| _ ->
-					assert false
+					loop2 [] el tl''
+				| t ->
+					loop cfl
 			end;
-
 		| [] ->
-			None
+			List.rev !matches
 	in
 	loop (cf :: cf.cf_overloads)
 
-let find_overload_rec' is_ctor map_type c name tl =
+let find_overload_rec' is_ctor map_type c name el =
+	let candidates = ref [] in
 	let rec loop map_type c =
-		try
+		begin try
 			let cf = if is_ctor then
 				(match c.cl_constructor with Some cf -> cf | None -> raise Not_found)
 			else
 				PMap.find name c.cl_fields
 			in
-			begin match find_overload map_type cf tl with
-			| Some cf -> Some(c,cf)
-			| None -> raise Not_found
+			begin match find_overload map_type c cf el with
+			| [] -> raise Not_found
+			| l -> candidates := !candidates @ l;
 			end
 		with Not_found ->
 			match c.cl_super with
-			| None -> None
+			| None -> ()
 			| Some(c,tl) -> loop (fun t -> apply_params c.cl_params (List.map map_type tl) t) c
+		end
 	in
-	loop map_type c
+	loop map_type c;
+	match Overloads.Resolution.reduce_compatible (List.rev !candidates) with
+	| (_,_,(c,cf)) :: _ -> Some(c,cf)
+	| [] -> None
 
 let find_overload_rec is_ctor map_type c cf el =
 	if Meta.has Meta.Overload cf.cf_meta || cf.cf_overloads <> [] then
-		find_overload_rec' is_ctor map_type c cf.cf_name (List.map (fun e -> e.etype) el)
+		find_overload_rec' is_ctor map_type c cf.cf_name el
 	else
 		Some(c,cf)
 
@@ -1526,7 +1537,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				false
 			in
 			begin match find_overload_rec false (apply_params c.cl_params tl) c cf el with
-			| None -> Error.error "Could not find overload" e1.epos
+			| None -> Error.error "Could not find overload!" e1.epos
 			| Some(c,cf) ->
 				let tl,tr = self#call_arguments cf.cf_type el in
 				let t1 = self#vtype e1.etype in
@@ -1887,7 +1898,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match get_constructor (fun cf -> cf.cf_type) c with
 			|_,cf ->
 				begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
-				| None -> Error.error "Could not find overload" e.epos
+				| None -> Error.error "Could not find overload!!" e.epos
 				| Some (c',cf) ->
 					let f () =
 						let tl,_ = self#call_arguments  cf.cf_type el in
@@ -2149,7 +2160,7 @@ class tclass_to_jvm gctx c = object(self)
 						begin match follow t with
 						| TFun(tl,tr) ->
 							begin
-								let tl' = List.map (fun (_,_,t) -> t) tl in
+								let tl' = List.map (fun (_,_,t) -> Texpr.Builder.make_null t null_pos) tl in
 								match find_overload_rec' false map_type c cf.cf_name tl' with
 								| Some(c_impl,cf_impl) when c_impl == c ->
 									let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
@@ -2605,8 +2616,8 @@ module Preprocessor = struct
 			Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
 
 	let check_tnew gctx c tl el p =
-		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" (List.map (fun e -> e.etype) el) with
-		| None -> Error.error "Could not find overload" p
+		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" el with
+		| None -> Error.error "Could not find overload!!!" p
 		| Some (c',cf) ->
 			if c != c' then add_implicit_ctor gctx c c' cf;
 		end
@@ -2627,7 +2638,7 @@ module Preprocessor = struct
 				| Some(c,tl) -> c,apply_params c.cl_params tl
 				| _ -> assert false
 			in
-			match find_overload_rec' true map_type csup "new" (List.map (fun e -> e.etype) el) with
+			match find_overload_rec' true map_type csup "new" el with
 			| Some(c,cf) ->
 				let rec loop csup =
 					if c != csup then begin
@@ -2708,7 +2719,7 @@ module Preprocessor = struct
 					| TFun(tl,_) -> tl
 					| _ -> assert false
 				in
-				match find_overload_rec' false map_type csup cf.cf_name (List.map (fun (_,_,t) -> t) tl) with
+				match find_overload_rec' false map_type csup cf.cf_name (List.map (fun (_,_,t) -> Texpr.Builder.make_null t null_pos) tl) with
 				| Some(_,cf') ->
 					let tr = match follow cf'.cf_type with
 						| TFun(_,tr) -> tr
