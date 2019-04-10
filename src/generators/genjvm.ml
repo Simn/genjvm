@@ -1569,7 +1569,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				false
 			in
 			begin match find_overload_rec false (apply_params c.cl_params tl) c cf el with
-			| None -> Error.error "Could not find overload!" e1.epos
+			| None -> Error.error "Could not find overload" e1.epos
 			| Some(c,cf) ->
 				let tl,tr = self#call_arguments cf.cf_type el in
 				let t1 = self#vtype e1.etype in
@@ -1930,7 +1930,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			begin match get_constructor (fun cf -> cf.cf_type) c with
 			|_,cf ->
 				begin match find_overload_rec true (apply_params c.cl_params tl) c cf el with
-				| None -> Error.error "Could not find overload!!" e.epos
+				| None -> Error.error "Could not find overload" e.epos
 				| Some (c',cf) ->
 					let f () =
 						let tl,_ = self#call_arguments  cf.cf_type el in
@@ -2167,9 +2167,12 @@ class tclass_to_jvm gctx c = object(self)
 		let map_type_params t =
 			let has_type_param = ref false in
 			let rec loop t = match follow t with
-				| TInst({cl_kind = KTypeParameter _},_) ->
+				| TInst({cl_kind = KTypeParameter tl},_) ->
 					has_type_param := true;
-					t_dynamic
+					begin match tl with
+					| [t] -> t
+					| _ -> t_dynamic
+					end
 				| _ -> Type.map loop t
 			in
 			let t = match follow t with
@@ -2182,70 +2185,62 @@ class tclass_to_jvm gctx c = object(self)
 			in
 			if !has_type_param then Some t else None
 		in
-		let check cf map_type =
+		let make_bridge cf cf_impl t =
+			let jsig = jsignature_of_type t in
+			if not (jc#has_method cf.cf_name jsig) then begin
+				begin match follow t with
+				| TFun(tl,tr) ->
+					let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
+					jm#load_this;
+					let jsig_impl = jsignature_of_type cf_impl.cf_type in
+					let jsigs,_ = match jsig_impl with TMethod(jsigs,jsig) -> jsigs,jsig | _ -> assert false in
+					List.iter2 (fun (n,_,t) jsig ->
+						let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
+						load();
+						jm#cast jsig;
+					) tl jsigs;
+					jm#invokevirtual c.cl_path cf.cf_name (object_path_sig c.cl_path) jsig_impl;
+					if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
+					jm#return;
+				| _ ->
+					()
+				end
+			end
+		in
+		let check cf cf_impl map_type =
 			match cf.cf_kind with
 			| Method (MethNormal | MethInline) ->
 				begin match map_type_params cf.cf_type with
-				| Some t ->
-					let jsig = jsignature_of_type t in
-					if not (jc#has_method cf.cf_name jsig) then begin
-						begin match follow t with
-						| TFun(tl,tr) ->
-							begin
-								let tl' = List.map (fun (_,_,t) -> Texpr.Builder.make_null t null_pos) tl in
-								match find_overload_rec' false map_type c cf.cf_name tl' with
-								| Some(c_impl,cf_impl) when c_impl == c ->
-									let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
-									jm#load_this;
-									let jsig_impl = jsignature_of_type cf_impl.cf_type in
-									let jsigs,_ = match jsig_impl with TMethod(jsigs,jsig) -> jsigs,jsig | _ -> assert false in
-									List.iter2 (fun (n,_,t) jsig ->
-										let _,load,_ = jm#add_local n (jsignature_of_type t) VarArgument in
-										load();
-										jm#cast jsig;
-									) tl jsigs;
-									jm#invokevirtual c_impl.cl_path cf.cf_name (object_path_sig c_impl.cl_path) jsig_impl;
-									if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
-									jm#return;
-								| _ ->
-									()
-							end
-						| _ ->
-							assert false
-						end
-					end
-				| None ->
-					()
+				| Some t -> make_bridge cf cf_impl t
+				| None -> ()
 				end
 			| _ ->
 				()
 		in
-		let check cf map_type =
-			check cf map_type;
-			List.iter (fun cf -> check cf map_type) cf.cf_overloads
+		let check cf cf_impl map_type =
+			check cf cf_impl map_type;
+			List.iter (fun cf -> check cf cf_impl map_type) cf.cf_overloads
 		in
-		let rec loop map_type c =
-			List.iter (fun (c,tl) ->
-				let map_type t = apply_params c.cl_params tl (map_type t) in
+		let rec loop map_type c_int =
+			List.iter (fun (c_int,tl) ->
+				let map_type t = apply_params c_int.cl_params tl (map_type t) in
 				List.iter (fun cf ->
-					check cf map_type
-				) c.cl_ordered_fields;
-				loop map_type c
-			) c.cl_implements
+					match raw_class_field (fun cf -> map_type cf.cf_type) c (List.map snd c.cl_params) cf.cf_name with
+					| Some(c',_),_,cf_impl when c' == c -> check cf cf_impl map_type
+					| _ -> ()
+				) c_int.cl_ordered_fields;
+				loop map_type c_int
+			) c_int.cl_implements
 		in
 		loop (fun t -> t) c;
 		begin match c.cl_overrides,c.cl_super with
 		| [],_ ->
 			()
 		| fields,Some(c_sup,tl) ->
-			List.iter (fun cf ->
-				let c,_,cf = raw_class_field (fun cf -> apply_params c_sup.cl_params tl cf.cf_type) c_sup tl cf.cf_name in
-				begin match c with
-				| Some(c,tl) ->
-					check cf (apply_params c.cl_params tl)
-				| None ->
-					assert false
-				end
+			List.iter (fun cf_impl ->
+				match raw_class_field (fun cf -> apply_params c_sup.cl_params tl cf.cf_type) c_sup tl cf_impl.cf_name with
+				| Some(c,tl),_,cf -> check cf cf_impl (apply_params c.cl_params tl)
+				| _ -> assert false
 			) fields
 		| _ ->
 			assert false
@@ -2649,7 +2644,7 @@ module Preprocessor = struct
 
 	let check_tnew gctx c tl el p =
 		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" el with
-		| None -> Error.error "Could not find overload!!!" p
+		| None -> Error.error "Could not find overload" p
 		| Some (c',cf) ->
 			if c != c' then add_implicit_ctor gctx c c' cf;
 		end
