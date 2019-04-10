@@ -49,7 +49,10 @@ import java.NativeArray;
 			return new Array<Y>((Y[]) ((java.lang.Object)new java.lang.Object[size]));
 	')
 	private static function alloc<Y>(size:Int):Array<Y> {
-		return null;
+		var a = new Array();
+		a.length = size;
+		a.__a = new java.NativeArray(size);
+		return a;
 	}
 
 	#if jvm

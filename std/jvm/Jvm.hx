@@ -122,7 +122,7 @@ class Jvm {
 	}
 
 	static public function readField(obj:Dynamic, name:String):Dynamic {
-		if (obj == null) {
+		if (obj == null || name == null) {
 			return null;
 		}
 		var isStatic = instanceof(obj, java.lang.Class);

@@ -2644,7 +2644,9 @@ module Preprocessor = struct
 
 	let check_tnew gctx c tl el p =
 		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" el with
-		| None -> Error.error "Could not find overload" p
+		| None ->
+			(* gctx.com.warning "Could not find overload" p *)
+			()
 		| Some (c',cf) ->
 			if c != c' then add_implicit_ctor gctx c c' cf;
 		end
