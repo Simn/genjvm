@@ -162,10 +162,10 @@ class builder jc name jsig = object(self)
 		match kind with
 		| ConstructInitPlusNew ->
 			code#dup;
-			if not no_value then code#dup;
 			code#aconst_null haxe_empty_constructor_sig;
 			self#invokespecial path "<init>" jc#get_jsig (method_sig [haxe_empty_constructor_sig] None);
 			if not no_value then self#set_top_initialized (object_path_sig path);
+			if not no_value then code#dup;
 			let jsigs = f () in
 			self#invokevirtual path "new" jc#get_jsig (method_sig jsigs None);
 		| ConstructInit ->
