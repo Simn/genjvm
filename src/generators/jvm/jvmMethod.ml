@@ -134,8 +134,7 @@ class builder jc name jsig = object(self)
 		code#putstatic offset jsigf
 
 	method load_this =
-		assert (not (self#has_method_flag MStatic));
-		code#aload jc#get_jsig 0
+		code#aload self#get_this_sig 0
 
 	method call_super_ctor (kind : construction_kind) (jsig_method : jsignature) =
 		assert (not (self#has_method_flag MStatic));
@@ -446,6 +445,14 @@ class builder jc name jsig = object(self)
 			store();
 			check_store();
 		)
+
+	method get_this_sig =
+		let rec loop locals = match locals with
+			| [(_,_,jsig)] -> jsig
+			| _ :: locals -> loop locals
+			| [] -> assert false
+		in
+		loop locals
 
 	method set_this_initialized =
 		let rec loop acc locals = match locals with

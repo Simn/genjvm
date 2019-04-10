@@ -1775,7 +1775,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TBool true -> code#bconst true
 		| TBool false -> code#bconst false
 		| TNull -> code#aconst_null (self#vtype t)
-		| TThis -> code#aload jc#get_jsig 0
+		| TThis ->
+			let _,load,_ = self#get_local_by_id (0,"this") in
+			load()
 		| TString s -> self#string s
 		| TSuper -> failwith "Invalid super access"
 
@@ -2152,7 +2154,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method object_constructor =
 		let path = jc#get_super_path in
 		let offset = pool#add_field path "<init>" (method_sig [] None) FKMethod in
-		code#aload jc#get_jsig 0;
+		jm#load_this;
 		code#invokespecial offset jc#get_jsig [] [];
 		jm#set_this_initialized
 end
@@ -2888,7 +2890,7 @@ let generate com =
 		| Some path -> snd path,"\nMain-Class: " ^ (s_type_path path)
 		| None -> "jar",""
 	in
-	let jar_name = if com.debug then jar_name ^ "-debug" else jar_name in
+	let jar_name = if com.debug then jar_name ^ "-Debug" else jar_name in
 	let jar_dir = add_trailing_slash com.file in
 	let jar_path = Printf.sprintf "%s%s.jar" jar_dir jar_name in
 	let gctx = {
