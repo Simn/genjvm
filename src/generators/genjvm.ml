@@ -15,25 +15,9 @@ open JvmBuilder
 
 let find_overload map_type c cf el =
 	let matches = ref [] in
-	let map_dynamic t =
-		let rec loop t = match t with
-			| TInst({cl_kind = KTypeParameter _},_) -> t_dynamic
-			| TMono m ->
-				begin match !m with
-				| None -> t_dynamic
-				| Some t -> loop t
-				end
-			| TLazy f ->
-				loop (lazy_type f)
-			| TType (t,tl) ->
-				loop (apply_params t.t_params tl t.t_type)
-			| _ -> Type.map loop t
-		in
-		loop t
-	in
 	let rec loop cfl = match cfl with
 		| cf :: cfl ->
-			begin match follow (map_dynamic (map_type cf.cf_type)) with
+			begin match follow (monomorphs cf.cf_params (map_type cf.cf_type)) with
 				| TFun(tl'',_) as tf ->
 					let rec loop2 acc el tl = match el,tl with
 						| e :: el,(n,o,t) :: tl ->
