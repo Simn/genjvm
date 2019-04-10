@@ -86,6 +86,7 @@ class Std {
 	public static function parseFloat(x:String):Float {
 		try {
 			x = StringTools.trim(x);
+			x = x.split("+").join(""); // TODO: stupid
 			return doubleFormatter.parse(x.toUpperCase()).doubleValue();
 		} catch(_:Dynamic) {
 			return Math.NaN;
