@@ -131,7 +131,7 @@ type generation_context = {
 	anon_lut : ((string * jsignature) list,jpath) Hashtbl.t;
 	anon_path_lut : (path,jpath) Hashtbl.t;
 	field_infos : field_generation_info DynArray.t;
-	implicit_ctors : (path,(path,tclass * tclass_field) PMap.t) Hashtbl.t;
+	implicit_ctors : (path,(path * jsignature,tclass * tclass_field) PMap.t) Hashtbl.t;
 	default_export_config : export_config;
 	mutable current_field_info : field_generation_info option;
 	mutable anon_num : int;
@@ -2664,20 +2664,12 @@ module Preprocessor = struct
 			()
 
 	let add_implicit_ctor gctx c c' cf =
+		let jsig = jsignature_of_type cf.cf_type in
 		try
 			let sm = Hashtbl.find gctx.implicit_ctors c.cl_path in
-			Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) sm);
+			Hashtbl.replace gctx.implicit_ctors c.cl_path (PMap.add (c'.cl_path,jsig) (c',cf) sm);
 		with Not_found ->
-			Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add c'.cl_path (c',cf) PMap.empty)
-
-	let check_tnew gctx c tl el p =
-		begin match find_overload_rec' true (apply_params c.cl_params tl) c "new" el with
-		| None ->
-			(* gctx.com.warning "Could not find overload" p *)
-			()
-		| Some (c',cf) ->
-			if c != c' then add_implicit_ctor gctx c c' cf;
-		end
+			Hashtbl.add gctx.implicit_ctors c.cl_path (PMap.add (c'.cl_path,jsig) (c',cf) PMap.empty)
 
 	let make_native cf =
 		cf.cf_meta <- (Meta.NativeGen,[],null_pos) :: cf.cf_meta
@@ -2723,9 +2715,6 @@ module Preprocessor = struct
 		let rec loop e =
 			check_anon gctx e;
 			begin match e.eexpr with
-			| TNew(c,tl,el) ->
-				List.iter loop el;
-				check_tnew gctx c tl el e.epos
 			| TBinop(OpAssign,{eexpr = TField({eexpr = TConst TThis},FInstance(_,_,cf))},e2) when is_on_current_class cf->
 				(* Assigning this.field = value is fine if field is declared on our current class *)
 				loop e2;
@@ -2754,12 +2743,7 @@ module Preprocessor = struct
 	let preprocess_expr gctx e =
 		let rec loop e =
 			check_anon gctx e;
-			match e.eexpr with
-			| TNew(c,tl,el) ->
-				List.iter loop el;
-				check_tnew gctx c tl el e.epos
-			| _ ->
-				Type.iter loop e
+			Type.iter loop e
 		in
 		loop e
 
