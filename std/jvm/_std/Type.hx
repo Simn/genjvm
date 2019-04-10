@@ -144,8 +144,10 @@ class Type {
 
 		// 3. attempt: unify actual constructor
 		for (ctor in cl.getDeclaredConstructors()) {
-			if (Jvm.unifyCallArguments(args, ctor.getParameterTypes(), argTypes)) {
-				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(args);
+			switch (Jvm.unifyCallArguments(args, ctor.getParameterTypes())) {
+				case Some(args):
+					return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(args);
+				case None:
 			}
 		}
 
@@ -154,8 +156,10 @@ class Type {
 			if (ctor.getName() != "new") {
 				continue;
 			}
-			if (Jvm.unifyCallArguments(args, ctor.getParameterTypes(), argTypes)) {
-				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(args);
+			switch (Jvm.unifyCallArguments(args, ctor.getParameterTypes())) {
+				case Some(args):
+					return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(args);
+				case None:
 			}
 		}
 

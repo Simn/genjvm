@@ -11,6 +11,8 @@ import jvm.annotation.EnumReflectionInformation;
 import jvm.annotation.EnumValueReflectionInformation;
 import java.lang.invoke.*;
 import java.NativeArray;
+import haxe.ds.Vector;
+import haxe.ds.Option;
 
 @:keep
 @:native('haxe.jvm.Jvm')
@@ -37,51 +39,83 @@ class Jvm {
 
 	// calls
 
-
-	static public function getArgumentTypes(args:NativeArray<Dynamic>):java.NativeArray<java.lang.Class<Dynamic>> {
-		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
+	static public function getArgumentTypes(args:NativeArray<Dynamic>):NativeArray<java.lang.Class<Dynamic>> {
+		var argTypes:NativeArray<java.lang.Class<Dynamic>> = new NativeArray(args.length);
 		for (i in 0...args.length) {
 			var arg = (cast args[i] : java.lang.Object);
 			argTypes[i] = arg == null ? (cast java.lang.Object) : arg.getClass();
-			args[i] = arg;
 		}
 		return argTypes;
 	}
 
-	static public function unifyCallArguments(args:NativeArray<Dynamic>, params:java.NativeArray<java.lang.Class<Dynamic>>, ?argTypes:java.NativeArray<java.lang.Class<Dynamic>>):Bool {
-		if (argTypes == null) {
-			argTypes = getArgumentTypes(args);
+	static public function unifyCallArguments(args:NativeArray<Dynamic>, params:NativeArray<java.lang.Class<Dynamic>>, allowPadding:Bool = false):Option<NativeArray<Dynamic>> {
+		var callArgs:NativeArray<Dynamic> = {
+			if (args.length < params.length) {
+				var callArgs = new NativeArray(params.length);
+				Vector.blit(cast args, 0, cast callArgs, 0, args.length);
+				callArgs;
+			} else {
+				Vector.fromData(args).copy().toData();
+			}
 		}
-		if (params.length != args.length) {
-			return false;
+		if (params.length < args.length) {
+			return None;
 		}
 		for (i in 0...params.length) {
 			var paramType = params[i];
-			var arg = getWrapperClass(paramType);
-			if (!arg.isAssignableFrom(argTypes[i])) {
-				if (args[i] == null && paramType.isPrimitive()) {
-					if (paramType == cast Bool) {
-						args[i] = false;
-					} else if (paramType == cast Float) {
-						args[i] = 0.0;
-					} else {
-						args[i] = 0;
-					}
-				}
-				if (arg == (cast java.lang.Double.DoubleClass) && argTypes[i] == cast java.lang.Integer.IntegerClass) {
-					args[i] = nullIntToNullFloat(args[i]);
+			if (i >= args.length) {
+				if (paramType == cast Bool) {
+					callArgs[i] = false;
+				} else if (paramType == cast Float) {
+					callArgs[i] = 0.0;
+				} else if (paramType == cast Int) {
+					callArgs[i] = 0;
 				} else {
-					return false;
+					if (!allowPadding) {
+						return None;
+					}
+					callArgs[i] = null;
 				}
+				continue;
+			}
+			var argValue = args[i];
+			if (argValue == null) {
+				if (paramType.isPrimitive()) {
+					if (paramType == cast Bool) {
+						callArgs[i] = false;
+					} else if (paramType == cast Float) {
+						callArgs[i] = 0.0;
+					} else if (paramType == cast Int) {
+						callArgs[i] = 0;
+					} else {
+						throw 'Unexpected basic type: $paramType';
+					}
+				} else {
+					callArgs[i] = null;
+				}
+				continue;
+			};
+			var argType = (argValue : java.lang.Object).getClass();
+			var arg = getWrapperClass(paramType);
+			if (arg.isAssignableFrom(argType)) {
+				callArgs[i] = args[i];
+				continue;
+			}
+			if (arg == (cast java.lang.Double.DoubleClass) && argType == cast java.lang.Integer.IntegerClass) {
+		 		callArgs[i] = nullIntToNullFloat(args[i]);
+			} else {
+				return None;
 			}
 		}
-		return true;
+		return Some(callArgs);
 	}
 
 	static public function call(mh:java.lang.invoke.MethodHandle, args:NativeArray<Dynamic>) {
 		var params = mh.type().parameterArray();
-		@:privateAccess unifyCallArguments(args, params);
-		return mh.invokeWithArguments(args);
+		return switch (unifyCallArguments(args, params, true)) {
+			case Some(args): mh.invokeWithArguments(args);
+			case None: mh.invokeWithArguments(args);
+		}
 	}
 
 	// casts
