@@ -124,50 +124,28 @@ class Type {
 	}
 
 	public static function createInstance<T>(cl:Class<T>, args:Array<Dynamic>):T {
-		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
+		var args = @:privateAccess args.getNative();
 		var cl = cl.native();
-		for (i in 0...args.length) {
-			var arg = (cast args[i] : java.lang.Object);
-			argTypes[i] = arg.getClass();
-			args[i] = arg;
-		}
+		var argTypes = Jvm.getArgumentTypes(args);
 		var methodType = MethodType.methodType(cast Void, argTypes);
-
 		// 1. attempt: direct constructor lookup
 		try {
 			var ctor = MethodHandles.lookup().findConstructor(cl, methodType);
-            return ctor.invokeWithArguments(@:privateAccess args.getNative());
+            return ctor.invokeWithArguments(args);
 		} catch(_:NoSuchMethodException) { }
 
 		// 2. attempt direct new lookup
 		try {
 			var ctor = MethodHandles.lookup().findVirtual(cl, "new", methodType);
 			var obj = cl.getConstructor(emptyClass).newInstance(emptyArg);
-			ctor.bindTo(obj).invokeWithArguments(@:privateAccess args.getNative());
+			ctor.bindTo(obj).invokeWithArguments(args);
 			return obj;
 		} catch (_:NoSuchMethodException) { }
 
-		function unify(params:java.NativeArray<java.lang.Class<Dynamic>>) {
-			if (params.length != args.length) {
-				return false;
-			}
-			for (i in 0...params.length) {
-				var arg = Jvm.getWrapperClass(params[i]);
-				if (!arg.isAssignableFrom(argTypes[i])) {
-					if (arg == (cast java.lang.Double.DoubleClass) && argTypes[i] == cast java.lang.Integer.IntegerClass) {
-						args[i] = Jvm.nullIntToNullFloat(args[i]);
-					} else {
-						return false;
-					}
-				}
-			}
-			return true;
-		}
-
 		// 3. attempt: unify actual constructor
 		for (ctor in cl.getDeclaredConstructors()) {
-			if (unify(ctor.getParameterTypes())) {
-				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(@:privateAccess args.getNative());
+			if (Jvm.unifyCallArguments(args, ctor.getParameterTypes(), argTypes)) {
+				return MethodHandles.lookup().unreflectConstructor(ctor).invokeWithArguments(args);
 			}
 		}
 
@@ -176,8 +154,8 @@ class Type {
 			if (ctor.getName() != "new") {
 				continue;
 			}
-			if (unify(ctor.getParameterTypes())) {
-				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(@:privateAccess args.getNative());
+			if (Jvm.unifyCallArguments(args, ctor.getParameterTypes(), argTypes)) {
+				return MethodHandles.lookup().unreflect(ctor).invokeWithArguments(args);
 			}
 		}
 

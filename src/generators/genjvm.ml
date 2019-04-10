@@ -1600,11 +1600,35 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#call_super_ctor kind (method_sig tl None);
 			None
 		| _ ->
-			self#texpr rvalue_any e1;
-			jm#cast method_handle_sig;
-			let tl,tr = self#call_arguments e1.etype el in
-			jm#invokevirtual method_handle_path "invoke" (self#vtype e1.etype) (method_sig tl tr);
-			tr
+			let involves_dynamic t =
+				let rec loop t = match follow t with
+					| TDynamic _
+					| TInst({cl_kind = KTypeParameter _},_)
+					| TMono _ ->
+						raise Exit
+					| _ ->
+						Type.map loop t
+				in
+				try
+					ignore(loop t);
+					false
+				with Exit ->
+					true
+			in
+			if involves_dynamic e1.etype then begin
+				self#texpr rvalue_any e1;
+				jm#cast method_handle_sig;
+				code#iconst (Int32.of_int (List.length el));
+				ignore(self#new_native_array object_sig el);
+				jm#invokestatic haxe_jvm_path "call" (method_sig [method_handle_sig;array_sig object_sig] (Some object_sig));
+				Some object_sig
+			end else begin
+				self#texpr rvalue_any e1;
+				jm#cast method_handle_sig;
+				let tl,tr = self#call_arguments e1.etype el in
+				jm#invokevirtual method_handle_path "invoke" (self#vtype e1.etype) (method_sig tl tr);
+				tr
+			end
 		in
 		match ret = RVoid,tro with
 		| true,Some _ -> code#pop

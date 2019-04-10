@@ -63,7 +63,7 @@ class Reflect {
 	}
 
 	public static function callMethod(o:Dynamic, func:haxe.Constraints.Function, args:Array<Dynamic>):Dynamic {
-		return (cast func : java.lang.invoke.MethodHandle).invokeWithArguments(@:privateAccess args.getNative());
+		return Jvm.call(cast func, @:privateAccess args.getNative());
 	}
 
 	public static function fields(o:Dynamic):Array<String> {

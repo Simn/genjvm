@@ -10,6 +10,7 @@ import jvm.annotation.ClassReflectionInformation;
 import jvm.annotation.EnumReflectionInformation;
 import jvm.annotation.EnumValueReflectionInformation;
 import java.lang.invoke.*;
+import java.NativeArray;
 
 @:keep
 @:native('haxe.jvm.Jvm')
@@ -32,6 +33,55 @@ class Jvm {
 
 	static public function compare<T>(v1:T, v2:T):Int {
 		return Reflect.compare(v1, v2);
+	}
+
+	// calls
+
+
+	static public function getArgumentTypes(args:NativeArray<Dynamic>):java.NativeArray<java.lang.Class<Dynamic>> {
+		var argTypes:java.NativeArray<java.lang.Class<Dynamic>> = new java.NativeArray(args.length);
+		for (i in 0...args.length) {
+			var arg = (cast args[i] : java.lang.Object);
+			argTypes[i] = arg == null ? (cast java.lang.Object) : arg.getClass();
+			args[i] = arg;
+		}
+		return argTypes;
+	}
+
+	static public function unifyCallArguments(args:NativeArray<Dynamic>, params:java.NativeArray<java.lang.Class<Dynamic>>, ?argTypes:java.NativeArray<java.lang.Class<Dynamic>>):Bool {
+		if (argTypes == null) {
+			argTypes = getArgumentTypes(args);
+		}
+		if (params.length != args.length) {
+			return false;
+		}
+		for (i in 0...params.length) {
+			var paramType = params[i];
+			var arg = getWrapperClass(paramType);
+			if (!arg.isAssignableFrom(argTypes[i])) {
+				if (args[i] == null && paramType.isPrimitive()) {
+					if (paramType == cast Bool) {
+						args[i] = false;
+					} else if (paramType == cast Float) {
+						args[i] = 0.0;
+					} else {
+						args[i] = 0;
+					}
+				}
+				if (arg == (cast java.lang.Double.DoubleClass) && argTypes[i] == cast java.lang.Integer.IntegerClass) {
+					args[i] = nullIntToNullFloat(args[i]);
+				} else {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	static public function call(mh:java.lang.invoke.MethodHandle, args:NativeArray<Dynamic>) {
+		var params = mh.type().parameterArray();
+		@:privateAccess unifyCallArguments(args, params);
+		return mh.invokeWithArguments(args);
 	}
 
 	// casts
