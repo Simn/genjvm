@@ -352,7 +352,6 @@ class builder pool = object(self)
 		let pad = if pad = 0 then pad else 4 - pad in
 		self#op (OpTableswitch(pad,offset_def,low,high,offsets)) (13 + pad + (Array.length offsets * 4)) [TInt] []
 
-
 	(* compare *)
 
 	method dcmpg = self#op OpDcmpg 1 [TDouble;TDouble] [TInt]
@@ -451,6 +450,14 @@ class builder pool = object(self)
 	method instanceof path =
 		let offset = pool#add_path path in
 		self#op (OpInstanceof offset) 3 [stack#top] [TInt]
+
+	(* monitor *)
+
+	method monitorenter =
+		self#op OpMonitorenter 1 [stack#top] []
+
+	method monitorexit =
+		self#op OpMonitorexit 1 [stack#top] []
 
 	(* constants *)
 

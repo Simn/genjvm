@@ -1585,6 +1585,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let tl,_ = self#call_arguments cf.cf_type el in
 			jm#call_super_ctor kind (method_sig tl None);
 			None
+		| TIdent "__lock__" ->
+			begin match el with
+				| [e1;e2] ->
+					self#texpr rvalue_any e1;
+					jm#get_code#dup;
+					jm#get_code#monitorenter;
+					(* TODO: this needs finally... *)
+					self#texpr RVoid e2;
+					jm#get_code#monitorexit;
+					None
+				| _ -> assert false
+			end
 		| _ ->
 			let involves_dynamic t =
 				let rec loop t = match follow t with
