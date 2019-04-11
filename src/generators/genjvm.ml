@@ -2139,7 +2139,7 @@ class tclass_to_jvm gctx c = object(self)
 			if not (jc#has_method cf.cf_name jsig) then begin
 				begin match follow t with
 				| TFun(tl,tr) ->
-					let jm = jc#spawn_method cf.cf_name jsig [MPublic] in
+					let jm = jc#spawn_method cf.cf_name jsig [MPublic;MSynthetic;MBridge] in
 					jm#load_this;
 					let jsig_impl = jsignature_of_type cf_impl.cf_type in
 					let jsigs,_ = match jsig_impl with TMethod(jsigs,jsig) -> jsigs,jsig | _ -> assert false in
