@@ -1,3 +1,4 @@
+open Globals
 open JvmGlobals
 open JvmData
 open JvmAttribute
@@ -376,6 +377,86 @@ class builder jc name jsig = object(self)
 		restore();
 		jump_then := code#get_fp - !jump_then;
 		self#add_stack_frame
+
+	method maybe_make_jump =
+		let r = ref code#get_fp in
+		if not self#is_terminated then code#goto r;
+		r
+
+	method close_jumps rl =
+		let fp' = code#get_fp in
+		let term = List.fold_left (fun term (term',r) ->
+			r := fp' - !r;
+			term && term'
+		) true rl in
+		self#set_terminated term;
+		if not term then self#add_stack_frame;
+
+	method int_switch (is_exhaustive : bool) (cases : (Int32.t list * (unit -> unit)) list) (def : (unit -> unit) option) =
+		let def,cases = match def,cases with
+			| None,(_,ec) :: cases when is_exhaustive ->
+				Some ec,cases
+			| _ ->
+				def,cases
+		in
+		let flat_cases = DynArray.create () in
+		let case_lut = ref IntMap.empty in
+		let fp = code#get_fp in
+		let imin = ref max_int in
+		let imax = ref min_int in
+		let cases = List.map (fun (il,f) ->
+			let rl = List.map (fun i32 ->
+				let r = ref fp in
+				let i = Int32.to_int i32 in
+				if i < !imin then imin := i;
+				if i > !imax then imax := i;
+				DynArray.add flat_cases (i,r);
+				case_lut := IntMap.add i r !case_lut;
+				r
+			) il in
+			(rl,f)
+		) cases in
+		let offset_def = ref fp in
+		(* No idea what's a good heuristic here... *)
+		let use_tableswitch = (!imax - !imin) < (DynArray.length flat_cases + 10) in
+		if use_tableswitch then begin
+			let offsets = Array.init (!imax - !imin + 1) (fun i ->
+				try IntMap.find (i + !imin) !case_lut
+				with Not_found -> offset_def
+			) in
+			code#tableswitch offset_def !imin !imax offsets
+		end else begin
+			let a = DynArray.to_array flat_cases in
+			Array.sort (fun (i1,_) (i2,_) -> compare i1 i2) a;
+			code#lookupswitch offset_def a;
+		end;
+		let restore = self#start_branch in
+		let def_term,r_def = match def with
+			| None ->
+				true,ref 0
+			| Some f ->
+				offset_def := code#get_fp - !offset_def;
+				self#add_stack_frame;
+				let pop_scope = self#push_scope in
+				f();
+				pop_scope();
+				self#is_terminated,self#maybe_make_jump
+		in
+
+		let rec loop acc cases = match cases with
+		| (rl,f) :: cases ->
+			restore();
+			self#add_stack_frame;
+			List.iter (fun r -> r := code#get_fp - !r) rl;
+			let pop_scope = self#push_scope in
+			f();
+			pop_scope();
+			loop ((self#is_terminated,self#maybe_make_jump) :: acc) cases
+		| [] ->
+			List.rev acc
+		in
+		let rl = loop [] cases in
+		self#close_jumps ((def_term,if def = None then offset_def else r_def) :: rl)
 
 	(** Adds a local with a given [name], signature [jsig] and an [init_state].
 	    This function returns a tuple consisting of:

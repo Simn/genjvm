@@ -6,6 +6,7 @@ import Enum;
 import jvm.DynamicObject;
 import jvm.Exception;
 import jvm.EmptyConstructor;
+import jvm.Object;
 import jvm.annotation.ClassReflectionInformation;
 import jvm.annotation.EnumReflectionInformation;
 import jvm.annotation.EnumValueReflectionInformation;
@@ -205,10 +206,7 @@ class Jvm {
 		return new ConstantCallSite(handle);
 	}
 
-	static public function readField(obj:Dynamic, name:String):Dynamic {
-		if (obj == null || name == null) {
-			return null;
-		}
+	static public function readFieldNoObject(obj:Dynamic, name:String):Dynamic {
 		var isStatic = instanceof(obj, java.lang.Class);
 		var cl = isStatic ? obj : (obj : java.lang.Object).getClass();
 		try {
@@ -255,6 +253,16 @@ class Jvm {
 			}
 			return null;
 		}
+	}
+
+	static public function readField(obj:Dynamic, name:String):Dynamic {
+		if (obj == null || name == null) {
+			return null;
+		}
+		if (instanceof(obj, jvm.Object)) {
+			return (cast obj : jvm.Object)._hx_getField(name);
+		}
+		return readFieldNoObject(obj, name);
 	}
 
 	static public function writeFieldNoDyn<T>(obj:Dynamic, name:String, value:T) {

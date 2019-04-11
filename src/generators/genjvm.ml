@@ -860,100 +860,27 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#cast TBool;
 			CmpNormal(CmpEq,TBool)
 
-	method maybe_make_jump =
-		let r = ref code#get_fp in
-		if not jm#is_terminated then code#goto r;
-		r
-
-	method close_jumps rl =
-		let fp' = code#get_fp in
-		let term = List.fold_left (fun term (term',r) ->
-			r := fp' - !r;
-			term && term'
-		) true rl in
-		jm#set_terminated term;
-		if not term then jm#add_stack_frame;
-
-	method int_switch ret is_exhaustive e1 cases def =
-		let def,cases = match def,cases with
-			| None,(_,ec) :: cases when is_exhaustive ->
-				Some ec,cases
-			| _ ->
-				def,cases
-		in
-		self#texpr rvalue_any e1;
-		jm#cast TInt;
-		let flat_cases = DynArray.create () in
-		let case_lut = ref IntMap.empty in
-		let fp = code#get_fp in
-		let imin = ref max_int in
-		let imax = ref min_int in
-		let cases = List.map (fun (el,e) ->
-			let rl = List.map (fun e ->
-				match e.eexpr with
-				| TConst (TInt i32) ->
-					let r = ref fp in
-					let i = Int32.to_int i32 in
-					if i < !imin then imin := i;
-					if i > !imax then imax := i;
-					DynArray.add flat_cases (i,r);
-					case_lut := IntMap.add i r !case_lut;
-					r
-				| _ ->
-					assert false
-			) el in
-			(rl,e)
-		) cases in
-		let offset_def = ref fp in
-		(* No idea what's a good heuristic here... *)
-		let use_tableswitch = (!imax - !imin) < (DynArray.length flat_cases + 10) in
-		if use_tableswitch then begin
-			let offsets = Array.init (!imax - !imin + 1) (fun i ->
-				try IntMap.find (i + !imin) !case_lut
-				with Not_found -> offset_def
-			) in
-			code#tableswitch offset_def !imin !imax offsets
-		end else begin
-			let a = DynArray.to_array flat_cases in
-			Array.sort (fun (i1,_) (i2,_) -> compare i1 i2) a;
-			code#lookupswitch offset_def a;
-		end;
-		let restore = jm#start_branch in
-		let def_term,r_def = match def with
-			| None ->
-				true,ref 0
-			| Some e ->
-				offset_def := code#get_fp - !offset_def;
-				jm#add_stack_frame;
-				let pop_scope = jm#push_scope in
-				self#texpr ret e;
-				pop_scope();
-				jm#is_terminated,self#maybe_make_jump
-		in
-
-		let rec loop acc cases = match cases with
-		| (rl,e) :: cases ->
-			restore();
-			jm#add_stack_frame;
-			List.iter (fun r -> r := code#get_fp - !r) rl;
-			let pop_scope = jm#push_scope in
-			self#texpr ret e;
-			pop_scope();
-			loop ((jm#is_terminated,self#maybe_make_jump) :: acc) cases
-		| [] ->
-			List.rev acc
-		in
-		let rl = loop [] cases in
-		self#close_jumps ((def_term,if def = None then offset_def else r_def) :: rl)
-
 	method switch ret e1 cases def =
 		(* TODO: hack because something loses the exhaustiveness marker before we get here *)
 		let is_exhaustive = OptimizerTexpr.is_exhaustive e1 || (ExtType.is_bool (follow e1.etype) && List.length cases > 1) in
 		if cases = [] then
 			self#texpr ret e1
-		else if List.for_all is_const_int_pattern cases then
-			self#int_switch ret is_exhaustive e1 cases def
-		else begin
+		else if List.for_all is_const_int_pattern cases then begin
+			let cases = List.map (fun (el,e) ->
+				let il = List.map (fun e -> match e.eexpr with
+					| TConst (TInt i32) -> i32
+					| _ -> assert false
+				) el in
+				(il,(fun () -> self#texpr ret e))
+			) cases in
+			let def = match def with
+				| None -> None
+				| Some e -> Some (fun () -> self#texpr ret e)
+			in
+			self#texpr rvalue_any e1;
+			jm#cast TInt;
+			jm#int_switch is_exhaustive cases def
+		end else begin
 			(* TODO: rewriting this is stupid *)
 			let pop_scope = jm#push_scope in
 			self#texpr rvalue_any e1;
@@ -1658,7 +1585,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		self#texpr ret e1;
 		caught_exceptions <- old_exceptions;
 		let term_try = jm#is_terminated in
-		let r_try = self#maybe_make_jump in
+		let r_try = jm#maybe_make_jump in
 		let fp_to = code#get_fp in
 		let unwrap () =
 			code#dup;
@@ -1701,7 +1628,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#cast v.v_type
 			end;
 			let term = run_catch_expr v e in
-			let r = self#maybe_make_jump in
+			let r = jm#maybe_make_jump in
 			term,r
 		in
 		let commit_instanceof_checks excl =
@@ -1757,7 +1684,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				acc
 		in
 		let rl = loop [] excl in
-		self#close_jumps ((term_try,r_try) :: rl)
+		jm#close_jumps ((term_try,r_try) :: rl)
 
 	(* texpr *)
 
@@ -2175,7 +2102,11 @@ class tclass_to_jvm gctx c = object(self)
 	val field_inits = DynArray.create ()
 	val delayed_field_inits = DynArray.create ()
 
-	val jc = new JvmClass.builder c.cl_path (Option.map_default (fun (c,_) -> c.cl_path) object_path c.cl_super)
+	val jc = new JvmClass.builder c.cl_path (match c.cl_super with
+		| Some(c,_) -> c.cl_path
+		| None ->
+			if c.cl_interface || Meta.has Meta.NativeGen c.cl_meta then object_path else haxe_object_path
+		)
 
 	method private set_access_flags =
 		jc#add_access_flag 1; (* public *)
@@ -2522,6 +2453,56 @@ class tclass_to_jvm gctx c = object(self)
 				jc#add_attribute (AttributeSignature offset)
 		end;
 
+	method generate_dynamic_access =
+		let jsig = method_sig [string_sig] (Some object_sig) in
+		let jm = jc#spawn_method "_hx_getField" jsig [MPublic;MSynthetic] in
+		let handler = new texpr_to_jvm gctx jc jm t_dynamic in
+		let _,load,_ = jm#add_local "name" string_sig VarArgument in
+		jm#finalize_arguments;
+		let tl = List.map snd c.cl_params in
+		let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
+		let make_field cf =
+			let fa = match cf.cf_kind with
+			| Method (MethNormal | MethInline) -> FClosure(Some(c,tl),cf)
+			| _ -> FInstance(c,tl,cf)
+			in
+			mk (TField(ethis,fa)) cf.cf_type null_pos
+		in
+		let rec pow a b = match b with
+			| 0 -> Int32.one
+			| 1 -> a
+			| _ -> Int32.mul a (pow a (b - 1))
+		in
+		let java_hash s =
+			let h = ref Int32.zero in
+			let l = String.length s in
+			let i31 = Int32.of_int 31 in
+			String.iteri (fun i char ->
+				let char = Int32.of_int (int_of_char char) in
+				h := Int32.add !h (Int32.mul char (pow i31 (l - (i + 1))))
+			) s;
+			!h
+		in
+		load();
+		jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+		let cases = List.map (fun cf ->
+			let hash = java_hash cf.cf_name in
+			let field = make_field cf in
+			[hash],(fun () ->
+				handler#texpr rvalue_any field;
+				jm#expect_reference_type;
+				ignore(jm#get_code#get_stack#pop);
+				jm#get_code#get_stack#push object_sig;
+			)
+		) c.cl_ordered_fields in
+		let def = (fun () ->
+			jm#load_this;
+			load();
+			jm#invokespecial jc#get_super_path "_hx_getField" jc#get_jsig jsig;
+		) in
+		jm#int_switch false cases (Some def);
+		jm#return
+
 	method generate_annotations =
 		AnnotationHandler.generate_annotations (jc :> JvmBuilder.base_builder) c.cl_meta;
 		jc#add_annotation (["haxe";"jvm";"annotation"],"ClassReflectionInformation") (["hasSuperClass",(ABool (c.cl_super <> None))])
@@ -2534,6 +2515,7 @@ class tclass_to_jvm gctx c = object(self)
 		self#set_interfaces;
 		if not c.cl_interface then self#handle_relation_type_params;
 		self#generate_signature;
+		if not (Meta.has Meta.NativeGen c.cl_meta) then self#generate_dynamic_access;
 		self#generate_annotations;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		let jc = jc#export_class gctx.default_export_config in

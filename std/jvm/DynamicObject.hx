@@ -4,12 +4,13 @@ import haxe.ds.StringMap;
 
 @:keep
 @:native('haxe.jvm.DynamicObject')
+@:nativeGen
 class DynamicObject implements java.lang.Cloneable {
 	var _hx_fields:Null<StringMap<Dynamic>>;
 
 	public var _hx_deletedAField:Null<Int>;
 
-	@:nativeGen public function new() {}
+	@:nativeGen public function new() { }
 
 	public function toString() {
 		_hx_initReflection();
