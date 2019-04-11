@@ -237,4 +237,11 @@ module NativeSignatures = struct
 			true
 		| _ ->
 			false
+
+	let is_dynamic_at_runtime = function
+		| TObject((["java";"lang"],"Object"),_)
+		| TTypeParameter _ ->
+			true
+		| _ ->
+			false
 end

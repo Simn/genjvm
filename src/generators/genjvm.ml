@@ -1529,22 +1529,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| _ -> assert false
 			end
 		| _ ->
-			let involves_dynamic t =
-				let rec loop t = match follow t with
-					| TDynamic _
-					| TInst({cl_kind = KTypeParameter _},_)
-					| TMono _ ->
-						raise Exit
-					| _ ->
-						Type.map loop t
-				in
-				try
-					ignore(loop t);
-					false
-				with Exit ->
-					true
+			let rec has_unknown_args jsig =
+				is_dynamic_at_runtime jsig || match jsig with
+					| TMethod(jsigs,_) -> List.exists has_unknown_args jsigs
+					| _ -> false
 			in
-			if involves_dynamic e1.etype then begin
+			if has_unknown_args (jsignature_of_type e1.etype) then begin
 				self#texpr rvalue_any e1;
 				jm#cast method_handle_sig;
 				code#iconst (Int32.of_int (List.length el));
