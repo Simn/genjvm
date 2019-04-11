@@ -183,6 +183,11 @@ class builder jc name jsig = object(self)
 		| TLong -> code#lconst Int64.zero
 		| jsig -> code#aconst_null jsig
 
+	method read_closure is_static path name jsig_method =
+		let offset = code#get_pool#add_field path name jsig_method FKMethod in
+		let offset = code#get_pool#add (ConstMethodHandle((if is_static then 6 else 5), offset)) in
+		code#ldc offset jsig_method
+
 	method return = match jsig with
 		| TMethod(_,tr) ->
 			begin match tr with
