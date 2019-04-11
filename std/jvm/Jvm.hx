@@ -262,7 +262,7 @@ class Jvm {
 		return readFieldNoObject(obj, name);
 	}
 
-	static public function writeFieldNoDyn<T>(obj:Dynamic, name:String, value:T) {
+	static public function writeFieldNoObject<T>(obj:Dynamic, name:String, value:T) {
 		try {
 			var cl = (obj : java.lang.Object).getClass();
 			var field = cl.getField(name);
@@ -283,13 +283,13 @@ class Jvm {
 	}
 
 	static public function writeField<T>(obj:Dynamic, name:String, value:T) {
-		if (obj == null) {
+		if (obj == null || name == null) {
 			return;
 		}
-		if (instanceof(obj, DynamicObject)) {
-			return (obj : DynamicObject)._hx_setField(name, value);
+		if (instanceof(obj, Object)) {
+			return (obj : Object)._hx_setField(name, value);
 		}
-		writeFieldNoDyn(obj, name, value);
+		writeFieldNoObject(obj, name, value);
 	}
 
 	// string

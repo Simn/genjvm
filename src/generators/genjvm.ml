@@ -2444,11 +2444,6 @@ class tclass_to_jvm gctx c = object(self)
 		end;
 
 	method generate_dynamic_access =
-		let jsig = method_sig [string_sig] (Some object_sig) in
-		let jm = jc#spawn_method "_hx_getField" jsig [MPublic;MSynthetic] in
-		let handler = new texpr_to_jvm gctx jc jm t_dynamic in
-		let _,load,_ = jm#add_local "name" string_sig VarArgument in
-		jm#finalize_arguments;
 		let tl = List.map snd c.cl_params in
 		let ethis = mk (TConst TThis) (TInst(c,tl)) null_pos in
 		let make_field cf =
@@ -2473,25 +2468,70 @@ class tclass_to_jvm gctx c = object(self)
 			) s;
 			!h
 		in
-		load();
-		jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
-		let cases = List.map (fun cf ->
-			let hash = java_hash cf.cf_name in
-			let field = make_field cf in
-			[hash],(fun () ->
-				handler#texpr rvalue_any field;
-				jm#expect_reference_type;
-				ignore(jm#get_code#get_stack#pop);
-				jm#get_code#get_stack#push object_sig;
-			)
-		) c.cl_ordered_fields in
-		let def = (fun () ->
-			jm#load_this;
+		begin match c.cl_ordered_fields with
+		| [] ->
+			()
+		| _ ->
+			let jsig = method_sig [string_sig] (Some object_sig) in
+			let jm = jc#spawn_method "_hx_getField" jsig [MPublic;MSynthetic] in
+			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
+			let _,load,_ = jm#add_local "name" string_sig VarArgument in
+			jm#finalize_arguments;
 			load();
-			jm#invokespecial jc#get_super_path "_hx_getField" jc#get_jsig jsig;
-		) in
-		jm#int_switch false cases (Some def);
-		jm#return
+			jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+			let cases = List.map (fun cf ->
+				let hash = java_hash cf.cf_name in
+				let field = make_field cf in
+				[hash],(fun () ->
+					handler#texpr rvalue_any field;
+					jm#expect_reference_type;
+					ignore(jm#get_code#get_stack#pop);
+					jm#get_code#get_stack#push object_sig;
+				)
+			) c.cl_ordered_fields in
+			let def = (fun () ->
+				jm#load_this;
+				load();
+				jm#invokespecial jc#get_super_path "_hx_getField" jc#get_jsig jsig;
+			) in
+			jm#int_switch false cases (Some def);
+			jm#return
+		end;
+		let fields = List.filter (fun cf -> match cf.cf_kind with
+			| Method (MethNormal | MethInline) -> false
+			| Var {v_write = AccNever} -> false
+			| _ -> true
+		) c.cl_ordered_fields in
+		begin match fields with
+		| [] ->
+			()
+		| _ ->
+			let jsig = method_sig [string_sig;object_sig] None in
+			let jm = jc#spawn_method "_hx_setField" jsig [MPublic;MSynthetic] in
+			let handler = new texpr_to_jvm gctx jc jm t_dynamic in
+			let _,load1,_ = jm#add_local "name" string_sig VarArgument in
+			let _,load2,_ = jm#add_local "value" object_sig VarArgument in
+			jm#finalize_arguments;
+			load1();
+			jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+			let cases = List.map (fun cf ->
+				let hash = java_hash cf.cf_name in
+				[hash],(fun () ->
+					jm#load_this;
+					load2();
+					handler#cast cf.cf_type;
+					jm#putfield jc#get_this_path cf.cf_name (handler#vtype cf.cf_type);
+				)
+			) fields in
+			let def = (fun () ->
+				jm#load_this;
+				load1();
+				load2();
+				jm#invokespecial jc#get_super_path "_hx_setField" jc#get_jsig jsig;
+			) in
+			jm#int_switch false cases (Some def);
+			jm#return
+		end;
 
 	method generate_annotations =
 		AnnotationHandler.generate_annotations (jc :> JvmBuilder.base_builder) c.cl_meta;

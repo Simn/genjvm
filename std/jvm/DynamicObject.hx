@@ -35,7 +35,7 @@ class DynamicObject implements java.lang.Cloneable extends Object {
 		_hx_initReflection();
 		_hx_deletedAField = 1;
 		try {
-			Jvm.writeFieldNoDyn(this, name, null);
+			Jvm.writeFieldNoObject(this, name, null);
 		} catch (_:Dynamic) {}
 		return _hx_fields.remove(name);
 	}
@@ -55,11 +55,11 @@ class DynamicObject implements java.lang.Cloneable extends Object {
 		return _hx_fields.exists(name);
 	}
 
-	final public function _hx_setField<T>(name:String, value:T) {
+	override public function _hx_setField(name:String, value:Dynamic) {
 		_hx_initReflection();
 		_hx_fields.set(name, value);
 		try {
-			Jvm.writeFieldNoDyn(this, name, value);
+			Jvm.writeFieldNoObject(this, name, value);
 		} catch (_:Dynamic) {}
 	}
 
