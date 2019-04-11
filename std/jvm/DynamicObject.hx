@@ -8,7 +8,7 @@ import haxe.ds.StringMap;
 class DynamicObject implements java.lang.Cloneable extends Object {
 	var _hx_fields:Null<StringMap<Dynamic>>;
 
-	public var _hx_deletedAField:Null<Int>;
+	public var _hx_deletedAField:Null<Bool>;
 
 	public function toString() {
 		_hx_initReflection();
@@ -33,7 +33,7 @@ class DynamicObject implements java.lang.Cloneable extends Object {
 
 	final public function _hx_deleteField(name:String) {
 		_hx_initReflection();
-		_hx_deletedAField = 1;
+		_hx_deletedAField = true;
 		try {
 			Jvm.writeFieldNoObject(this, name, null);
 		} catch (_:Dynamic) {}
@@ -58,9 +58,6 @@ class DynamicObject implements java.lang.Cloneable extends Object {
 	override public function _hx_setField(name:String, value:Dynamic) {
 		_hx_initReflection();
 		_hx_fields.set(name, value);
-		try {
-			Jvm.writeFieldNoObject(this, name, value);
-		} catch (_:Dynamic) {}
 	}
 
 	final public function _hx_clone() {

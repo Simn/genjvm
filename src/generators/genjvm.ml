@@ -2084,7 +2084,7 @@ let failsafe p f =
 	with Failure s | HarderFailure s ->
 		Error.error s p
 
-let generate_dynamic_access gctx (jc : JvmClass.builder) fields =
+let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
 	let rec pow a b = match b with
 		| 0 -> Int32.one
 		| 1 -> a
@@ -2151,6 +2151,12 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields =
 		jm#finalize_arguments;
 		load1();
 		jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+		let def = (fun () ->
+			jm#load_this;
+			load1();
+			load2();
+			jm#invokespecial jc#get_super_path "_hx_setField" jc#get_jsig jsig;
+		) in
 		let cases = List.map (fun (name,jsig,_) ->
 			let hash = java_hash name in
 			[hash],(fun () ->
@@ -2158,14 +2164,18 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields =
 				load2();
 				jm#cast jsig;
 				jm#putfield jc#get_this_path name jsig;
+				(* Have to deal with Reflect.deleteField crap here... *)
+				if is_anon then begin
+					jm#load_this;
+					jm#getfield jc#get_this_path "_hx_deletedAField" boolean_sig;
+					jm#if_then
+						(fun () -> jm#get_code#if_null_ref boolean_sig)
+						(fun () ->
+							def();
+						)
+				end;
 			)
 		) fields in
-		let def = (fun () ->
-			jm#load_this;
-			load1();
-			load2();
-			jm#invokespecial jc#get_super_path "_hx_setField" jc#get_jsig jsig;
-		) in
 		jm#int_switch false cases (Some def);
 		jm#return
 	end
@@ -2539,7 +2549,7 @@ class tclass_to_jvm gctx c = object(self)
 		if not c.cl_interface then self#handle_relation_type_params;
 		self#generate_signature;
 		if not (Meta.has Meta.NativeGen c.cl_meta) then
-			generate_dynamic_access gctx jc (List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type,cf.cf_kind) c.cl_ordered_fields);
+			generate_dynamic_access gctx jc (List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type,cf.cf_kind) c.cl_ordered_fields) false;
 		self#generate_annotations;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		let jc = jc#export_class gctx.default_export_config in
@@ -2959,6 +2969,7 @@ let generate com =
 			load();
 			jm_fields#get_code#return_value string_map_sig
 		end;
+		generate_dynamic_access gctx jc (List.map (fun (name,jsig) -> name,jsig,Var {v_write = AccNormal;v_read = AccNormal}) fields) true;
 		write_class gctx.jar path (jc#export_class gctx.default_export_config)
 	) gctx.anon_lut;
 	Zip.close_out gctx.jar
