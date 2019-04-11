@@ -1556,9 +1556,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				| [e1;e2] ->
 					self#texpr rvalue_any e1;
 					jm#get_code#dup;
+					let _,load,save = jm#add_local "tmp" (self#vtype e1.etype) VarWillInit in
+					save();
 					jm#get_code#monitorenter;
 					(* TODO: this needs finally... *)
 					self#texpr RVoid e2;
+					load();
 					jm#get_code#monitorexit;
 					None
 				| _ -> assert false
