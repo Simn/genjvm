@@ -1577,11 +1577,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					Error.error "Something went wrong" e1.epos
 			in
 			let kind = get_construction_mode c cf in
-			let jsig = match kind with
-				| ConstructInit -> TUninitialized None
-				| ConstructInitPlusNew -> jc#get_jsig
-			in
-			code#aload jsig 0;
+			begin match kind with
+				| ConstructInitPlusNew when jm#get_name = "<init>" ->
+					jm#load_this;
+					jm#get_code#aconst_null haxe_empty_constructor_sig;
+					jm#call_super_ctor ConstructInit (method_sig [haxe_empty_constructor_sig] None);
+				| _ ->
+					()
+			end;
+			jm#load_this;
 			let tl,_ = self#call_arguments cf.cf_type el in
 			jm#call_super_ctor kind (method_sig tl None);
 			None
