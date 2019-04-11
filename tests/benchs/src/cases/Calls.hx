@@ -47,6 +47,7 @@ class Calls extends TestCase {
 				return null;
 			}
 		};
+		escape(cActualAnon);
 		var cDynamic:Dynamic = c;
 		var staticClosureCall0 = CallClass.staticCall0;
 		var memberClosureCall0 = c.instanceCall0;
@@ -82,6 +83,7 @@ class Calls extends TestCase {
 				return null;
 			}
 		};
+		escape(cActualAnon);
 		var cDynamic:Dynamic = c;
 		var staticClosureCall1 = CallClass.staticCall1;
 		var memberClosureCall1 = c.instanceCall1;
@@ -117,6 +119,7 @@ class Calls extends TestCase {
 				return null;
 			}
 		};
+		escape(cActualAnon);
 		var cDynamic:Dynamic = c;
 		var staticClosureCall2 = CallClass.staticCall2;
 		var memberClosureCall2 = c.instanceCall2;
@@ -138,4 +141,6 @@ class Calls extends TestCase {
 		suite.add("field closure", memberClosureCall2("foo", "bar"));
 		return suite.run();
 	}
+
+	static function escape(d:Dynamic) { }
 }
