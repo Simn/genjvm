@@ -818,6 +818,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#texpr rvalue_any e1;
 					if ak <> AKNone then code#dup;
 					self#texpr rvalue_any e2;
+					jm#cast TInt;
 					if ak <> AKNone then begin
 						code#dup_x1;
 						code#invokevirtual offset_get vta [TInt] [vte];
