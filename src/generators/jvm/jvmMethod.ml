@@ -388,12 +388,13 @@ class builder jc name jsig = object(self)
 		if not self#is_terminated then code#goto r;
 		r
 
-	method close_jumps rl =
+	method close_jumps is_exhaustive rl =
 		let fp' = code#get_fp in
 		let term = List.fold_left (fun term (term',r) ->
 			r := fp' - !r;
 			term && term'
 		) true rl in
+		let term = is_exhaustive && term in
 		self#set_terminated term;
 		if not term then self#add_stack_frame;
 
@@ -461,7 +462,7 @@ class builder jc name jsig = object(self)
 			List.rev acc
 		in
 		let rl = loop [] cases in
-		self#close_jumps ((def_term,if def = None then offset_def else r_def) :: rl)
+		self#close_jumps (def <> None) ((def_term,if def = None then offset_def else r_def) :: rl)
 
 	(** Adds a local with a given [name], signature [jsig] and an [init_state].
 	    This function returns a tuple consisting of:

@@ -1671,7 +1671,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				acc
 		in
 		let rl = loop [] excl in
-		jm#close_jumps ((term_try,r_try) :: rl)
+		jm#close_jumps true ((term_try,r_try) :: rl)
 
 	(* texpr *)
 
