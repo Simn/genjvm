@@ -13,6 +13,21 @@ open JvmBuilder
 
 (* hacks *)
 
+let rec pow a b = match b with
+	| 0 -> Int32.one
+	| 1 -> a
+	| _ -> Int32.mul a (pow a (b - 1))
+
+let java_hash s =
+	let h = ref Int32.zero in
+	let l = String.length s in
+	let i31 = Int32.of_int 31 in
+	String.iteri (fun i char ->
+		let char = Int32.of_int (int_of_char char) in
+		h := Int32.add !h (Int32.mul char (pow i31 (l - (i + 1))))
+	) s;
+	!h
+
 let find_overload map_type c cf el =
 	let matches = ref [] in
 	let rec loop cfl = match cfl with
@@ -406,6 +421,12 @@ let write_class jar path jc =
 let is_const_int_pattern (el,_) =
 	List.for_all (fun e -> match e.eexpr with
 		| TConst (TInt _) -> true
+		| _ -> false
+	) el
+
+let is_const_string_pattern (el,_) =
+	List.for_all (fun e -> match e.eexpr with
+		| TConst (TString _) -> true
 		| _ -> false
 	) el
 
@@ -876,6 +897,22 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			self#texpr rvalue_any e1;
 			jm#cast TInt;
+			jm#int_switch is_exhaustive cases def
+		end else if List.for_all is_const_string_pattern cases then begin
+			let cases = List.map (fun (el,e) ->
+				let il = List.map (fun e -> match e.eexpr with
+					| TConst (TString s) -> java_hash s
+					| _ -> assert false
+				) el in
+				(il,(fun () -> self#texpr ret e))
+			) cases in
+			let def = match def with
+				| None -> None
+				| Some e -> Some (fun () -> self#texpr ret e)
+			in
+			self#texpr rvalue_any e1;
+			jm#cast string_sig;
+			jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
 			jm#int_switch is_exhaustive cases def
 		end else begin
 			(* TODO: rewriting this is stupid *)
@@ -2085,21 +2122,6 @@ let failsafe p f =
 		Error.error s p
 
 let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
-	let rec pow a b = match b with
-		| 0 -> Int32.one
-		| 1 -> a
-		| _ -> Int32.mul a (pow a (b - 1))
-	in
-	let java_hash s =
-		let h = ref Int32.zero in
-		let l = String.length s in
-		let i31 = Int32.of_int 31 in
-		String.iteri (fun i char ->
-			let char = Int32.of_int (int_of_char char) in
-			h := Int32.add !h (Int32.mul char (pow i31 (l - (i + 1))))
-		) s;
-		!h
-	in
 	begin match fields with
 	| [] ->
 		()
