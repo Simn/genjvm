@@ -239,9 +239,6 @@ class Jvm {
 						return method;
 					}
 				}
-				if (instanceof(obj, DynamicObject)) {
-					return (obj : DynamicObject)._hx_getField(name);
-				}
 				if (isStatic) {
 					if (cl == cast java.lang.Class) {
 						break;

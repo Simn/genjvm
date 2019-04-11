@@ -5,12 +5,10 @@ import haxe.ds.StringMap;
 @:keep
 @:native('haxe.jvm.DynamicObject')
 @:nativeGen
-class DynamicObject implements java.lang.Cloneable {
+class DynamicObject implements java.lang.Cloneable extends Object {
 	var _hx_fields:Null<StringMap<Dynamic>>;
 
 	public var _hx_deletedAField:Null<Int>;
-
-	@:nativeGen public function new() { }
 
 	public function toString() {
 		_hx_initReflection();
@@ -47,7 +45,7 @@ class DynamicObject implements java.lang.Cloneable {
 		return [for (key in _hx_fields.keys()) key];
 	}
 
-	final public function _hx_getField<T>(name:String) {
+	override public function _hx_getField<T>(name:String) {
 		_hx_initReflection();
 		return _hx_fields.get(name);
 	}

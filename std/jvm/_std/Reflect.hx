@@ -168,7 +168,8 @@ class Reflect {
 		if (!Jvm.instanceof(o, jvm.DynamicObject)) {
 			return null;
 		}
-		return cast(cast o : jvm.DynamicObject)._hx_clone();
+		var o = (cast o : jvm.DynamicObject);
+		return cast o._hx_clone();
 	}
 
 	@:overload(function(f:Array<Dynamic>->Void):Dynamic {})
