@@ -2624,7 +2624,7 @@ let generate_enum gctx en =
 			) args;
 			jm_ctor#get_code#return_void;
 			jc_ctor#add_annotation (["haxe";"jvm";"annotation"],"EnumValueReflectionInformation") (["argumentNames",AArray (List.map (fun (name,_) -> AString name) args)]);
-			begin
+			if args <> [] then begin
 				let jm_params = jc_ctor#spawn_method "_hx_getParameters" (method_sig [] (Some (array_sig object_sig))) [MPublic] in
 				let fl = List.map (fun (n,jsig) ->
 					(fun () ->
