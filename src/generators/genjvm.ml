@@ -2616,6 +2616,19 @@ let generate_enum gctx en =
 			) args;
 			jm_ctor#get_code#return_void;
 			jc_ctor#add_annotation (["haxe";"jvm";"annotation"],"EnumValueReflectionInformation") (["argumentNames",AArray (List.map (fun (name,_) -> AString name) args)]);
+			begin
+				let jm_params = jc_ctor#spawn_method "_hx_getParameters" (method_sig [] (Some (array_sig object_sig))) [MPublic] in
+				let fl = List.map (fun (n,jsig) ->
+					(fun () ->
+						jm_params#load_this;
+						jm_params#getfield jc_ctor#get_this_path n jsig;
+						jm_params#cast object_sig;
+					)
+				) args in
+				jm_params#get_code#iconst (Int32.of_int (List.length args));
+				ignore(jm_params#new_native_array object_sig fl);
+				jm_params#return
+			end;
 			jc_ctor
 		end in
 		write_class gctx.jar jc_ctor#get_this_path (jc_ctor#export_class gctx.default_export_config);

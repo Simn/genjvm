@@ -279,8 +279,8 @@ class Type {
 		if (a._hx_index != b._hx_index) {
 			return false;
 		}
-		var params1 = enumParameters(cast a);
-		var params2 = enumParameters(cast b);
+		var params1 = a._hx_getParameters();
+		var params2 = b._hx_getParameters();
 		if (params1.length != params2.length) {
 			return false;
 		}
@@ -308,16 +308,8 @@ class Type {
 	}
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
-		var clInfo:java.lang.Class<EnumValueReflectionInformation> = cast EnumValueReflectionInformation;
-		var annotation = (cast e : java.lang.Object).getClass().getAnnotation(clInfo);
-		var ret = [];
-		if (annotation == null) {
-			return ret;
-		}
-		for (name in annotation.argumentNames()) {
-			ret.push(Jvm.readField(e, name));
-		}
-		return ret;
+		var a = (cast e : jvm.Enum)._hx_getParameters();
+		return @:privateAccess Array.ofNative(a);
 	}
 
 	public static function enumIndex(e:EnumValue):Int {

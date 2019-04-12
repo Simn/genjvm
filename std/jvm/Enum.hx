@@ -11,6 +11,10 @@ class Enum {
 		this._hx_index = index;
 	}
 
+	public function _hx_getParameters() {
+		return new java.NativeArray(0);
+	}
+
 	public function toString() {
 		var baseName = Type.getEnumConstructs(Type.getEnum(cast this))[_hx_index];
 		var parameters = Type.enumParameters(cast this);
