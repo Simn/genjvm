@@ -1,5 +1,5 @@
 compile-each.hxml
 --main unit.TestMain
 --java-lib native_java/native.jar
--java bin/java
+-java bin/jvm
 -D jvm
