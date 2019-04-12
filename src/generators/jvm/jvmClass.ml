@@ -144,7 +144,7 @@ class builder path_this path_super = object(self)
 			| None ->
 				self#add_field jm#export_field
 			end;
-		) spawned_methods;
+		) (List.rev spawned_methods);
 		self#commit_bootstrap_methods;
 		self#commit_inner_classes;
 		self#commit_annotations pool;
