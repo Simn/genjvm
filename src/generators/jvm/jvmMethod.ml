@@ -17,6 +17,58 @@ type construction_kind =
 	| ConstructInitPlusNew
 	| ConstructInit
 
+module NativeArray = struct
+	let read code ja je = match je with
+		| TBool -> code#baload TBool ja
+		| TByte -> code#baload TByte ja
+		| TChar -> code#caload ja
+		| TDouble -> code#daload ja
+		| TFloat -> code#faload ja
+		| TInt -> code#iaload ja
+		| TLong -> code#laload ja
+		| TShort -> code#saload ja
+		| _ -> code#aaload ja je
+
+	let write code ja je = match je with
+		| TBool -> code#bastore TBool ja
+		| TByte -> code#bastore TByte ja
+		| TChar -> code#castore ja
+		| TDouble -> code#dastore ja
+		| TFloat -> code#fastore ja
+		| TInt -> code#iastore ja
+		| TLong -> code#lastore ja
+		| TShort -> code#sastore ja
+		| _ -> code#aastore ja je
+
+	let create code pool je =
+		let ja = (TArray(je,None)) in
+		let primitive i =
+			code#newarray ja i
+		in
+		let reference path =
+			let offset = pool#add_path path in
+			code#anewarray ja offset;
+		in
+		begin match je with
+		| TBool -> primitive 4
+		| TChar -> primitive 5
+		| TFloat -> primitive 6
+		| TDouble -> primitive 7
+		| TByte -> primitive 8
+		| TShort -> primitive 9
+		| TInt -> primitive 10
+		| TLong -> primitive 11
+		| TObject(path,_) -> reference path
+		| TMethod _ -> reference NativeSignatures.method_handle_path
+		| TTypeParameter _ -> reference NativeSignatures.object_path
+		| TArray _ ->
+			let offset = pool#add_type (generate_signature false je) in
+			code#anewarray ja offset
+		| TObjectInner _ | TUninitialized _ -> assert false
+		end;
+		ja
+end
+
 class builder jc name jsig = object(self)
 	inherit base_builder
 	val code = new JvmCode.builder jc#get_pool
@@ -182,6 +234,17 @@ class builder jc name jsig = object(self)
 		| TDouble -> code#dconst 0.
 		| TLong -> code#lconst Int64.zero
 		| jsig -> code#aconst_null jsig
+
+	method new_native_array (jsig : jsignature) (fl : (unit -> unit) list) =
+		let jasig = NativeArray.create code jc#get_pool jsig in
+		List.iteri (fun i f ->
+			code#dup;
+			code#iconst (Int32.of_int i);
+			f();
+			self#cast jsig;
+			NativeArray.write code jasig jsig
+		) fl;
+		jasig,jsig
 
 	method read_closure is_static path name jsig_method =
 		let offset = code#get_pool#add_field path name jsig_method FKMethod in

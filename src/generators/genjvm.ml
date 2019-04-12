@@ -159,58 +159,6 @@ type block_exit =
 	| ExitExecute of (unit -> unit)
 	| ExitLoop
 
-module NativeArray = struct
-	let read code ja je = match je with
-		| TBool -> code#baload TBool ja
-		| TByte -> code#baload TByte ja
-		| TChar -> code#caload ja
-		| TDouble -> code#daload ja
-		| TFloat -> code#faload ja
-		| TInt -> code#iaload ja
-		| TLong -> code#laload ja
-		| TShort -> code#saload ja
-		| _ -> code#aaload ja je
-
-	let write code ja je = match je with
-		| TBool -> code#bastore TBool ja
-		| TByte -> code#bastore TByte ja
-		| TChar -> code#castore ja
-		| TDouble -> code#dastore ja
-		| TFloat -> code#fastore ja
-		| TInt -> code#iastore ja
-		| TLong -> code#lastore ja
-		| TShort -> code#sastore ja
-		| _ -> code#aastore ja je
-
-	let create code pool je =
-		let ja = (TArray(je,None)) in
-		let primitive i =
-			code#newarray ja i
-		in
-		let reference path =
-			let offset = pool#add_path path in
-			code#anewarray ja offset;
-		in
-		begin match je with
-		| TBool -> primitive 4
-		| TChar -> primitive 5
-		| TFloat -> primitive 6
-		| TDouble -> primitive 7
-		| TByte -> primitive 8
-		| TShort -> primitive 9
-		| TInt -> primitive 10
-		| TLong -> primitive 11
-		| TObject(path,_) -> reference path
-		| TMethod _ -> reference NativeSignatures.method_handle_path
-		| TTypeParameter _ -> reference NativeSignatures.object_path
-		| TArray _ ->
-			let offset = pool#add_type (generate_signature false je) in
-			code#anewarray ja offset
-		| TObjectInner _ | TUninitialized _ -> assert false
-		end;
-		ja
-end
-
 open NativeSignatures
 
 let rec jsignature_of_type stack t =
@@ -1787,19 +1735,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TString s -> self#string s
 		| TSuper -> failwith "Invalid super access"
 
-	method new_native_array_f jsig (fl : (unit -> unit) list) =
-		let jasig = NativeArray.create code pool jsig in
-		List.iteri (fun i f ->
-			code#dup;
-			code#iconst (Int32.of_int i);
-			f();
-			jm#cast jsig;
-			self#write_native_array jasig jsig
-		) fl;
-		jasig,jsig
-
 	method new_native_array jsig el =
-		self#new_native_array_f jsig (List.map (fun e -> fun () -> self#texpr (rvalue_sig jsig) e) el)
+		jm#new_native_array jsig (List.map (fun e -> fun () -> self#texpr (rvalue_sig jsig) e) el)
 
 	method basic_type_path name =
 		let offset = pool#add_field (["java";"lang"],name) "TYPE" java_class_sig FKField in
