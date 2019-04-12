@@ -2590,8 +2590,8 @@ let map_expr_type f ft fv e =
 		{ e with eexpr = TEnumParameter (f e1,ef,i); etype = ft e.etype }
 	| TEnumIndex e1 ->
 		{ e with eexpr = TEnumIndex (f e1); etype = ft e.etype }
-	| TField (e1',v) ->
-		let e1 = f e1' in
+	| TField (e1,v) ->
+		let e1 = f e1 in
 		let v = try
 			let n = match v with
 				| FClosure _ -> raise Not_found

@@ -373,13 +373,7 @@ let rec wait_loop process_params verbose accept =
 							in
 							loop [] e.e_meta
 						| TAbstractDecl a ->
-							a.a_meta <- List.filter (fun (m,el,_) -> match m,el with
-								| Meta.ValueUsed,_ -> false
-								| Meta.RealPath,[Ast.EConst (Ast.String path),_] ->
-									a.a_path <- Ast.parse_path path;
-									false
-								| _ -> true
-							) a.a_meta
+							a.a_meta <- List.filter (fun (m,_,_) -> m <> Meta.ValueUsed) a.a_meta
 						| _ -> ()
 					) m.m_types;
 					TypeloadModule.add_module ctx m p;
