@@ -30,10 +30,35 @@ and jsignature =
 (* ( jsignature list ) ReturnDescriptor (| V | jsignature) *)
 and jmethod_signature = jsignature list * jsignature option
 
+let s_wildcard = function
+	| WExtends -> "WExtends"
+	| WSuper -> "WSuper"
+	| WNone -> "WNone"
+
+let rec s_signature_kind = function
+	| TByte -> "TByte"
+	| TChar -> "TChar"
+	| TDouble -> "TDouble"
+	| TFloat -> "TFloat"
+	| TInt -> "TInt"
+	| TLong -> "TLong"
+	| TShort -> "TShort"
+	| TBool -> "TBool"
+	| TObject(path,params) -> Printf.sprintf "TObject(%s,[%s])" (Globals.s_type_path path) (String.concat "," (List.map s_signature_param_kind params))
+	| TObjectInner _ -> "TObjectInner"
+	| TArray(jsig,io) -> Printf.sprintf "TArray(%s,%s)" (s_signature_kind jsig) (Option.map_default string_of_int "None" io)
+	| TMethod(jsigs,jsig) -> Printf.sprintf "TMethod([%s],%s)" (String.concat "," (List.map s_signature_kind jsigs)) (Option.map_default s_signature_kind "None" jsig)
+	| TTypeParameter name -> Printf.sprintf "TTypeParameter(%s)" name
+	| TUninitialized io -> Printf.sprintf "TUninitilaized(%s)" (Option.map_default string_of_int "None" io)
+
+and s_signature_param_kind = function
+	| TAny -> "TAny"
+	| TType(wc,jsig) -> Printf.sprintf "TType(%s,%s)" (s_wildcard wc) (s_signature_kind jsig)
+
 let encode_path (pack,name) =
 	String.concat "/" (pack @ [name])
 
-let rec write_param full ch ch param = match param with
+let rec write_param full ch param = match param with
 	| TAny -> write_byte ch (Char.code '*')
 	| TType(w, s) ->
 		begin match w with
@@ -57,7 +82,7 @@ and write_signature full ch jsig = match jsig with
 		write_string ch (encode_path path);
 		if params <> [] && full then begin
 			write_byte ch (Char.code '<');
-			List.iter (write_param full ch ch) params;
+			List.iter (write_param full ch) params;
 			write_byte ch (Char.code '>')
 		end;
 		write_byte ch (Char.code ';')
@@ -73,7 +98,7 @@ and write_signature full ch jsig = match jsig with
 			write_string ch name;
 			if params <> [] then begin
 				write_byte ch (Char.code '<');
-				List.iter (write_param full ch ch) params;
+				List.iter (write_param full ch) params;
 				write_byte ch (Char.code '>')
 			end;
 		) inners;
@@ -174,8 +199,11 @@ module NativeSignatures = struct
 	let retention_policy_path = (["java";"lang";"annotation"],"RetentionPolicy")
 	let retention_policy_sig = TObject(retention_policy_path,[])
 
+	let java_enum_path = (["java";"lang"],"Enum")
+	let java_enum_sig jsig = TObject(java_enum_path,[TType(WNone,jsig)])
+
 	let haxe_enum_path = (["haxe";"jvm"],"Enum")
-	let haxe_enum_sig = TObject(haxe_enum_path,[])
+	let haxe_enum_sig jsig = TObject(haxe_enum_path,[TType(WNone,jsig)])
 
 	let haxe_empty_constructor_path = (["haxe";"jvm"],"EmptyConstructor")
 	let haxe_empty_constructor_sig = TObject(haxe_empty_constructor_path,[])

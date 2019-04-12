@@ -109,21 +109,17 @@ class TestJava extends Test
 		t(haxe.uppercasepackage.Lowercase.lowercaseFound);
 	}
 
-	#if !jvm // different enum representation
-
 	function testEnumSet()
 	{
 		var es1:EnumSet<TEnum> = EnumSet.noneOf(java.Lib.toNativeEnum(TEnum));
 		f(es1.contains(TA));
 		es1.add(TA);
 		t(es1.contains(TA));
-		var es2 = EnumSet.of(HA,HB);
-		t(es2.contains(HA));
-		t(es2.contains(HB));
-		f(es2.contains(HC));
+		// var es2 = EnumSet.of(HA,HB);
+		// t(es2.contains(HA));
+		// t(es2.contains(HB));
+		// f(es2.contains(HC));
 	}
-
-	#end
 
 	function testHaxeKeywords()
 	{
@@ -278,8 +274,6 @@ class TestJava extends Test
 		eq(b.throwsMemberTest(true), 10);
 	}
 
-	#if !jvm // different enum representation
-
 	function testJavaLibEnum()
 	{
 		var e = TEnum.TA;
@@ -292,8 +286,6 @@ class TestJava extends Test
 		}
 		eq("TA",Type.enumConstructor(e));
 	}
-
-	#end
 
 	function testMiscJavaLib()
 	{

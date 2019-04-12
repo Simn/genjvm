@@ -274,9 +274,9 @@ class Type {
 		if (b == null) {
 			return false;
 		}
-		var a:jvm.Enum = cast a;
-		var b:jvm.Enum = cast b;
-		if (a._hx_index != b._hx_index) {
+		var a:jvm.Enum<Dynamic> = cast a;
+		var b:jvm.Enum<Dynamic> = cast b;
+		if (a.ordinal() != b.ordinal()) {
 			return false;
 		}
 		var params1 = a._hx_getParameters();
@@ -299,21 +299,16 @@ class Type {
 	}
 
 	public static function enumConstructor(e:EnumValue):String {
-		var clInfo:java.lang.Class<EnumReflectionInformation> = cast EnumReflectionInformation;
-		var annotation = getEnum(e).native().getAnnotation(clInfo);
-		if (annotation == null) {
-			return null;
-		}
-		return annotation.constructorNames()[(cast e : jvm.Enum)._hx_index];
+		return (cast e : java.lang.Enum<Dynamic>).name();
 	}
 
 	public static function enumParameters(e:EnumValue):Array<Dynamic> {
-		var a = (cast e : jvm.Enum)._hx_getParameters();
+		var a = (cast e : jvm.Enum<Dynamic>)._hx_getParameters();
 		return @:privateAccess Array.ofNative(a);
 	}
 
 	public static function enumIndex(e:EnumValue):Int {
-		return (cast e : jvm.Enum)._hx_index;
+		return (cast e : java.lang.Enum<Dynamic>).ordinal();
 	}
 
 	public static function allEnums<T>(e:Enum<T>):Array<T> {

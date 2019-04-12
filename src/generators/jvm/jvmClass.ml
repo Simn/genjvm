@@ -17,7 +17,7 @@ class builder path_this path_super = object(self)
 	val fields = DynArray.create ()
 	val methods = DynArray.create ()
 	val method_sigs = Hashtbl.create 0
-	val inner_classes = DynArray.create ()
+	val inner_classes = Hashtbl.create 0
 	val mutable closure_count = 0
 	val mutable bootstrap_methods = []
 	val mutable num_bootstrap_methods = 0
@@ -62,7 +62,7 @@ class builder path_this path_super = object(self)
 
 	method spawn_inner_class (jm : JvmMethod.builder option) (path_super : jpath) (name : string option) =
 		let path = match name with
-			| None -> (fst path_this,Printf.sprintf "%s$%i" (snd path_this) (DynArray.length inner_classes))
+			| None -> (fst path_this,Printf.sprintf "%s$%i" (snd path_this) (Hashtbl.length inner_classes))
 			| Some name -> (fst path_this,Printf.sprintf "%s$%s" (snd path_this) name)
 		in
 		let jc = new builder path path_super in
@@ -78,8 +78,8 @@ class builder path_this path_super = object(self)
 			let offset_info = pool#add (ConstNameAndType(offset_name,offset_desc)) in
 			jc#add_attribute (JvmAttribute.AttributeEnclosingMethod(offset_class,offset_info));
 		end;
-		ignore(pool#add_path path);
-		DynArray.add inner_classes jc;
+		let offset = pool#add_path path in
+		Hashtbl.add inner_classes offset jc;
 		jc
 
 	method spawn_method (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
@@ -96,10 +96,10 @@ class builder path_this path_super = object(self)
 		spawned_methods <- (jm,Some pop_scope) :: spawned_methods;
 		jm
 
-	method spawn_field (name : string) (jsig_method : jsignature) (flags : MethodAccessFlags.t list) =
+	method spawn_field (name : string) (jsig_method : jsignature) (flags : FieldAccessFlags.t list) =
 		let jm = new JvmMethod.builder self name jsig_method in
 		List.iter (fun flag ->
-			jm#add_access_flag (MethodAccessFlags.to_int flag)
+			jm#add_access_flag (FieldAccessFlags.to_int flag)
 		) flags;
 		spawned_methods <- (jm,None) :: spawned_methods;
 		jm
@@ -112,12 +112,13 @@ class builder path_this path_super = object(self)
 			) pool#get_inner_classes [] in
 			let l = List.map (fun (path,name,offset_class) ->
 				let offset_name = pool#add_string name in
+				let flags = try (Hashtbl.find inner_classes offset_class)#get_access_flags with Not_found -> 9 in
 				let offset_outer = pool#add_path path in
 				{
 					ic_inner_class_info_index = offset_class;
 					ic_outer_class_info_index = offset_outer;
 					ic_inner_name_index = offset_name;
-					ic_inner_class_access_flags = 9;
+					ic_inner_class_access_flags = flags;
 				}
 			) l in
 			let a = Array.of_list l in

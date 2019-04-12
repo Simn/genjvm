@@ -5,6 +5,7 @@ open Type
 open Path
 open JvmGlobals
 open MethodAccessFlags
+open FieldAccessFlags
 open JvmData
 open JvmAttribute
 open JvmSignature
@@ -164,7 +165,7 @@ open NativeSignatures
 let rec jsignature_of_type stack t =
 	if List.exists (fast_eq t) stack then object_sig else
 	let jsignature_of_type = jsignature_of_type (t :: stack) in
-	let jtype_argument_of_type t = jtype_argument_of_type (t :: stack) t in
+	let jtype_argument_of_type t = jtype_argument_of_type stack t in
 	match t with
 	| TAbstract(a,tl) ->
 		begin match a.a_path with
@@ -193,7 +194,7 @@ let rec jsignature_of_type stack t =
 			| [],("Class" | "Enum") ->
 				java_class_sig
 			| [],"EnumValue" ->
-				object_path_sig (["haxe";"jvm"],"Enum")
+				java_enum_sig object_sig
 			| _ ->
 				if Meta.has Meta.CoreType a.a_meta then
 					TObject(a.a_path,List.map jtype_argument_of_type tl)
@@ -225,7 +226,7 @@ let rec jsignature_of_type stack t =
 	| TLazy f -> jsignature_of_type (lazy_type f)
 
 and jtype_argument_of_type stack t =
-	TType(WNone,jsignature_of_type (t :: stack) t)
+	TType(WNone,jsignature_of_type stack t)
 
 let jsignature_of_type t =
 	jsignature_of_type [] t
@@ -686,7 +687,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| FAnon ({cf_name = s} as cf) ->
 			self#texpr rvalue_any e1;
 			let default () =
-				self#string s;
+				jm#string s;
 				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 				cast();
 			in
@@ -708,7 +709,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			end
 		| FDynamic s | FInstance(_,_,{cf_name = s}) | FEnum(_,{ef_name = s}) | FClosure(Some({cl_interface = true},_),{cf_name = s}) ->
 			self#texpr rvalue_any e1;
-			self#string s;
+			jm#string s;
 			jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
 			cast();
 		| FClosure((Some(c,_)),cf) ->
@@ -749,7 +750,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TField(e1,(FDynamic s | FAnon {cf_name = s} | FInstance(_,_,{cf_name = s}))) ->
 			self#texpr rvalue_any e1;
 			if ak <> AKNone then code#dup;
-			self#string s;
+			jm#string s;
 			if ak <> AKNone then begin
 				code#dup_x1;
 				jm#invokestatic haxe_jvm_path "readField" (method_sig [object_sig;string_sig] (Some object_sig));
@@ -1715,10 +1716,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* texpr *)
 
-	method string s =
-		let offset = pool#add_const_string s in
-		code#sconst (string_sig) offset
-
 	method const ret t ct = match ct with
 		| Type.TInt i32 -> code#iconst i32
 		| TFloat f ->
@@ -1732,7 +1729,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TThis ->
 			let _,load,_ = self#get_local_by_id (0,"this") in
 			load()
-		| TString s -> self#string s
+		| TString s -> jm#string s
 		| TSuper -> failwith "Invalid super access"
 
 	method new_native_array jsig el =
@@ -2018,7 +2015,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr ret (Texpr.for_remap com.basic v e1 e2 e.epos)
 		| TEnumIndex e1 ->
 			self#texpr rvalue_any e1;
-			jm#getfield haxe_enum_path "_hx_index" TInt
+			jm#invokevirtual java_enum_path "ordinal" (java_enum_sig object_sig) (method_sig [] (Some TInt))
 		| TEnumParameter(e1,ef,i) ->
 			self#texpr rvalue_any e1;
 			let path,name,jsig_arg = match follow ef.ef_type with
@@ -2089,7 +2086,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jm#construct ConstructInit haxe_dynamic_object_path (fun () -> []);
 				List.iter (fun ((name,_,_),e) ->
 					code#dup;
-					self#string name;
+					jm#string name;
 					self#texpr rvalue_any e;
 					self#expect_reference_type;
 					jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
@@ -2224,6 +2221,7 @@ class tclass_to_jvm gctx c = object(self)
 			(* TODO: this should be done via Haxe metadata instead of hardcoding it here *)
 			jc#add_annotation retention_path ["value",(AEnum(retention_policy_sig,"RUNTIME"))];
 		end;
+		if c.cl_path = (["haxe";"jvm"],"Enum") then jc#add_access_flag 0x4000; (* enum *)
 
 	method private handle_relation_type_params =
 		let map_type_params t =
@@ -2456,9 +2454,8 @@ class tclass_to_jvm gctx c = object(self)
 
 	method generate_field gctx (jc : JvmClass.builder) c mtype cf =
 		let jsig = jsignature_of_type cf.cf_type in
-		let flags = [MPublic] in
-		let flags = if c.cl_interface then MAbstract :: flags else flags in
-		let flags = if mtype = MStatic then MethodAccessFlags.MStatic :: flags else flags in
+		let flags = [FdPublic] in
+		let flags = if mtype = MStatic then FdStatic :: flags else flags in
 		let jm = jc#spawn_field cf.cf_name jsig flags in
 		let default e =
 			let p = null_pos in
@@ -2537,24 +2534,24 @@ class tclass_to_jvm gctx c = object(self)
 			end
 
 	method private generate_signature =
-		begin match c.cl_params with
-			| [] ->
-				()
-			| _ ->
-				let stl = String.concat "" (List.map (fun (n,_) ->
-					Printf.sprintf "%s:Ljava/lang/Object;" n
-				) c.cl_params) in
-				let ssuper = match c.cl_super with
-					| Some(c,tl) -> generate_method_signature true (jsignature_of_type (TInst(c,tl)))
-					| None -> generate_method_signature true object_sig
-				in
-				let sinterfaces = String.concat "" (List.map (fun(c,tl) ->
-					generate_method_signature true (jsignature_of_type (TInst(c,tl)))
-				) c.cl_implements) in
-				let s = Printf.sprintf "<%s>%s%s" stl ssuper sinterfaces in
-				let offset = jc#get_pool#add_string s in
-				jc#add_attribute (AttributeSignature offset)
-		end;
+			let stl = match c.cl_params with
+				| [] -> ""
+				| params ->
+					let stl = String.concat "" (List.map (fun (n,_) ->
+						Printf.sprintf "%s:Ljava/lang/Object;" n
+					) c.cl_params) in
+					Printf.sprintf "<%s>" stl
+			in
+			let ssuper = match c.cl_super with
+				| Some(c,tl) -> generate_method_signature true (jsignature_of_type (TInst(c,tl)))
+				| None -> generate_method_signature true object_sig
+			in
+			let sinterfaces = String.concat "" (List.map (fun(c,tl) ->
+				generate_method_signature true (jsignature_of_type (TInst(c,tl)))
+			) c.cl_implements) in
+			let s = Printf.sprintf "%s%s%s" stl ssuper sinterfaces in
+			let offset = jc#get_pool#add_string s in
+			jc#add_attribute (AttributeSignature offset)
 
 	method generate_annotations =
 		AnnotationHandler.generate_annotations (jc :> JvmBuilder.base_builder) c.cl_meta;
@@ -2584,13 +2581,22 @@ let generate_enum gctx en =
 	let jc_enum = new JvmClass.builder en.e_path haxe_enum_path in
 	jc_enum#add_access_flag 0x1; (* public *)
 	jc_enum#add_access_flag 0x400; (* abstract *)
-	let jsig_enum_ctor = method_sig [TInt] None in
-	(* Create base constructor *)
+	jc_enum#add_access_flag 0x4000; (* enum *)
 	begin
+		let jsig = haxe_enum_sig (object_path_sig en.e_path) in
+		let s = generate_signature true jsig in
+		let offset = jc_enum#get_pool#add_string s in
+		jc_enum#add_attribute (AttributeSignature offset)
+	end;
+	let jsig_enum_ctor = method_sig [TInt;string_sig] None in
+	(* Create base constructor *)
+	 begin
 		let jm_ctor = jc_enum#spawn_method "<init>" jsig_enum_ctor [MProtected] in
 		jm_ctor#load_this;
-		let _,load,_ = jm_ctor#add_local "index" TInt VarArgument in
-		load();
+		let _,load1,_ = jm_ctor#add_local "index" TInt VarArgument in
+		let _,load2,_ = jm_ctor#add_local "name" string_sig VarArgument in
+		load1();
+		load2();
 		jm_ctor#call_super_ctor ConstructInit jsig_enum_ctor;
 		jm_ctor#get_code#return_void;
 	end;
@@ -2606,10 +2612,12 @@ let generate_enum gctx en =
 		let jc_ctor = begin
 			let jc_ctor = jc_enum#spawn_inner_class None jc_enum#get_this_path (Some ef.ef_name) in
 			jc_ctor#add_access_flag 0x10; (* final *)
+			jc_ctor#add_access_flag 0x4000; (* enum *)
 			let jsig_method = method_sig jsigs None in
 			let jm_ctor = jc_ctor#spawn_method "<init>" jsig_method [MPublic] in
 			jm_ctor#load_this;
 			jm_ctor#get_code#iconst (Int32.of_int ef.ef_index);
+			jm_ctor#string ef.ef_name;
 			jm_ctor#call_super_ctor ConstructInit jsig_enum_ctor;
 			List.iter (fun (n,jsig) ->
 				jm_ctor#add_argument_and_field n jsig
@@ -2635,7 +2643,7 @@ let generate_enum gctx en =
 		begin match args with
 			| [] ->
 				(* Create static field for ctor without args *)
-				let jm_static = jc_enum#spawn_field ef.ef_name jc_enum#get_jsig [MPublic;MStatic;MFinal] in
+				let jm_static = jc_enum#spawn_field ef.ef_name jc_enum#get_jsig [FdPublic;FdStatic;FdFinal;FdEnum] in
 				DynArray.add inits (jm_static,jc_ctor);
 			| _ ->
 				(* Create static function for ctor with args *)
@@ -2664,7 +2672,7 @@ let generate_enum gctx en =
 		| None ->
 			()
 		| Some e ->
-			ignore(jc_enum#spawn_field "__meta__" object_sig [MStatic;MPublic]);
+			ignore(jc_enum#spawn_field "__meta__" object_sig [FdStatic;FdPublic]);
 			let handler = new texpr_to_jvm gctx jc_enum jm_clinit (gctx.com.basic.tvoid) in
 			handler#texpr rvalue_any e;
 			jm_clinit#putstatic jc_enum#get_this_path "__meta__" object_sig

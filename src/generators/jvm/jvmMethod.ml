@@ -152,6 +152,10 @@ class builder jc name jsig = object(self)
 
 	(* Convenience *)
 
+	method string s =
+		let offset = jc#get_pool#add_const_string s in
+		code#sconst (string_sig) offset
+
 	method invokevirtual (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in

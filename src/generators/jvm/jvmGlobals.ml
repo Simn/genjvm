@@ -107,6 +107,33 @@ module MethodAccessFlags = struct
 		b land (to_int flag) <> 0
 end
 
+module FieldAccessFlags = struct
+	type t =
+		| FdPublic
+		| FdPrivate
+		| FdProtected
+		| FdStatic
+		| FdFinal
+		| FdVolatile
+		| FdTransient
+		| FdSynthetic
+		| FdEnum
+
+	let to_int = function
+		| FdPublic -> 0x1
+		| FdPrivate -> 0x2
+		| FdProtected -> 0x4
+		| FdStatic -> 0x8
+		| FdFinal -> 0x10
+		| FdVolatile -> 0x40
+		| FdTransient -> 0x80
+		| FdSynthetic -> 0x1000
+		| FdEnum -> 0x4000
+
+	let has_flag b flag =
+		b land (to_int flag) <> 0
+end
+
 let write_byte ch i = IO.write_byte ch i
 let write_bytes ch b = IO.nwrite ch b
 let write_ui16 ch i = IO.BigEndian.write_ui16 ch i
