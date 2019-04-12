@@ -155,6 +155,10 @@ type compare_kind =
 	| CmpNormal of jcmp * jsignature
 	| CmpSpecial of (unit -> jbranchoffset ref)
 
+type block_exit =
+	| ExitExecute of (unit -> unit)
+	| ExitLoop
+
 module NativeArray = struct
 	let read code ja je = match je with
 		| TBool -> code#baload TBool ja
@@ -571,6 +575,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	val mutable breaks = []
 	val mutable continue = 0
 	val mutable caught_exceptions = []
+	val mutable block_exits = []
 	val mutable env = None
 
 	method vtype t =
@@ -1559,10 +1564,44 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let _,load,save = jm#add_local "tmp" (self#vtype e1.etype) VarWillInit in
 					save();
 					jm#get_code#monitorenter;
-					(* TODO: this needs finally... *)
+					let f_exit () =
+						load();
+						jm#get_code#monitorexit;
+					in
+					block_exits <- (ExitExecute f_exit) :: block_exits;
+					let fp_from = jm#get_code#get_fp in
 					self#texpr RVoid e2;
-					load();
-					jm#get_code#monitorexit;
+					let term_try = jm#is_terminated in
+					if not jm#is_terminated then f_exit();
+					let fp_to = jm#get_code#get_fp in
+					let r_try = jm#maybe_make_jump in
+					let fp_target = jm#get_code#get_fp in
+					let pop_scope = jm#push_scope in
+					code#get_stack#push throwable_sig;
+					jm#add_stack_frame;
+					jm#add_exception {
+						exc_start_pc = fp_from;
+						exc_end_pc = fp_to;
+						exc_handler_pc = fp_target;
+						exc_catch_type = None;
+					};
+					begin
+						let _,load,save = jm#add_local "tmp" throwable_sig VarWillInit in
+						save();
+						f_exit();
+						jm#add_exception {
+							exc_start_pc = fp_target;
+							exc_end_pc = jm#get_code#get_fp;
+							exc_handler_pc = fp_target;
+							exc_catch_type = None;
+						};
+						load();
+						jm#get_code#athrow;
+					end;
+					pop_scope();
+					block_exits <- List.tl block_exits;
+					if not term_try then jm#add_stack_frame;
+					jm#close_jumps true ([term_try,r_try]);
 					None
 				| _ -> assert false
 			end
@@ -1713,6 +1752,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		in
 		let rl = loop [] excl in
 		jm#close_jumps true ((term_try,r_try) :: rl)
+
+	method emit_block_exits is_loop_exit =
+		let rec loop stack = match stack with
+			| [] ->
+				()
+			| ExitLoop :: stack ->
+				if not is_loop_exit then loop stack
+			| ExitExecute f :: stack ->
+				f();
+				loop stack
+		in
+		loop block_exits
 
 	(* texpr *)
 
@@ -1867,6 +1918,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#switch ret e1 cases def
 		| TWhile(e1,e2,flag) -> (* TODO: do-while *)
 			(* TODO: could optimize a bit *)
+			block_exits <- ExitLoop :: block_exits;
 			let is_true_loop = match (Texpr.skip e1).eexpr with TConst (TBool true) -> true | _ -> false in
 			jm#add_stack_frame;
 			let fp = code#get_fp in
@@ -1890,12 +1942,15 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				jm#set_terminated true;
 			continue <- old_continue;
 			breaks <- old_breaks;
+			block_exits <- List.tl block_exits;
 		| TBreak ->
+			self#emit_block_exits true;
 			let r = ref (code#get_fp) in
 			code#goto r;
 			breaks <- r :: breaks;
 			jm#set_terminated true;
 		| TContinue ->
+			self#emit_block_exits true;
 			code#goto (ref (continue - code#get_fp));
 			jm#set_terminated true;
 		| TTry(e1,catches) ->
@@ -1923,12 +1978,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				end
 			end
 		| TReturn None ->
+			self#emit_block_exits false;
 			code#return_void;
 			jm#set_terminated true;
 		| TReturn (Some e1) ->
 			self#texpr rvalue_any e1;
 			self#cast return_type;
 			let vt = self#vtype return_type in
+			self#emit_block_exits false;
 			code#return_value vt;
 			jm#set_terminated true;
 		| TFunction tf ->
