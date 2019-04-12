@@ -457,7 +457,8 @@ class builder jc name jsig = object(self)
 			let pop_scope = self#push_scope in
 			f();
 			pop_scope();
-			loop ((self#is_terminated,self#maybe_make_jump) :: acc) cases
+			let r = if cases = [] then ref 0 else self#maybe_make_jump in
+			loop ((self#is_terminated,r) :: acc) cases
 		| [] ->
 			List.rev acc
 		in
