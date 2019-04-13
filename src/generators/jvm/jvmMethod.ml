@@ -240,6 +240,7 @@ class builder jc name jsig = object(self)
 		| jsig -> code#aconst_null jsig
 
 	method new_native_array (jsig : jsignature) (fl : (unit -> unit) list) =
+		code#iconst (Int32.of_int (List.length fl));
 		let jasig = NativeArray.create code jc#get_pool jsig in
 		List.iteri (fun i f ->
 			code#dup;
@@ -247,8 +248,7 @@ class builder jc name jsig = object(self)
 			f();
 			self#cast jsig;
 			NativeArray.write code jasig jsig
-		) fl;
-		jasig,jsig
+		) fl
 
 	method read_closure is_static path name jsig_method =
 		let offset = code#get_pool#add_field path name jsig_method FKMethod in

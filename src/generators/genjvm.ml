@@ -1448,9 +1448,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TIdent "__array__" | TField(_,FStatic({cl_path = (["java"],"NativeArray")},{cf_name = "make"})) ->
 			begin match follow tr with
 			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
-				code#iconst (Int32.of_int (List.length el));
-				let jasig,_ = self#new_native_array (self#vtype t) el in
-				Some jasig
+				let jsig = self#vtype t in
+				self#new_native_array jsig el;
+				Some (array_sig jsig)
 			| _ ->
 				Error.error (Printf.sprintf "Bad __array__ type: %s" (s_type (print_context()) tr)) e1.epos;
 			end
@@ -1560,8 +1560,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			if has_unknown_args (jsignature_of_type e1.etype) then begin
 				self#texpr rvalue_any e1;
 				jm#cast method_handle_sig;
-				code#iconst (Int32.of_int (List.length el));
-				ignore(self#new_native_array object_sig el);
+				self#new_native_array object_sig el;
 				jm#invokestatic haxe_jvm_path "call" (method_sig [method_handle_sig;array_sig object_sig] (Some object_sig));
 				Some object_sig
 			end else begin
@@ -1893,7 +1892,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TNew({cl_path = (["java"],"NativeArray")},[t],[e1]) ->
 			self#texpr (match ret with RVoid -> RVoid | _ -> rvalue_any) e1;
 			(* Technically this could throw... but whatever *)
-			if ret <> RVoid then ignore(self#new_native_array (jsignature_of_type t) [])
+			if ret <> RVoid then ignore(NativeArray.create jm#get_code jc#get_pool (jsignature_of_type t))
 		| TNew(c,tl,el) ->
 			begin match get_constructor (fun cf -> cf.cf_type) c with
 			|_,cf ->
@@ -1946,11 +1945,9 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TArrayDecl el when ret = RVoid ->
 			List.iter (self#texpr ret) el
 		| TArrayDecl el ->
-			let length = List.length el in
 			begin match follow e.etype with
 			| TInst({cl_path = ([],"Array")},[t]) ->
-				code#iconst (Int32.of_int length);
-				ignore(self#new_native_array (jsignature_of_type (self#mknull t)) el);
+				self#new_native_array (jsignature_of_type (self#mknull t)) el;
 				jm#invokestatic ([],"Array") "ofNative" (method_sig [array_sig object_sig] (Some (object_path_sig ([],"Array"))));
 				self#cast e.etype
 			| _ ->
@@ -2629,8 +2626,7 @@ let generate_enum gctx en =
 						jm_params#cast object_sig;
 					)
 				) args in
-				jm_params#get_code#iconst (Int32.of_int (List.length args));
-				ignore(jm_params#new_native_array object_sig fl);
+				jm_params#new_native_array object_sig fl;
 				jm_params#return
 			end;
 			jc_ctor
