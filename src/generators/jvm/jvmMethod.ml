@@ -152,47 +152,57 @@ class builder jc name jsig = object(self)
 
 	(* Convenience *)
 
+	(** Adds [s] as a string constant to the constant pool and emits an instruction to load it. **)
 	method string s =
 		let offset = jc#get_pool#add_const_string s in
 		code#sconst (string_sig) offset
 
+	(** Emits an invokevirtual instruction to invoke method [name] on [path] with signature [jsigm]. **)
 	method invokevirtual (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
 			code#invokevirtual offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	(** Emits an invokespecial instruction to invoke method [name] on [path] with signature [jsigm]. **)
 	method invokespecial (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
 			code#invokespecial offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	(** Emits an invokestatic instruction to invoke method [name] on [path] with signature [jsigm]. **)
 	method invokestatic (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
 			code#invokestatic offset tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	(** Emits a getfield instruction to get the value of field [name] on object [path] with signature [jsigf]. **)
 	method getfield (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#getfield offset (object_path_sig path) jsigf
 
+	(** Emits a putfield instruction to set the value of field [name] on object [path] with signature [jsigf]. **)
 	method putfield (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#putfield offset (object_path_sig path) jsigf
 
+	(** Emits a getstatic instruction to get the value of field [name] on Class [path] with signature [jsigf]. **)
 	method getstatic (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#getstatic offset jsigf
 
+	(** Emits a putstatic instruction to set the value of field [name] on Class [path] with signature [jsigf]. **)
 	method putstatic (path : jpath) (name : string) (jsigf : jsignature) =
 		let offset = code#get_pool#add_field path name jsigf FKField in
 		code#putstatic offset jsigf
 
+	(** Loads `this` **)
 	method load_this =
 		code#aload self#get_this_sig 0
 
+	(** Calls the parent constructor with signature [jsig_method] using the specified construction_kind [kind]. **)
 	method call_super_ctor (kind : construction_kind) (jsig_method : jsignature) =
 		assert (not (self#has_method_flag MStatic));
 		match kind with
@@ -202,6 +212,8 @@ class builder jc name jsig = object(self)
 			self#invokespecial jc#get_super_path "<init>" jsig_method;
 			self#set_this_initialized
 
+	(** Adds a field named [name] with signature [jsig_field] to the enclosing class, and adds an argument with the same name
+	    to this method. The argument value is loaded and stored into the field immediately. **)
 	method add_argument_and_field (name : string) (jsig_field : jsignature) =
 		assert (not (self#has_method_flag MStatic));
 		let jf = new builder jc name jsig_field in
@@ -212,6 +224,14 @@ class builder jc name jsig = object(self)
 		load();
 		self#putfield jc#get_this_path name jsig_field;
 
+	(** Constructs a [path] object using the specified construction_kind [kind].
+
+	    The function [f] is invokved to handle the call arguments. Its returned jsignature list is then used as the
+		method type of the constructor to invoke.
+
+	    If [no_value] is true, this function ensures that the stack is neutral. Otherwise, the created object is pushed
+		onto the stack.
+	**)
 	method construct ?(no_value=false) (kind : construction_kind) (path : jpath) (f : unit -> jsignature list) =
 		let pool = code#get_pool in
 		let offset = pool#add_path path in
@@ -231,6 +251,7 @@ class builder jc name jsig = object(self)
 			self#invokespecial path "<init>" (method_sig jsigs None);
 			if not no_value then self#set_top_initialized (object_path_sig path)
 
+	(** Loads the default value corresponding to a given signature. **)
 	method load_default_value = function
 		| TByte | TBool | TChar | TShort | TInt ->
 			code#iconst Int32.zero;
@@ -239,6 +260,10 @@ class builder jc name jsig = object(self)
 		| TLong -> code#lconst Int64.zero
 		| jsig -> code#aconst_null jsig
 
+	(** Constructs a new native array with element type [jsig].
+
+	    Iterates over [fl] and invokes the functions to handle the array elements.
+	**)
 	method new_native_array (jsig : jsignature) (fl : (unit -> unit) list) =
 		code#iconst (Int32.of_int (List.length fl));
 		let jasig = NativeArray.create code jc#get_pool jsig in
@@ -250,11 +275,18 @@ class builder jc name jsig = object(self)
 			NativeArray.write code jasig jsig
 		) fl
 
+	(** Adds a closure to method [name] ob [path] with signature [jsig_method] to the constant pool.
+
+	    Also emits an instruction to load the closure.
+	**)
 	method read_closure is_static path name jsig_method =
 		let offset = code#get_pool#add_field path name jsig_method FKMethod in
 		let offset = code#get_pool#add (ConstMethodHandle((if is_static then 6 else 5), offset)) in
 		code#ldc offset jsig_method
 
+	(**
+		Emits a return instruction.
+	**)
 	method return = match jsig with
 		| TMethod(_,tr) ->
 			begin match tr with
@@ -449,11 +481,19 @@ class builder jc name jsig = object(self)
 		jump_then := code#get_fp - !jump_then;
 		self#add_stack_frame
 
+	(**
+		Returns an instruction offset and emits a goto instruction to it if this method isn't terminated.
+	**)
 	method maybe_make_jump =
 		let r = ref code#get_fp in
 		if not self#is_terminated then code#goto r;
 		r
 
+	(**
+		Closes the list of instruction offsets [rl], effectively making them jump to the current fp.
+
+		Also generates a stack map frame unless [is_exhaustive] is true and all branches terminated.
+	**)
 	method close_jumps is_exhaustive rl =
 		let fp' = code#get_fp in
 		let term = List.fold_left (fun term (term',r) ->
@@ -464,6 +504,14 @@ class builder jc name jsig = object(self)
 		self#set_terminated term;
 		if not term then self#add_stack_frame;
 
+
+	(**
+		Emits a tableswitch or lookupswitch instruction, depending on which one makes more sense.
+
+		The switch subject is expected to be on the stack before calling this function.
+
+		If [is_exhaustive] is true and [def] is None, the first case is used as the default case.
+	**)
 	method int_switch (is_exhaustive : bool) (cases : (Int32.t list * (unit -> unit)) list) (def : (unit -> unit) option) =
 		let def,cases = match def,cases with
 			| None,(_,ec) :: cases when is_exhaustive ->
