@@ -696,7 +696,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| _ ->
 			assert false
 
-	method read_write ret ak e (f : unit -> unit) (t : Type.t) =
+	method read_write ret ak e (f : unit -> unit) =
 		let apply dup =
 			if ret <> RVoid && ak = AKPost then dup();
 			f();
@@ -751,7 +751,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					apply (fun () -> code#dup_x2;);
 					self#cast t;
 					jm#invokevirtual c.cl_path "__set" (method_sig [TInt;object_sig] None);
-				| TInst({cl_path = (["java"],"NativeArray")},_) ->
+				| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
 					let vte = self#vtype t in
 					let vta = self#vtype e1.etype in
 					self#texpr rvalue_any e1;
@@ -774,7 +774,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						jm#invokestatic haxe_jvm_path "arrayRead" (method_sig [object_sig;TInt] (Some object_sig));
 					end;
 					apply (fun () -> code#dup_x2;);
-					self#cast t;
+					self#cast e.etype;
 					self#expect_reference_type;
 					jm#invokestatic haxe_jvm_path "arrayWrite" (method_sig [object_sig;TInt;object_sig] None);
 				end
@@ -1195,7 +1195,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		let slot,_,_ = self#get_local v in
 		in_range true Int8Range slot
 
-	method binop ret op e1 e2 t = match op with
+	method binop ret op e1 e2 = match op with
 		| OpEq | OpNotEq | OpLt | OpGt | OpLte | OpGte ->
 			let op = convert_cmp_op op in
 			self#boolop (self#binop_compare op e1 e2)
@@ -1204,7 +1204,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr (rvalue_type e1.etype) e2;
 				self#cast e1.etype;
 			in
-			self#read_write ret AKNone e1 f t
+			self#read_write ret AKNone e1 f
 		| OpAssignOp op ->
 			let jsig1 = jsignature_of_type e1.etype in
 			begin match op,(Texpr.skip e1).eexpr,(Texpr.skip e2).eexpr with
@@ -1223,7 +1223,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					self#binop_basic ret op (self#get_binop_type e1.etype e2.etype) (fun () -> ()) (fun () -> self#texpr rvalue_any e2);
 					jm#cast jsig1;
 				in
-				self#read_write ret AKPre e1 f t
+				self#read_write ret AKPre e1 f
 			end
 		| _ ->
 			let f e () = self#texpr rvalue_any e in
@@ -1254,7 +1254,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					jm#invokestatic haxe_jvm_path (if op = Increment then "++" else "--") (method_sig [object_sig] (Some object_sig))
 				end
 			in
-			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f e.etype;
+			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f;
 		| Neg,_ ->
 			self#texpr rvalue_any e;
 			let jsig = jsignature_of_type (follow e.etype) in
@@ -1790,12 +1790,12 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#invokevirtual string_builder_path "toString" (method_sig [] (Some string_sig));
 		| TBinop(op,e1,e2) ->
 			begin match op with
-			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2 e.etype
+			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2
 			| _ when ret = RVoid ->
 				self#texpr ret e1;
 				self#texpr ret e2;
 			| _ ->
-				self#binop ret op e1 e2 e.etype
+				self#binop ret op e1 e2
 			end
 		| TConst ct ->
 			self#const ret e.etype ct
