@@ -339,24 +339,6 @@ let resolve_class com path =
 	in
 	loop com.types
 
-let resolve_field com static path name =
-	let c = resolve_class com path in
-	try
-		c,PMap.find name (if static then c.cl_statics else c.cl_fields)
-	with Not_found ->
-		jerror (Printf.sprintf "No such field: %s.%s" (s_type_path path) name)
-
-let add_field pool c cf =
-	let field_kind = match cf.cf_kind with
-		| Method (MethNormal | MethInline) ->
-			if c.cl_interface then FKInterfaceMethod else FKMethod
-		| _ ->
-			if c.cl_interface then jerror (Printf.sprintf "Interface field access is not supported on JVM (for %s.%s)" (s_type_path c.cl_path) cf.cf_name);
-			FKField
-	in
-	let t = jsignature_of_type cf.cf_type in
-	pool#add_field c.cl_path (if cf.cf_name = "new" then "<init>" else cf.cf_name) t field_kind
-
 let write_class jar path jc =
 	let dir = match path with
 		| ([],s) -> s
@@ -670,11 +652,8 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let vtobj = self#vtype e1.etype in
 			code#arraylength vtobj;
 		| FInstance(c,tl,cf) | FClosure(Some(c,tl),({cf_kind = Method MethDynamic} as cf)) when not (is_interface_var_access c cf) ->
-			let vt = self#vtype cf.cf_type in
-			let offset = add_field pool c cf in
 			self#texpr rvalue_any e1;
-			let vtobj = self#vtype e1.etype in
-			code#getfield offset vtobj vt;
+			jm#getfield c.cl_path cf.cf_name (self#vtype cf.cf_type);
 			cast();
 		| FEnum(en,ef) when not (match follow ef.ef_type with TFun _ -> true | _ -> false) ->
 			let jsig = self#vtype ef.ef_type in
@@ -759,25 +738,19 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TArray(e1,e2) ->
 			begin match follow e1.etype with
 				| TInst({cl_path = ([],"Array")} as c,[t]) ->
-					let cf_get = PMap.find "__get" c.cl_fields in
-					let cf_set = PMap.find "__set" c.cl_fields in
-					let offset_get = add_field pool c cf_get in
-					let offset_set = add_field pool c cf_set in
-					let vta = self#vtype e1.etype in
 					let t = self#mknull t in
-					let vte = self#vtype t in
 					self#texpr rvalue_any e1;
 					if ak <> AKNone then code#dup;
 					self#texpr rvalue_any e2;
 					jm#cast TInt;
 					if ak <> AKNone then begin
 						code#dup_x1;
-						code#invokevirtual offset_get vta [TInt] [vte];
+						jm#invokevirtual c.cl_path "__get" (method_sig [TInt] (Some object_sig));
 						self#cast_expect ret e.etype;
 					end;
 					apply (fun () -> code#dup_x2;);
 					self#cast t;
-					code#invokevirtual offset_set vta [TInt;vte] []
+					jm#invokevirtual c.cl_path "__set" (method_sig [TInt;object_sig] None);
 				| TInst({cl_path = (["java"],"NativeArray")},_) ->
 					let vte = self#vtype t in
 					let vta = self#vtype e1.etype in
@@ -1471,9 +1444,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| None -> Error.error "Could not find overload" e1.epos
 			| Some(c,cf) ->
 				let tl,tr = self#call_arguments cf.cf_type el in
-				let t1 = self#vtype e1.etype in
-				let offset = add_field pool c cf in
-				(if is_super then code#invokespecial else if c.cl_interface then code#invokeinterface else code#invokevirtual) offset t1 tl (retype tr);
+				(if is_super then jm#invokespecial else if c.cl_interface then jm#invokeinterface else jm#invokevirtual) c.cl_path cf.cf_name (self#vtype cf.cf_type);
 				tr
 			end
 		| TField(_,FEnum(en,ef)) ->

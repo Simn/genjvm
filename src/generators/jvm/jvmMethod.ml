@@ -164,6 +164,13 @@ class builder jc name jsig = object(self)
 			code#invokevirtual offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
+	(** Emits an invokeinterface instruction to invoke method [name] on [path] with signature [jsigm]. **)
+	method invokeinterface (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
+		| TMethod(tl,tr) ->
+			let offset = code#get_pool#add_field path name jsigm FKInterfaceMethod in
+			code#invokeinterface offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
+		| _ -> assert false
+
 	(** Emits an invokespecial instruction to invoke method [name] on [path] with signature [jsigm]. **)
 	method invokespecial (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
