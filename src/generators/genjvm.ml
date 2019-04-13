@@ -201,8 +201,7 @@ let rec jsignature_of_type stack t =
 				else
 					jsignature_of_type (Abstract.get_underlying_type a tl)
 		end
-	| TDynamic t' when t' == t_dynamic -> object_sig
-	| TDynamic _ -> object_sig (* TODO: hmm... *)
+	| TDynamic _ -> object_sig
 	| TMono r ->
 		begin match !r with
 		| Some t -> jsignature_of_type t
@@ -292,7 +291,6 @@ module AnnotationHandler = struct
 		let parse_expr e = match fst e with
 			| ECall(e1,el) ->
 				let path = parse_path e1 in
-				(* TODO: this is not robust... *)
 				let _,name = ExtString.String.replace (snd path) "." "$" in
 				let path = (fst path,name) in
 				let values = List.map parse_value_pair el in
@@ -666,8 +664,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			cast();
 		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
 			self#texpr rvalue_any e1;
-			let vtobj = self#vtype e1.etype in
-			jm#invokevirtual string_path "length" vtobj (method_sig [] (Some TInt))
+			jm#invokevirtual string_path "length" (method_sig [] (Some TInt))
 		| FInstance({cl_path = (["java"],"NativeArray")},_,{cf_name = "length"}) ->
 			self#texpr rvalue_any e1;
 			let vtobj = self#vtype e1.etype in
@@ -716,7 +713,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			let jsig = self#vtype cf.cf_type in
 			jm#read_closure false c.cl_path cf.cf_name jsig;
 			self#texpr rvalue_any e1;
-			jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+			jm#invokevirtual method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig));
 		| _ ->
 			assert false
 
@@ -867,7 +864,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			in
 			self#texpr rvalue_any e1;
 			jm#cast string_sig;
-			jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+			jm#invokevirtual string_path "hashCode" (method_sig [] (Some TInt));
 			jm#int_switch is_exhaustive cases def
 		end else begin
 			(* TODO: rewriting this is stupid *)
@@ -1571,7 +1568,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr rvalue_any e1;
 				jm#cast method_handle_sig;
 				let tl,tr = self#call_arguments e1.etype el in
-				jm#invokevirtual method_handle_path "invoke" (self#vtype e1.etype) (method_sig tl tr);
+				jm#invokevirtual method_handle_path "invoke" (method_sig tl tr);
 				tr
 			end
 		in
@@ -1817,11 +1814,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						| _ ->
 							object_sig
 					in
-					jm#invokevirtual string_builder_path "append" string_builder_sig (method_sig [jsig] (Some string_builder_sig));
+					jm#invokevirtual string_builder_path "append" (method_sig [jsig] (Some string_builder_sig));
 			in
 			loop e1;
 			loop e2;
-			jm#invokevirtual string_builder_path "toString" string_builder_sig (method_sig [] (Some string_sig));
+			jm#invokevirtual string_builder_path "toString" (method_sig [] (Some string_sig));
 		| TBinop(op,e1,e2) ->
 			begin match op with
 			| OpAssign | OpAssignOp _ -> self#binop ret op e1 e2 e.etype
@@ -1932,7 +1929,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					let _,load,_ = self#get_local_by_id arg in
 					load();
 					self#expect_reference_type;
-					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+					jm#invokevirtual method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig));
 				| args ->
 					let f () =
 						let tl = List.map (fun (arg,jsig) ->
@@ -1944,7 +1941,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						tl
 					in
 					jm#construct ConstructInit ctx_class#get_path f;
-					jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+					jm#invokevirtual method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig));
 				end
 			end
 		| TArrayDecl el when ret = RVoid ->
@@ -1970,7 +1967,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				self#texpr rvalue_any e1;
 				self#texpr (rvalue_sig TInt) e2;
 				jm#cast TInt;
-				jm#invokevirtual c.cl_path "__get" (object_path_sig c.cl_path) (method_sig [TInt] (Some object_sig));
+				jm#invokevirtual c.cl_path "__get" (method_sig [TInt] (Some object_sig));
 				self#cast e.etype
 			| TInst({cl_path = (["java"],"NativeArray")},[t]) ->
 				self#texpr rvalue_any e1;
@@ -2015,7 +2012,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr ret (Texpr.for_remap com.basic v e1 e2 e.epos)
 		| TEnumIndex e1 ->
 			self#texpr rvalue_any e1;
-			jm#invokevirtual java_enum_path "ordinal" (java_enum_sig object_sig) (method_sig [] (Some TInt))
+			jm#invokevirtual java_enum_path "ordinal" (method_sig [] (Some TInt))
 		| TEnumParameter(e1,ef,i) ->
 			self#texpr rvalue_any e1;
 			let path,name,jsig_arg = match follow ef.ef_type with
@@ -2089,7 +2086,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					jm#string name;
 					self#texpr rvalue_any e;
 					self#expect_reference_type;
-					jm#invokevirtual haxe_dynamic_object_path "_hx_setField" haxe_dynamic_object_sig (method_sig [string_sig;object_sig] None);
+					jm#invokevirtual haxe_dynamic_object_path "_hx_setField" (method_sig [string_sig;object_sig] None);
 				) fl;
 			end
 		| TIdent _ ->
@@ -2126,7 +2123,7 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
 		let _,load,_ = jm#add_local "name" string_sig VarArgument in
 		jm#finalize_arguments;
 		load();
-		jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+		jm#invokevirtual string_path "hashCode" (method_sig [] (Some TInt));
 		let cases = List.map (fun (name,jsig,kind) ->
 			let hash = java_hash name in
 			[hash],(fun () ->
@@ -2134,7 +2131,7 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
 					| Method (MethNormal | MethInline) ->
 						jm#read_closure false jc#get_this_path name jsig;
 						jm#load_this;
-						jm#invokevirtual method_handle_path "bindTo" method_handle_sig (method_sig [object_sig] (Some method_handle_sig));
+						jm#invokevirtual method_handle_path "bindTo" (method_sig [object_sig] (Some method_handle_sig));
 					| _ ->
 						jm#load_this;
 						jm#getfield jc#get_this_path name jsig;
@@ -2147,7 +2144,7 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
 		let def = (fun () ->
 			jm#load_this;
 			load();
-			jm#invokespecial jc#get_super_path "_hx_getField" jc#get_jsig jsig;
+			jm#invokespecial jc#get_super_path "_hx_getField" jsig;
 		) in
 		jm#int_switch false cases (Some def);
 		jm#return
@@ -2167,12 +2164,12 @@ let generate_dynamic_access gctx (jc : JvmClass.builder) fields is_anon =
 		let _,load2,_ = jm#add_local "value" object_sig VarArgument in
 		jm#finalize_arguments;
 		load1();
-		jm#invokevirtual string_path "hashCode" string_sig (method_sig [] (Some TInt));
+		jm#invokevirtual string_path "hashCode" (method_sig [] (Some TInt));
 		let def = (fun () ->
 			jm#load_this;
 			load1();
 			load2();
-			jm#invokespecial jc#get_super_path "_hx_setField" jc#get_jsig jsig;
+			jm#invokespecial jc#get_super_path "_hx_setField" jsig;
 		) in
 		let cases = List.map (fun (name,jsig,_) ->
 			let hash = java_hash name in
@@ -2259,7 +2256,7 @@ class tclass_to_jvm gctx c = object(self)
 						load();
 						jm#cast jsig;
 					) tl jsigs;
-					jm#invokevirtual c.cl_path cf.cf_name (object_path_sig c.cl_path) jsig_impl;
+					jm#invokevirtual c.cl_path cf.cf_name jsig_impl;
 					if not (ExtType.is_void (follow tr)) then jm#cast (jsignature_of_type tr);
 					jm#return;
 				| _ ->
@@ -3005,7 +3002,7 @@ let generate com =
 				jm_fields#load_this;
 				jm_fields#getfield jc#get_this_path name jsig;
 				jm_fields#expect_reference_type;
-				jm_fields#invokevirtual string_map_path "set" string_map_sig (method_sig [string_sig;object_sig] None);
+				jm_fields#invokevirtual string_map_path "set" (method_sig [string_sig;object_sig] None);
 			) fields;
 			load();
 			jm_fields#get_code#return_value string_map_sig

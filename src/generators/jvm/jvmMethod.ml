@@ -156,16 +156,16 @@ class builder jc name jsig = object(self)
 		let offset = jc#get_pool#add_const_string s in
 		code#sconst (string_sig) offset
 
-	method invokevirtual (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
+	method invokevirtual (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
-			code#invokevirtual offset jsig tl (match tr with None -> [] | Some tr -> [tr])
+			code#invokevirtual offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
-	method invokespecial (path : jpath) (name : string) (jsig : jsignature) (jsigm : jsignature) = match jsigm with
+	method invokespecial (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
 		| TMethod(tl,tr) ->
 			let offset = code#get_pool#add_field path name jsigm FKMethod in
-			code#invokespecial offset jsig tl (match tr with None -> [] | Some tr -> [tr])
+			code#invokespecial offset (object_path_sig path) tl (match tr with None -> [] | Some tr -> [tr])
 		| _ -> assert false
 
 	method invokestatic (path : jpath) (name : string) (jsigm : jsignature) = match jsigm with
@@ -197,9 +197,9 @@ class builder jc name jsig = object(self)
 		assert (not (self#has_method_flag MStatic));
 		match kind with
 		| ConstructInitPlusNew ->
-			self#invokespecial jc#get_super_path "new" jc#get_jsig jsig_method;
+			self#invokespecial jc#get_super_path "new" jsig_method;
 		| ConstructInit ->
-			self#invokespecial jc#get_super_path "<init>" jc#get_jsig jsig_method;
+			self#invokespecial jc#get_super_path "<init>" jsig_method;
 			self#set_this_initialized
 
 	method add_argument_and_field (name : string) (jsig_field : jsignature) =
@@ -220,15 +220,15 @@ class builder jc name jsig = object(self)
 		| ConstructInitPlusNew ->
 			code#dup;
 			code#aconst_null haxe_empty_constructor_sig;
-			self#invokespecial path "<init>" jc#get_jsig (method_sig [haxe_empty_constructor_sig] None);
+			self#invokespecial path "<init>" (method_sig [haxe_empty_constructor_sig] None);
 			if not no_value then self#set_top_initialized (object_path_sig path);
 			if not no_value then code#dup;
 			let jsigs = f () in
-			self#invokevirtual path "new" jc#get_jsig (method_sig jsigs None);
+			self#invokevirtual path "new" (method_sig jsigs None);
 		| ConstructInit ->
 			if not no_value then code#dup;
 			let jsigs = f () in
-			self#invokespecial path "<init>" jc#get_jsig (method_sig jsigs None);
+			self#invokespecial path "<init>" (method_sig jsigs None);
 			if not no_value then self#set_top_initialized (object_path_sig path)
 
 	method load_default_value = function
@@ -289,9 +289,8 @@ class builder jc name jsig = object(self)
 		if not_null then begin
 			let unwrap_null tname name =
 				let path = (["java";"lang"],tname) in
-				let jsig_wrapper = object_path_sig path in
 				self#cast (get_boxed_type jsig);
-				self#invokevirtual path name jsig_wrapper (method_sig [] (Some jsig))
+				self#invokevirtual path name (method_sig [] (Some jsig))
 			in
 			match jsig with
 			| TByte -> unwrap_null "Number" "byteValue"
