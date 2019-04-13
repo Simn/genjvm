@@ -143,11 +143,3 @@ let write_string ch s = IO.nwrite_string ch s
 let write_array16 ch f a =
 	write_ui16 ch (Array.length a);
 	Array.iter (f ch) a
-
-let path_map path = match path with
-	| [],"String" -> ["java";"lang"],"String"
-	(* | [],"Bool" -> ["java";"lang"],"Boolean"
-	| [],"Int" -> ["java";"lang"],"Integer"
-	| [],"Float" -> ["java";"lang"],"Double" *)
-	| ["java"],"NativeArray" -> ["java";"lang"],"Object"
-	| _ -> path

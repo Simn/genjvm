@@ -23,7 +23,11 @@
 import haxe.iterators.StringIterator;
 import haxe.iterators.StringKeyValueIterator;
 
-@:coreApi extern class String implements java.lang.CharSequence {
+@:coreApi
+#if jvm
+@:native("java.lang.String")
+#end
+extern class String implements java.lang.CharSequence {
 
 	var length(default,null) : Int;
 

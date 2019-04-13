@@ -66,7 +66,6 @@ class constant_pool = object(self)
 		self#add (ConstClass offset);
 
 	method add_path path =
-		let path = path_map path in
 		let s = self#s_type_path path in
 		let offset = self#add_type s in
 		if String.contains (snd path) '$' then begin

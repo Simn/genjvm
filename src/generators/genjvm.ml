@@ -355,7 +355,7 @@ let add_field pool c cf =
 			FKField
 	in
 	let t = jsignature_of_type cf.cf_type in
-	pool#add_field (path_map c.cl_path) (if cf.cf_name = "new" then "<init>" else cf.cf_name) t field_kind
+	pool#add_field c.cl_path (if cf.cf_name = "new" then "<init>" else cf.cf_name) t field_kind
 
 let write_class jar path jc =
 	let dir = match path with
@@ -655,14 +655,14 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			jm#getstatic double_path cf.cf_name TDouble
 		| FStatic({cl_path = (["java";"lang"],"Math")},({cf_name = "isNaN" | "isFinite"} as cf)) ->
 			jm#read_closure true double_path cf.cf_name (jsignature_of_type cf.cf_type);
-		| FStatic({cl_path = ([],"String")},({cf_name = "fromCharCode"} as cf)) ->
+		| FStatic({cl_path = (["java";"lang"],"String")},({cf_name = "fromCharCode"} as cf)) ->
 			jm#read_closure true (["haxe";"jvm"],"StringExt") cf.cf_name (jsignature_of_type cf.cf_type);
 		| FStatic(c,({cf_kind = Method (MethNormal | MethInline)} as cf)) ->
 			jm#read_closure true c.cl_path cf.cf_name (jsignature_of_type cf.cf_type);
 		| FStatic(c,cf) ->
 			jm#getstatic c.cl_path cf.cf_name (self#vtype cf.cf_type);
 			cast();
-		| FInstance({cl_path = ([],"String")},_,{cf_name = "length"}) ->
+		| FInstance({cl_path = (["java";"lang"],"String")},_,{cf_name = "length"}) ->
 			self#texpr rvalue_any e1;
 			jm#invokevirtual string_path "length" (method_sig [] (Some TInt))
 		| FInstance({cl_path = (["java"],"NativeArray")},_,{cf_name = "length"}) ->
@@ -1746,7 +1746,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 		| TShort -> self#basic_type_path "Short"
 		| TBool -> self#basic_type_path "Boolean"
 		| TObject(path,_) ->
-			let path = path_map path in
 			let offset = pool#add_path path in
 			let t = object_path_sig path in
 			code#ldc offset (TObject(java_class_path,[TType(WNone,t)]))
@@ -2004,7 +2003,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			self#texpr rvalue_any e1;
 			let jsig = jsignature_of_type (type_of_module_type mt) in
 			if is_unboxed jsig || is_unboxed jm#get_code#get_stack#top then jm#cast jsig
-			else code#checkcast (path_map (t_infos mt).mt_path);
+			else code#checkcast (t_infos mt).mt_path;
 			if ret = RVoid then code#pop;
 		| TParenthesis e1 | TMeta(_,e1) ->
 			self#texpr ret e1
@@ -2567,7 +2566,7 @@ class tclass_to_jvm gctx c = object(self)
 		self#generate_annotations;
 		jc#add_attribute (AttributeSourceFile (jc#get_pool#add_string c.cl_pos.pfile));
 		let jc = jc#export_class gctx.default_export_config in
-		write_class gctx.jar (path_map c.cl_path) jc
+		write_class gctx.jar c.cl_path jc
 end
 
 let generate_class gctx c =
