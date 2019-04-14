@@ -219,7 +219,11 @@ let rec jsignature_of_type stack t =
 	| TInst({cl_path = ["_Enum"],"Enum_Impl_"},_) -> java_class_sig
 	| TInst(c,tl) -> TObject(c.cl_path,List.map jtype_argument_of_type tl)
 	| TEnum(en,tl) -> TObject(en.e_path,List.map jtype_argument_of_type tl)
-	| TFun(tl,tr) -> method_sig (List.map (fun (_,_,t) -> jsignature_of_type t) tl) (if ExtType.is_void (follow tr) then None else Some (jsignature_of_type tr))
+	| TFun(tl,tr) -> method_sig (List.map (fun (_,o,t) ->
+		let jsig = jsignature_of_type t in
+		let jsig = if o then get_boxed_type jsig else jsig in
+		jsig
+	) tl) (if ExtType.is_void (follow tr) then None else Some (jsignature_of_type tr))
 	| TAnon an -> object_sig
 	| TType(td,tl) -> jsignature_of_type (apply_params td.t_params tl td.t_type)
 	| TLazy f -> jsignature_of_type (lazy_type f)
@@ -1289,15 +1293,16 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	(* calls *)
 
+	method get_argument_signatures t el =
+		match jsignature_of_type t with
+		| TMethod(jsigs,r) -> jsigs,r
+		| _ -> List.map (fun _ -> object_sig) el,(Some object_sig)
+
 	method call_arguments t el =
-		let tl,tr = match follow t with
-			| TFun(tl,tr) -> tl,tr
-			| _ -> (List.map (fun _ -> "",false,t_dynamic) el),t_dynamic
-		in
+		let tl,tr = self#get_argument_signatures t el in
 		let rec loop acc tl el = match tl,el with
-			| (_,o,t) :: tl,e :: el ->
-					self#texpr (rvalue_type t) e;
-					let jsig = self#vtype (if o then self#mknull t else t) in
+			| jsig :: tl,e :: el ->
+					self#texpr (rvalue_sig jsig) e;
 					jm#cast jsig;
 					loop (jsig :: acc) tl el
 			| _,[] -> List.rev acc
@@ -1307,7 +1312,6 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				loop (self#vtype e.etype :: acc) [] el
 		in
 		let tl = loop [] tl el in
-		let tr = if ExtType.is_void (follow tr) then None else Some (self#vtype tr) in
 		tl,tr
 
 	method call ret tr e1 el =
