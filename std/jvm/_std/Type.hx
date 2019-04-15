@@ -5,6 +5,7 @@ import jvm.Jvm;
 
 using jvm.NativeTools.NativeClassTools;
 using jvm.NativeTools.NativeEnumTools;
+using jvm.NativeTools.ObjectTools;
 
 enum ValueType {
 	TNull;
@@ -39,11 +40,11 @@ class Type {
 		if (Jvm.instanceof(o, Class)) {
 			return null;
 		}
-		var c = (cast o : java.lang.Object).getClass();
+		var c = o.object().getClass();
 		if (isEnumValueClass(c)) {
 			return null;
 		}
-		if (c == cast jvm.DynamicObject) {
+		if (c == jvm.DynamicObject.native()) {
 			return null;
 		}
 		return c.haxe();
@@ -53,11 +54,11 @@ class Type {
 		if (o == null) {
 			return null;
 		}
-		var c = (cast o : java.lang.Object).getClass().getSuperclass();
+		var c = o.object().getClass().getSuperclass();
 		if (!c.isAnnotationPresent(cast EnumReflectionInformation)) {
 			return null;
 		}
-		return cast c;
+		return c.haxeEnum();
 	}
 
 	public static function getSuperClass(c:Class<Dynamic>):Class<Dynamic> {
@@ -107,7 +108,7 @@ class Type {
 			if (!isEnumClass(c)) {
 				null;
 			} else {
-				cast c;
+				c.haxeEnum();
 			}
 		} catch (e:java.lang.ClassNotFoundException) {
 			return null;
@@ -122,7 +123,7 @@ class Type {
 
 	static final emptyClass = {
 		var a = new java.NativeArray(1);
-		a[0] = (cast jvm.EmptyConstructor : java.lang.Class<Dynamic>);
+		a[0] = jvm.EmptyConstructor.native();
 		a;
 	}
 
@@ -262,7 +263,7 @@ class Type {
 		var c = (cast v : java.lang.Object).getClass();
 		// TODO: native enums?
 		if (isEnumValueClass(c)) {
-			return TEnum(cast c.getSuperclass());
+			return TEnum(c.getSuperclass().haxeEnum());
 		}
 		if (Jvm.instanceof(v, java.lang.Class)) {
 			return TObject;
