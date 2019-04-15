@@ -3,6 +3,9 @@ import java.lang.NoSuchMethodException;
 import jvm.annotation.*;
 import jvm.Jvm;
 
+using jvm.NativeTools.NativeClassTools;
+using jvm.NativeTools.NativeEnumTools;
+
 enum ValueType {
 	TNull;
 	TInt;
@@ -43,7 +46,7 @@ class Type {
 		if (c == cast jvm.DynamicObject) {
 			return null;
 		}
-		return c;
+		return c.haxe();
 	}
 
 	public static function getEnum(o:EnumValue):Enum<Dynamic> {
@@ -70,7 +73,7 @@ class Type {
 		if (annotation != null && annotation.hasSuperClass() == false) {
 			return null;
 		}
-		return cSuper;
+		return cSuper.haxe();
 	}
 
 	public static function getClassName(c:Class<Dynamic>):String {
@@ -92,7 +95,7 @@ class Type {
 			return java.lang.Math;
 		}
 		return try {
-			java.lang.Class.forName(name);
+			java.lang.Class.forName(name).haxe();
 		} catch (e:java.lang.ClassNotFoundException) {
 			return null;
 		}
@@ -264,7 +267,7 @@ class Type {
 		if (Jvm.instanceof(v, java.lang.Class)) {
 			return TObject;
 		}
-		return TClass(c);
+		return TClass(c.haxe());
 	}
 
 	public static function enumEq<T>(a:T, b:T):Bool {
