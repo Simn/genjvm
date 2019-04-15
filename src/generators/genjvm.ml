@@ -2627,13 +2627,20 @@ let generate_enum gctx en =
 		end;
 		AString name
 	) en.e_names in
-	(* Assign static fields for ctors without args *)
 	if DynArray.length inits > 0 then begin
+		(* Assign static fields for ctors without args *)
 		let jm_clinit = jc_enum#spawn_method "<clinit>" (method_sig [] None) [MStatic] in
-		DynArray.iter (fun (jm_static,jc_ctor) ->
+		let jm_values = jc_enum#spawn_method "values" (method_sig [] (Some (array_sig (object_path_sig jc_enum#get_this_path)))) [MPublic;MStatic] in
+		let inits = DynArray.to_list inits in
+		let fl = List.map (fun (jm_static,jc_ctor) ->
 			jm_clinit#construct ConstructInit jc_ctor#get_this_path (fun () -> []);
 			jm_clinit#putstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
-		) inits;
+			(fun () ->
+				jm_values#getstatic jc_enum#get_this_path jm_static#get_name jm_static#get_jsig;
+			)
+		) inits in
+		jm_values#new_native_array (object_path_sig jc_enum#get_this_path) fl;
+		jm_values#return;
 		(* Add __meta__ TODO: do this via annotations instead? *)
 		begin match Texpr.build_metadata gctx.com.basic (TEnumDecl en) with
 		| None ->
