@@ -6,27 +6,40 @@ import haxe.ds.StringMap;
 @:native('haxe.jvm.DynamicObject')
 @:nativeGen
 class DynamicObject implements java.lang.Cloneable extends Object {
+	static var __hx_toString_depth  = 0;
+
 	var _hx_fields:Null<StringMap<Dynamic>>;
 
 	public var _hx_deletedAField:Null<Bool>;
 
 	public function toString() {
+		if (__hx_toString_depth >= 5) {
+			return "...";
+		}
+		++__hx_toString_depth;
 		_hx_initReflection();
 		if (_hx_hasField("toString")) {
+			--__hx_toString_depth;
 			return _hx_getField("toString")();
 		}
 		var buf = new StringBuf();
 		buf.addChar("{".code);
 		var first = true;
-		for (key in _hx_fields.keys()) {
-			buf.add(key);
-			buf.add(": ");
-			buf.add(_hx_fields.get(key));
-			if (first) {
-				first = false;
-				buf.add(", ");
+		try {
+			for (key in _hx_fields.keys()) {
+				buf.add(key);
+				buf.add(": ");
+				buf.add(_hx_fields.get(key));
+				if (first) {
+					first = false;
+					buf.add(", ");
+				}
 			}
+		} catch(e:Dynamic) {
+			--__hx_toString_depth;
+			throw(e);
 		}
+		--__hx_toString_depth;
 		buf.addChar("}".code);
 		return buf.toString();
 	}
