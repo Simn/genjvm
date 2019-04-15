@@ -87,7 +87,7 @@ class Type {
 
 	public static function resolveClass(name:String):Class<Dynamic> {
 		if (name == "String") {
-			return java.lang.JavaString.String;
+			return java.NativeString;
 		} else if (name == "Math") {
 			return java.lang.Math;
 		}

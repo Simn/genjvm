@@ -30,7 +30,7 @@ class TestClosure extends BaseTest {
 
 		// native
 
-		var s:java.lang.JavaString.String = cast "foo";
+		var s:java.NativeString = cast "foo";
 		var closure = s.concat;
 		eq("foobar", closure("bar"));
 

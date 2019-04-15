@@ -1,6 +1,6 @@
 package jvm;
 
-import java.lang.JavaString.String as JavaString;
+import java.NativeString;
 
 @:native("haxe.jvm.StringExt")
 class StringExt {
@@ -14,27 +14,27 @@ class StringExt {
 		if (index >= me.length || index < 0)
 			return "";
 		else
-			return java.lang.Character._toString((cast me : JavaString).charAt(index));
+			return java.lang.Character._toString((cast me : NativeString).charAt(index));
 	}
 
 	public static function charCodeAt(me:String, index:Int):Null<Int> {
 		if (index >= me.length || index < 0)
 			return null;
 		else
-			return cast((cast me : JavaString).charAt(index), Int);
+			return cast((cast me : NativeString).charAt(index), Int);
 	}
 
 	public static function indexOf(me:String, str:String, startIndex:Null<Int>) {
 		return
-			if (startIndex == null) (cast me : java.lang.JavaString.String).indexOf(str)
-			else (cast me : java.lang.JavaString.String).indexOf(str, startIndex);
+			if (startIndex == null) (cast me : NativeString).indexOf(str)
+			else (cast me : NativeString).indexOf(str, startIndex);
 	}
 
 	public static function lastIndexOf(me:String, str:String, ?startIndex:Int):Int {
 		if (startIndex == null || startIndex > me.length || startIndex < 0) {
 			startIndex = me.length - 1;
 		}
-		return (cast me : JavaString).lastIndexOf(str, startIndex);
+		return (cast me : NativeString).lastIndexOf(str, startIndex);
 	}
 
 	public static function split(me:String, delimiter:String):Array<String> {
@@ -47,11 +47,11 @@ class StringExt {
 			var start = 0;
 			var pos = me.indexOf(delimiter, start);
 			while (pos >= 0) {
-				ret.push((cast me : java.lang.JavaString.String).substring(start, pos));
+				ret.push((cast me : NativeString).substring(start, pos));
 				start = pos + delimiter.length;
 				pos = me.indexOf(delimiter, start);
 			}
-			ret.push((cast me : java.lang.JavaString.String).substring(start));
+			ret.push((cast me : NativeString).substring(start));
 		}
 		return ret;
 	}
@@ -75,7 +75,7 @@ class StringExt {
 		if (pos < 0 || len <= 0) {
 			return "";
 		}
-		return (cast me : java.lang.JavaString.String).substring(pos, pos + len);
+		return (cast me : NativeString).substring(pos, pos + len);
 	}
 
 	public static function substring(me:String, startIndex:Int, ?endIndex:Int):String {
@@ -96,6 +96,6 @@ class StringExt {
 			startIndex = endIndex;
 			endIndex = tmp;
 		}
-		return (cast me : java.lang.JavaString.String).substring(startIndex, endIndex);
+		return (cast me : NativeString).substring(startIndex, endIndex);
 	}
 }

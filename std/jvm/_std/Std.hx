@@ -72,7 +72,7 @@ class Std {
 			if (x.length < 2) {
 				return integerFormatter.parse(x).intValue();
 			}
-			switch ((cast x : java.lang.JavaString.String).codePointAt(1)) {
+			switch ((cast x : java.NativeString).codePointAt(1)) {
 				case 'x'.code | 'X'.code:
 					return java.lang.Integer.decode(x).intValue();
 				case _:

@@ -31,7 +31,7 @@ class Jvm {
 		if (v2 == null) {
 			return -1;
 		}
-		return (cast v1 : java.lang.JavaString.String).compareTo(v2);
+		return (cast v1 : java.NativeString).compareTo(v2);
 	}
 
 	static public function compare<T>(v1:T, v2:T):Int {
@@ -245,7 +245,7 @@ class Jvm {
 		if (instanceof(obj, jvm.Object)) {
 			return (cast obj : jvm.Object)._hx_getField(name);
 		}
-		if (instanceof(obj, java.lang.JavaString.String)) {
+		if (instanceof(obj, java.NativeString)) {
 			switch (name) {
 				case "length": return (obj : String).length;
 				case "charAt": return (cast jvm.StringExt.charAt : java.lang.invoke.MethodHandle).bindTo(obj);
@@ -309,14 +309,14 @@ class Jvm {
 	}
 
 	static public function stringConcat<A:java.lang.Object, B:java.lang.Object>(a:A, b:B):String {
-		return (cast toString(a) : java.lang.JavaString.String).concat(toString(b));
+		return (cast toString(a) : java.NativeString).concat(toString(b));
 	}
 
 	// ops
 
 	@:native("+")
 	static public function opAdd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
-		if (instanceof(a, java.lang.JavaString.String) || instanceof(b, java.lang.JavaString.String)) {
+		if (instanceof(a, java.NativeString) || instanceof(b, java.NativeString)) {
 			return stringConcat(a, b);
 		}
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {

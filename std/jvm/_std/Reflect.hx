@@ -100,11 +100,11 @@ class Reflect {
 		if (Jvm.instanceof(a, java.lang.Number) && Jvm.instanceof(b, java.lang.Number)) {
 			return java.lang.Long.compare((cast a : java.lang.Number).longValue(), (cast b : java.lang.Number).longValue());
 		}
-		if (Jvm.instanceof(a, java.lang.JavaString.String)) {
-			if (!Jvm.instanceof(b, java.lang.JavaString.String)) {
+		if (Jvm.instanceof(a, java.NativeString)) {
+			if (!Jvm.instanceof(b, java.NativeString)) {
 				return -1;
 			}
-			return (cast a : java.lang.JavaString.String).compareTo(cast b);
+			return (cast a : java.NativeString).compareTo(cast b);
 		}
 		return -1;
 	}
