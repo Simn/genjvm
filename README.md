@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-	<a href="https://travis-ci.org/HaxeFoundation/haxe"><img src="https://travis-ci.org/HaxeFoundation/haxe.svg?branch=development" alt="TravisCI Build Status"></a>
+	<a href="https://travis-ci.org/Simn/genjvm"><img src="https://travis-ci.org/Simn/genjvm.svg?branch=development" alt="TravisCI Build Status"></a>
 	<a href="https://ci.appveyor.com/project/HaxeFoundation/haxe"><img src="https://ci.appveyor.com/api/projects/status/github/HaxeFoundation/haxe?branch=development&amp;svg=true" alt="AppVeyor Build Status"></a>
 	<a href="https://saucelabs.com/u/haxe"><img src="https://saucelabs.com/buildstatus/haxe" alt="SauceLabs Test Status"></a>
 	<a href="https://gitter.im/HaxeFoundation/haxe?utm_source=badge&amp;utm_medium=badge&amp;utm_campaign=pr-badge"><img src="https://badges.gitter.im/Join%20Chat.svg" alt="Gitter"></a>
