@@ -12,97 +12,19 @@
 
 ---
 
-Haxe is an open source toolkit that allows you to easily build cross-platform tools and applications that target many mainstream platforms. The Haxe toolkit includes:
+## Genjvm
 
- * **The Haxe programming language**, a modern, high-level, strictly-typed programming language
- * **The Haxe cross-compiler**, a state-of-the-art, lightning-speed compiler for many targets
- * **The Haxe standard library**, a complete, cross-platform library of common functionality
+JVM target generator for Haxe. Use `-D jvm` with normal Java compilation parameters.
 
-Haxe allows you to compile for the following targets:
+### Status
 
- * JavaScript
- * C++
- * C#
- * Java
- * Lua
- * PHP
- * Python 3
- * [HashLink](https://hashlink.haxe.org/)
- * [NekoVM](https://nekovm.org/)
- * Flash (SWF Bytecode)
- * ActionScript 3
- * And its own [interpreter](https://haxe.org/blog/eval/)
+* Passes the unit tests and most other tests
+* Still plenty of annoying corner cases to deal with
+* Not in Haxe proper because I already have enough other stuff to maintain
 
-You can try Haxe directly from your browser at [try.haxe.org](https://try.haxe.org)!
+### Differences to genjava
 
-For more information about Haxe, head to the [official Haxe website](https://haxe.org).
-
-## License
-
-The Haxe project has several licenses, covering different parts of the projects.
-
- * The Haxe compiler is released under the GNU General Public License version 2 or any later version.
- * The Haxe standard library is released under the MIT license.
- * The Neko virtual machine is released under the MIT license. Its bundled runtime libraries (ndll) and tools are released under open source licenses as described in https://github.com/HaxeFoundation/neko/blob/master/LICENSE
-
-For the complete Haxe licenses, please see https://haxe.org/foundation/open-source.html or [extra/LICENSE.txt](extra/LICENSE.txt).
-
-## Installing Haxe
-
-The latest stable release is available at [https://haxe.org/download/](https://haxe.org/download/). Pre-built binaries are available for your platform:
-
- * **[Windows installer](https://haxe.org/download/file/latest/haxe-latest-win.exe/)**
- * **[Windows binaries](https://haxe.org/download/file/latest/haxe-latest-win.zip/)**
- * **[OSX installer](https://haxe.org/download/file/latest/haxe-latest-osx-installer.pkg/)**
- * **[OSX binaries](https://haxe.org/download/file/latest/haxe-latest-osx.tar.gz/)**
- * **[Linux Software Packages](https://haxe.org/download/linux/)**
- * **[Linux 32-bit binaries](https://haxe.org/download/file/latest/haxe-latest-linux32.tar.gz/)**
- * **[Linux 64-bit binaries](https://haxe.org/download/file/latest/haxe-latest-linux64.tar.gz/)**
-
-Automated development builds are available from [build.haxe.org](http://build.haxe.org).
-
-## Building from source
-
-See [extra/BUILDING.md](extra/BUILDING.md).
-
-## Using Haxe
-
-For information on using Haxe, consult the [Haxe documentation](https://haxe.org/documentation/):
-
- * [Haxe Introduction](https://haxe.org/documentation/introduction/), an introduction to the Haxe toolkit
- * [The Haxe Manual](https://haxe.org/manual/), the reference manual for the Haxe language
- * [Haxe Code Cookbook](https://code.haxe.org), code snippets / learning resource
- * [Haxe API](https://api.haxe.org), documentation for the Haxe standard and native APIs
- * [Haxelib](https://lib.haxe.org), Haxelib is the package manager for the Haxe Toolkit.
-
-## Community
-
-You can get help and talk with fellow Haxers from around the world via:
-
- * [Haxe Community Forum](http://community.haxe.org)
- * [Haxe on Stack Overflow](https://stackoverflow.com/questions/tagged/haxe)
- * [Haxe Gitter chatroom](https://gitter.im/HaxeFoundation/haxe/)
- * [Haxe Discord server](https://discordapp.com/invite/0uEuWH3spjck73Lo)
- * [#haxe on Twitter](https://twitter.com/hashtag/haxe?src=hash)
-
-:+1: Get notified of the latest Haxe news, follow us on [Twitter](https://twitter.com/haxelang), [Facebook](https://www.facebook.com/haxe.org) and don't forget to read the [Haxe roundups](https://haxe.io/).
-
-## Version compatibility
-
-Haxe            | Neko  | SWF |  Python   | HL    | PHP   | Lua  |
-----            | ----  | ----   | ----   |  ---- | ----  | ---- |
-2.*             | 1.*   | 8-10   | -      | -     | -     | -    |
-3.0.0           | 2.0.0 |        | -      | -     | 5.1+  | -    |
-3.2.0           |       | 12-14  | 3.2+   | -     |       | -    |
-3.3.0           | 2.1.0 | 21     |        | -     |       | 5.1, 5.2, 5.3, LuaJIT 2.0, 2.1 |
-3.4.0           |       |        |        | 1.1   | 5.4+ and 7.0+ (with `-D php7`)   |      |
-4.0.0-preview.1 |       |        |        | 1.2   | 7.0+  |      |
-4.0.0-preview.3 |       |        |        | 1.3   |       |      |
-4.0.0-preview.4 |       |        |        | 1.6   |       |      |
-4.0.0-preview.5 |       |        |        | 1.8   |       |      |
-4.0.0-rc.1      |       |        |        | 1.9   |       |      |
-
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more. Thank you!
+* Compiles much faster because there's no `javac` involved
+* Performs equally in most cases, slower in some
+* Type parameters work sometimes
+* Cannot use any feature that deals with Java code, such as `__java__` or `@:functionCode`
