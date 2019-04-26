@@ -298,7 +298,19 @@ let ident i =
 let as3 p =
 	HMName (p,HNNamespace "http://adobe.com/AS3/2006/builtin")
 
-let property ctx p t =
+let make_class_ns c =
+	match c.cl_path with
+	| [], n -> n
+	| p, n -> String.concat "." p ^ ":" ^ n
+
+let is_cf_protected cf = Meta.has Meta.Protected cf.cf_meta
+
+let property ctx fa t =
+	match fa with
+	| FStatic (c, cf) when is_cf_protected cf ->
+		HMName (reserved cf.cf_name, HNStaticProtected (Some (make_class_ns c))), None, false
+	| _ ->
+	let p = field_name fa in
 	match follow t with
 	| TInst ({ cl_path = [],"Array" },_) ->
 		(match p with
@@ -349,13 +361,20 @@ let property ctx p t =
 		in
 		(try
 			let c = loop c in
-			let ns = HMName (reserved p, HNNamespace (match c.cl_path with [],n -> n | l,n -> String.concat "." l ^ ":" ^ n)) in
+			let ns = HMName (reserved p, HNNamespace (make_class_ns c)) in
 			ns, None, false
 		with Not_found | Exit ->
 			ident p, None, false)
 
 	| _ ->
 		ident p, None, false
+
+let this_property fa =
+	match fa with
+	| FInstance (c,_,cf) | FClosure (Some (c,_),cf) when is_cf_protected cf ->
+		HMName (reserved cf.cf_name, HNProtected (make_class_ns c))
+	| _ ->
+		ident (field_name fa)
 
 let default_infos() =
 	{
@@ -859,11 +878,9 @@ let rec gen_access ctx e (forset : 'a) : 'a access =
 	match e.eexpr with
 	| TLocal v ->
 		gen_local_access ctx v e.epos forset
-	| TField ({ eexpr = TConst TSuper } as e1,f) ->
-		let f = field_name f in
-		let id, _, _ = property ctx f e1.etype in
+	| TField ({ eexpr = TConst TSuper },f) ->
 		write ctx HThis;
-		VSuper id
+		VSuper (this_property f)
 	| TEnumParameter (e1,_,i) ->
 		gen_expr ctx true e1;
 		write ctx (HGetProp (ident "params"));
@@ -873,13 +890,17 @@ let rec gen_access ctx e (forset : 'a) : 'a access =
 		gen_expr ctx true e1;
 		VId (ident "index")
 	| TField (e1,fa) ->
-		let f = field_name fa in
-		let id, k, closure = property ctx f e1.etype in
+		let id, k, closure =
+			match e1.eexpr with
+			| TConst (TThis | TSuper) when not ctx.in_static ->
+				let id = this_property fa in
+				write ctx (HFindProp id);
+				id, None, false
+			| _ ->
+				gen_expr ctx true e1;
+				property ctx fa e1.etype
+		in
 		if closure && not ctx.for_call then abort "In Flash9, this method cannot be accessed this way : please define a local function" e1.epos;
-		(match e1.eexpr with
-		| TConst (TThis|TSuper) when not ctx.in_static ->
-			write ctx (HFindProp id)
-		| _ -> gen_expr ctx true e1);
 		(match k with
 		| Some t -> VCast (id,t)
 		| None ->
@@ -1492,13 +1513,13 @@ and gen_call ctx retval e el r =
 		List.iter (gen_expr ctx true) el;
 		write ctx (HConstructSuper (List.length el));
 	| TField ({ eexpr = TConst TSuper },f) , _ ->
-		let id = ident (field_name f) in
+		let id = this_property f in
 		write ctx (HFindPropStrict id);
 		List.iter (gen_expr ctx true) el;
 		write ctx (HCallSuper (id,List.length el));
 		coerce ctx (classify ctx r);
 	| TField ({ eexpr = TConst TThis },f) , _ when not ctx.in_static ->
-		let id = ident (field_name f) in
+		let id = this_property f in
 		write ctx (HFindProp id);
 		List.iter (gen_expr ctx true) el;
 		if retval then begin
@@ -1510,7 +1531,7 @@ and gen_call ctx retval e el r =
 		let old = ctx.for_call in
 		ctx.for_call <- true;
 		gen_expr ctx true e1;
-		let id , _, _ = property ctx (field_name f) e1.etype in
+		let id , _, _ = property ctx f e1.etype in
 		ctx.for_call <- old;
 		List.iter (gen_expr ctx true) el;
 		if retval then begin
@@ -2076,7 +2097,7 @@ let generate_class ctx c =
 				| Some (c,_) -> find_meta c
 		in
 		let protect() =
-			let p = (match c.cl_path with [], n -> n | p, n -> String.concat "." p ^ ":" ^ n) in
+			let p = make_class_ns c in
 			has_protected := Some p;
 			HMName (f.cf_name,HNProtected p)
 		in
@@ -2094,7 +2115,7 @@ let generate_class ctx c =
 				| _ -> loop_meta l
 		in
 		if c.cl_interface then
-			HMName (reserved f.cf_name, HNNamespace (match c.cl_path with [],n -> n | l,n -> String.concat "." l ^ ":" ^ n))
+			HMName (reserved f.cf_name, HNNamespace (make_class_ns c))
 		else
 			loop_meta (find_meta c)
 	in
