@@ -1044,9 +1044,18 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 	method binop_basic ret op cast_type f1 f2 =
 		let emit_exprs () = self#binop_exprs cast_type f1 f2 in
 		let method_name () = match op with
-			| OpShl -> "shl"
-			| OpDiv -> "div"
-			| _ -> s_binop op
+			| OpAdd -> "opAdd"
+			| OpSub -> "opSub"
+			| OpMult -> "opMul"
+			| OpDiv -> "opDiv"
+			| OpMod -> "opMod"
+			| OpAnd -> "opAnd"
+			| OpOr -> "opOr"
+			| OpXor -> "opXor"
+			| OpShl -> "opShl"
+			| OpShr -> "opShr"
+			| OpUShr -> "opUshr"
+			| _ -> assert false
 		in
 		begin match cast_type with
 			| TByte | TShort | TInt ->
@@ -1260,7 +1269,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 					if op = Increment then code#iadd else code#isub;
 					if is_null then self#expect_reference_type;
 				| _ ->
-					jm#invokestatic haxe_jvm_path (if op = Increment then "++" else "--") (method_sig [object_sig] (Some object_sig))
+					jm#invokestatic haxe_jvm_path (if op = Increment then "opIncrement" else "opDecrement") (method_sig [object_sig] (Some object_sig))
 				end
 			in
 			self#read_write ret (if flag = Prefix then AKPre else AKPost) e f;
@@ -1272,7 +1281,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 			| TLong -> code#lneg;
 			| TDouble -> code#dneg;
 			| TByte | TShort | TInt -> code#ineg;
-			| _ -> jm#invokestatic haxe_jvm_path "neg" (method_sig [object_sig] (Some object_sig))
+			| _ -> jm#invokestatic haxe_jvm_path "opNeg" (method_sig [object_sig] (Some object_sig))
 			end;
 			self#cast e.etype;
 		| Not,_ ->
@@ -1292,7 +1301,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				code#lconst Int64.minus_one;
 				code#lxor_;
 			| _ ->
-				jm#invokestatic haxe_jvm_path "~" (method_sig [object_sig] (Some object_sig))
+				jm#invokestatic haxe_jvm_path "opNegBits" (method_sig [object_sig] (Some object_sig))
 			end;
 			self#cast e.etype;
 

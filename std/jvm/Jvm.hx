@@ -314,7 +314,6 @@ class Jvm {
 
 	// ops
 
-	@:native("+")
 	static public function opAdd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.NativeString) || instanceof(b, java.NativeString)) {
 			return stringConcat(a, b);
@@ -331,7 +330,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("-")
 	static public function opSub<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
 			return toDouble(a) - toDouble(b);
@@ -345,7 +343,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("*")
 	static public function opMul<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
 			return toDouble(a) * toDouble(b);
@@ -359,7 +356,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("div")
 	static public function opDiv<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
 			return toDouble(a) / toDouble(b);
@@ -373,7 +369,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("%")
 	static public function opMod<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
 			return toDouble(a) % toDouble(b);
@@ -387,7 +382,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("&")
 	static public function opAnd<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) & toLong(b);
@@ -398,7 +392,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("|")
 	static public function opOr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) | toLong(b);
@@ -409,7 +402,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("^")
 	static public function opXor<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) ^ toLong(b);
@@ -420,7 +412,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("shl")
 	static public function opShl<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) << toInt(b);
@@ -431,7 +422,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native(">>")
 	static public function opShr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) >> toInt(b);
@@ -442,7 +432,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native(">>>")
 	static public function opUshr<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass) || instanceof(b, java.lang.Long.LongClass)) {
 			return toLong(a) >>> toInt(b);
@@ -453,7 +442,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("++")
 	static public function opIncrement<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
 			return toDouble(a) + 1.;
@@ -467,7 +455,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("--")
 	static public function opDecrement<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
 			return toDouble(a) - 1.;
@@ -481,7 +468,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("neg")
 	static public function opNeg<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass)) {
 			return -toDouble(a);
@@ -495,7 +481,6 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("~")
 	static public function opNegBits<T1:java.lang.Object>(a:T1):Dynamic {
 		if (instanceof(a, java.lang.Long.LongClass)) {
 			return ~toLong(a);
