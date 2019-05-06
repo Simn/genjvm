@@ -1043,6 +1043,11 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 
 	method binop_basic ret op cast_type f1 f2 =
 		let emit_exprs () = self#binop_exprs cast_type f1 f2 in
+		let method_name () = match op with
+			| OpShl -> "shl"
+			| OpDiv -> "div"
+			| _ -> s_binop op
+		in
 		begin match cast_type with
 			| TByte | TShort | TInt ->
 				begin match op with
@@ -1174,7 +1179,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 						(fun () -> operand f2)
 				| _ ->
 					emit_exprs();
-					let name = if op = OpShl then "shl" else s_binop op in
+					let name = method_name () in
 					jm#invokestatic haxe_jvm_path name (method_sig [object_sig;object_sig] (Some object_sig))
 				end
 			| TObject(path,_) ->
@@ -1182,7 +1187,7 @@ class texpr_to_jvm gctx (jc : JvmClass.builder) (jm : JvmMethod.builder) (return
 				if path = string_path then
 					jm#invokestatic haxe_jvm_path "stringConcat" (method_sig [object_sig;object_sig] (Some string_sig))
 				else begin
-					let name = if op = OpShl then "shl" else s_binop op in
+					let name = method_name () in
 					jm#invokestatic haxe_jvm_path name (method_sig [object_sig;object_sig] (Some object_sig))
 				end
 			| _ ->

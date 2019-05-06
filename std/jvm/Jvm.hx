@@ -359,7 +359,7 @@ class Jvm {
 		throw "Invalid operation";
 	}
 
-	@:native("/")
+	@:native("div")
 	static public function opDiv<T1:java.lang.Object, T2:java.lang.Object>(a:T1, b:T2):Dynamic {
 		if (instanceof(a, java.lang.Double.DoubleClass) || instanceof(b, java.lang.Double.DoubleClass)) {
 			return toDouble(a) / toDouble(b);
