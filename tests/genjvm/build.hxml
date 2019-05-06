@@ -1,8 +1,0 @@
--cp src
--main Main
--D jvm
--java export
--D dump=pretty
--dce no
--lib utest
--debug
