@@ -2542,10 +2542,12 @@ class tclass_to_jvm gctx c = object(self)
 	method generate =
 		self#set_access_flags;
 		self#generate_fields;
-		self#generate_empty_ctor;
-		self#generate_implicit_ctors;
 		self#set_interfaces;
-		if not c.cl_interface then self#handle_relation_type_params;
+		if not c.cl_interface then begin
+			self#generate_empty_ctor;
+			self#generate_implicit_ctors;
+			self#handle_relation_type_params;
+		end;
 		self#generate_signature;
 		if not (Meta.has Meta.NativeGen c.cl_meta) then
 			generate_dynamic_access gctx jc (List.map (fun cf -> cf.cf_name,jsignature_of_type cf.cf_type,cf.cf_kind) c.cl_ordered_fields) false;
@@ -2903,7 +2905,7 @@ module Preprocessor = struct
 
 	let preprocess gctx =
 		List.iter (function
-			| TClassDecl c when debug_path c.cl_path -> preprocess_class gctx c
+			| TClassDecl c when debug_path c.cl_path && not c.cl_interface -> preprocess_class gctx c
 			| _ -> ()
 		) gctx.com.types
 end
