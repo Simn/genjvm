@@ -17,6 +17,8 @@ class Jvm {
 
 		changeDirectory(threadsDir);
 		runCommand("haxe", ["build.hxml", "-java", "export/jvm", "-D", "jvm"]);
-		runCommand("java", ["-jar", "export/jvm/Main.jar"]);
+		if (ci != AppVeyor) { // #8154
+			runCommand("java", ["-jar", "export/jvm/Main.jar"]);
+		}
 	}
 }
