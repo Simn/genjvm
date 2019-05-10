@@ -21,4 +21,7 @@ extern class NativeString {
 	function startsWith(prefix:String):Bool;
 	@:overload function substring(beginIndex:Int):String;
 	@:overload function substring(beginIndex:Int, endIndex:Int):String;
+
+	function toLowerCase():String;
+	function toUpperCase():String;
 }
