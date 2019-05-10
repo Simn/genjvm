@@ -98,4 +98,12 @@ class StringExt {
 		}
 		return (cast me : NativeString).substring(startIndex, endIndex);
 	}
+
+	public static function toLowerCase(me:String):String {
+		return me.toLowerCase();
+	}
+
+	public static function toUpperCase(me:String):String {
+		return me.toUpperCase();
+	}
 }
