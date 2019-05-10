@@ -257,8 +257,6 @@ class Jvm {
 				case "split": return (cast jvm.StringExt.split : java.lang.invoke.MethodHandle).bindTo(obj);
 				case "substr": return (cast jvm.StringExt.substr : java.lang.invoke.MethodHandle).bindTo(obj);
 				case "substring": return (cast jvm.StringExt.substring : java.lang.invoke.MethodHandle).bindTo(obj);
-				case "toLowerCase": return (cast (cast java.NativeString).toLowerCase : java.lang.invoke.MethodHandle).bindTo(obj);
-				case "toUpperCase": return (cast (cast java.NativeString).toUpperCase : java.lang.invoke.MethodHandle).bindTo(obj);
 			}
 		}
 		return readFieldNoObject(obj, name);
